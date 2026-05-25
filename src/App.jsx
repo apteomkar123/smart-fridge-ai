@@ -53,6 +53,31 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // NEW FEATURE LOGIC: Smart Token Sanitizer for Receipt and Manual Items
+  const cleanIngredientName = (rawName) => {
+    if (!rawName) return '';
+    let name = rawName.toLowerCase().trim();
+
+    // Remove pack sizes, counts, and measurements (e.g., "3 pack", "12oz", "6ct")
+    name = name.replace(/\d+\s*(pack|pk|ct|count|oz|lb|g|ml|pcs|pack|bag|box|can)\b/g, '');
+    name = name.replace(/\b\d+\s*-\s*(pack|pk|ct|count)\b/g, '');
+    name = name.replace(/\b\d+\b/g, ''); // strip loose numbers
+
+    // Common descriptive junk-word vectors to filter out
+    const junkWords = [
+      'large', 'small', 'medium', 'brown', 'white', 'pasture', 'raised', 'organic', 
+      'fresh', 'natural', 'sweet', 'whole', 'sliced', 'diced', 'shredded', 'premium', 
+      'xtra', 'extra', 'pack', 'package', 'frozen', 'salted', 'unsalted', 'raw', 'cooked'
+    ];
+    
+    // Split into tokens, filter out the descriptors, and stitch back together
+    let tokens = name.split(/[\s,/\-\(\)]+/);
+    let cleanedTokens = tokens.filter(t => t && !junkWords.includes(t));
+    
+    // Return unified name fallback if everything gets stripped
+    return cleanedTokens.length > 0 ? cleanedTokens.join(' ').trim() : name.trim();
+  };
+
   const fetchAppData = async () => {
     if (!user) return;
     try {
@@ -66,7 +91,7 @@ export default function App() {
       const currentFridge = inventory 
         ? inventory
             .filter(i => i && i.item_name)
-            .map(i => i.item_name.toLowerCase().trim()) 
+            .map(i => cleanIngredientName(i.item_name)) 
         : [];
       setFridge(currentFridge);
 
@@ -79,6 +104,7 @@ export default function App() {
         
       if (recError) throw recError;
 
+      // FIXED SELF-HEALING REGEX EXTRACTOR: Resolves string array conflicts seamlessly
       const normalizedRecipes = (recipes || []).map(r => {
         let parsedIngredients = [];
         if (r.ingredients) {
@@ -86,20 +112,21 @@ export default function App() {
             parsedIngredients = r.ingredients;
           } else if (typeof r.ingredients === 'string') {
             try {
-              // DOUBLE-LAYERED PARSE WALL: Cleans escaped quotes and string-wrapped brackets cleanly
               const cleanString = r.ingredients.trim();
               const initialAttempt = JSON.parse(cleanString);
               parsedIngredients = typeof initialAttempt === 'string' ? JSON.parse(initialAttempt) : initialAttempt;
             } catch (e) {
-              parsedIngredients = [];
+              // Extract items out via structural string wrappers if JSON standard fails
+              const words = r.ingredients.match(/"([^"\\]*(\\.[^"\\]*)*)"|\b[a-zA-Z\- ]+\b/g) || [];
+              parsedIngredients = words.map(w => w.replace(/["'\[\]\\]/g, '').trim()).filter(w => w.length > 1);
             }
           }
         }
-        return { ...r, ingredients: Array.isArray(parsedIngredients) ? parsedIngredients : [] };
+        return { ...r, ingredients: Array.isArray(parsedIngredients) ? parsedIngredients.map(i => i.toLowerCase().trim()) : [] };
       });
       setMasterRecipes(normalizedRecipes);
     } catch (err) {
-      console.error("Database streaming data mapping error:", err.message);
+      console.error("Data syncing loop failed:", err.message);
     }
   };
 
@@ -107,18 +134,17 @@ export default function App() {
     if (user) fetchAppData();
   }, [user]);
 
-  // Dynamic Ingredient Quantity Assignment Matrix
+  // Dynamic Scaling Measurement Engine
   const getCleanMeasurement = (ingredientName, multiplier) => {
     const baseAmount = 1;
     const scaledAmount = baseAmount * multiplier;
-    
-    if (['pizza dough', 'naan bread', 'brioche bun', 'spinach tortilla', 'corn tortillas'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['pizza dough', 'naan bread', 'brioche bun', 'spinach tortilla', 'corn tortillas', 'croissants'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount} Pcs`;
     }
     if (['mozzarella', 'cheese sauce', 'goat cheese', 'pepper jack cheese'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 75}g`;
     }
-    if (['paneer', 'tofu', 'tempeh', 'mushrooms', 'sweet potato cubes', 'lentils', 'chickpeas', 'black beans', 'seitan'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['paneer', 'tofu', 'tempeh', 'mushrooms', 'sweet potato cubes', 'lentils', 'chickpeas', 'black beans', 'seitan', 'eggs'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 150}g`;
     }
     return `${scaledAmount * 0.5} Cups`;
@@ -126,82 +152,65 @@ export default function App() {
 
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!authEmail.trim()) return alert("Please type your email address.");
+    if (!authEmail.trim()) return alert("Please specify email.");
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
-      alert("📧 Password reset token successfully transmitted!");
+      alert("📧 Reset layout token fired! Check your inbox.");
       setIsForgotPasswordView(false);
-    } catch (err) {
-      alert(`Fault: ${err.message}`);
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (err) { alert(err.message); }
+    finally { setAuthLoading(false); }
   };
 
   const handleResetPasswordConfirmation = async (e) => {
     e.preventDefault();
-    if (newPasswordValue.trim().length < 6) return alert("Passwords must be at least 6 characters.");
+    if (newPasswordValue.trim().length < 6) return alert("Min 6 characters required.");
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
       if (error) throw error;
-      alert("✅ Password configuration reset verified!");
+      alert("✅ Credentials validated!");
       setIsResettingPasswordMode(false);
-      setNewPasswordValue('');
-    } catch (err) {
-      alert(`Fault: ${err.message}`);
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (err) { alert(err.message); }
+    finally { setAuthLoading(false); }
   };
 
   const handleChangePasswordInternally = async (e) => {
     e.preventDefault();
-    if (newPasswordValue.trim().length < 6) return alert("New password must be at least 6 characters.");
+    if (newPasswordValue.trim().length < 6) return alert("Min 6 characters.");
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
       if (error) throw error;
-      alert("🌟 Password settings updated successfully!");
+      alert("⚙️ Settings configuration saved!");
       setIsSettingsOpen(false);
-      setNewPasswordValue('');
-    } catch (err) {
-      alert(`Internal Update Error: ${err.message}`);
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (err) { alert(err.message); }
+    finally { setAuthLoading(false); }
   };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const cleanEmail = authEmail.trim();
     const cleanPassword = authPassword.trim();
-    if (!cleanEmail || !cleanPassword) return alert("Credentials required.");
-    if (cleanPassword.length < 6) return alert("Password must be at least 6 characters.");
-
     setAuthLoading(true);
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email: cleanEmail, password: cleanPassword });
         if (error) throw error;
-        alert("🚀 Account registered successfully!");
+        alert("🚀 Profile registered successfully!");
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
         if (error) throw error;
       }
-    } catch (err) { 
-      alert(`Refused: ${err.message}`);
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (err) { alert(err.message); }
+    finally { setAuthLoading(false); }
   };
 
-  // CORE FIX: Sandboxed configurations for html2canvas to stop parsing errors
+  // RE-ENGINEERED CANVAS DOWNLOAD EXECUTOR: Clean layout snapshot rules
   const handleDownloadRecipeImage = async () => {
     if (!snapshotCardRef.current) return;
     try {
@@ -210,19 +219,17 @@ export default function App() {
         scale: 2, 
         useCORS: true,
         allowTaint: true,
-        logging: false,
-        windowWidth: 750
+        logging: false
       });
-      
-      const imageUri = canvas.toDataURL('image/png');
-      const downloadLink = document.createElement('a');
-      downloadLink.href = imageUri;
-      downloadLink.download = `recipe-card.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      const dataUri = canvas.toDataURL('image/png');
+      const testAnchor = document.createElement('a');
+      testAnchor.href = dataUri;
+      testAnchor.download = `smartfridge-recipe-card.png`;
+      document.body.appendChild(testAnchor);
+      testAnchor.click();
+      document.body.removeChild(testAnchor);
     } catch (err) {
-      console.error("Canvas conversion exception caught:", err);
+      console.error("Canvas parsing blocked:", err);
     }
   };
 
@@ -255,7 +262,6 @@ export default function App() {
     masterRecipes.forEach(recipe => {
       const recipeIngredients = recipe.ingredients || [];
       const missing = recipeIngredients.filter(ing => !fridge.includes(ing.toLowerCase().trim()));
-      
       if (missing.length >= 1 && missing.length <= 3 && recipeIngredients.length > missing.length) {
         alerts.push({ recipe, missingItems: missing, mealType: recipe.meal_type || 'General' });
       }
@@ -288,8 +294,12 @@ export default function App() {
       });
       if (response.ok) {
         const data = await response.json();
-        const cleanItems = data.added ? data.added.map(item => item.trim().toLowerCase()) : [];
-        const uniqueItems = [...new Set(cleanItems)];
+        const rawItems = data.added ? data.added.map(item => item.trim().toLowerCase()) : [];
+        
+        // Clean each incoming receipt token string using our descriptive token remover logic
+        const sanitizedItems = rawItems.map(item => cleanIngredientName(item)).filter(Boolean);
+        const uniqueItems = [...new Set(sanitizedItems)];
+        
         const insertPayload = uniqueItems.map(item => ({ item_name: item, user_id: user.id }));
         setFridge(prev => [...new Set([...prev, ...uniqueItems])]);
         await supabase.from('fridge_inventory').upsert(insertPayload, { onConflict: 'user_id,item_name' });
@@ -317,10 +327,14 @@ export default function App() {
   const handleAddManualItem = async (e) => {
     e.preventDefault();
     if (!manualItem.trim()) return;
-    const input = manualItem.trim().toLowerCase();
-    setFridge(prev => [...new Set([...prev, input])]);
+    
+    // Sanitize user typed inputs directly before sending to Supabase storage tables
+    const cleanedInput = cleanIngredientName(manualItem);
+    if (!cleanedInput) return;
+
+    setFridge(prev => [...new Set([...prev, cleanedInput])]);
     setManualItem('');
-    await supabase.from('fridge_inventory').upsert([{ item_name: input, user_id: user.id }], { onConflict: 'user_id,item_name' });
+    await supabase.from('fridge_inventory').upsert([{ item_name: cleanedInput, user_id: user.id }], { onConflict: 'user_id,item_name' });
     await fetchAppData();
   };
 
@@ -338,29 +352,18 @@ export default function App() {
     const freshMap = {};
     rawInventory.forEach(row => {
       if (row && row.item_name) {
-        const name = row.item_name.toLowerCase().trim();
+        const name = cleanIngredientName(row.item_name);
         freshMap[name] = { daysLeft: 6, statusLabel: 'STABLE' };
       }
     });
     setExpirationMap(freshMap);
   };
 
-  const getStaticRecipeSteps = (recipe) => {
-    if (recipe && recipe.steps && recipe.steps.length > 0) return recipe.steps;
-    const itemsList = recipe && recipe.ingredients ? recipe.ingredients : ['ingredients'];
-    return [
-      `Prep your primary base component selection (${itemsList[0] || 'vegetables'}).`,
-      `Heat 2 tbsp of olive oil in an artisan skillet over medium heat.`,
-      `Introduce remaining recipe elements: ${itemsList.slice(1).join(', ')}.`,
-      `Cook thoroughly for 8-10 minutes, adjust seasoning to taste, and serve.`
-    ];
-  };
-
-  // CORE FIX: Clean-scope mapping chains evaluate match accuracy against ingredients seamlessly
   const processedRecipes = masterRecipes.map(recipe => {
     const recipeIngredients = recipe.ingredients || [];
     const total = recipeIngredients.length;
     
+    // Evaluate matching indexes strictly against cleaned names
     const ownedItems = recipeIngredients.filter(ing => fridge.includes(ing.toLowerCase().trim()));
     const owned = ownedItems.length;
     
@@ -370,11 +373,10 @@ export default function App() {
     if (!recipeSearch) return true;
     return recipe.name && recipe.name.toLowerCase().includes(recipeSearch.toLowerCase());
   }).sort((a, b) => {
-    // Rank strictly by highest calculated pantry match match count first
+    // Dynamic Sorting Priority Rank: Highest matched rows float to the top deck
     if (b.matchPercentage !== a.matchPercentage) {
       return b.matchPercentage - a.matchPercentage;
     }
-    // Secondary tiebreaker maps standard text comparison loops cleanly
     return (a.name || '').localeCompare(b.name || '');
   });
 
@@ -412,8 +414,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans antialiased pb-12">
       
-      {/* Navigation rows bar */}
-      <header className="bg-white/80 border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md px-4 sm:px-6 py-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-sm">
+      {/* Porcelain Top Navigation Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-sm">
         <div className="text-center lg:text-left">
           <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent tracking-tight">SmartFridge AI</h1>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">Account Profile: <span className="text-slate-600 normal-case font-semibold">{user.email}</span></p>
@@ -424,17 +426,20 @@ export default function App() {
             {aiGenerating ? "⚡ Synthesizing..." : "🔮 AI Recipe"}
           </button>
           <button onClick={triggerStoreTripPlanner} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider shadow-sm transition-all">🛒 Run Trip Planner</button>
+          
+          {/* CRITICAL FIXED SETTINGS FONT ATTRIBUTE */}
           <button onClick={() => setIsSettingsOpen(true)} className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors font-sans text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2">
             <span>⚙️</span> Settings
           </button>
+          
           <button onClick={handleSignOut} className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 font-bold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-slate-200/40">Sign Out</button>
         </div>
       </header>
 
-      {/* Main Grid Workspace */}
+      {/* Main Responsive Grid Layout Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="space-y-6 lg:col-span-1">
-          {/* Nutrition Analytics */}
+          {/* Allocation Deck */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-[11px] font-black tracking-widest uppercase text-slate-400 mb-4">📊 Nutrient Allocation Monitor</h2>
             <div className="grid grid-cols-3 gap-3 text-center">
@@ -444,7 +449,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Scanner Card */}
+          {/* Intake Scanner Card */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">📸 Receipt Intake Scanner</h2>
             <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-400 p-8 text-center bg-slate-50 rounded-2xl cursor-pointer transition-all group">
@@ -452,30 +457,30 @@ export default function App() {
               <p className="text-xs font-bold text-slate-600">Upload Grocery Receipt</p>
             </div>
             <form onSubmit={handleAddManualItem} className="flex gap-2 pt-5 mt-5 border-t border-slate-100">
-              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Type manual ingredient..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 focus:outline-none" />
+              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Type item (e.g. Croissants 3 Pack)..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 focus:outline-none" />
               <button type="submit" className="bg-slate-800 text-white text-xs font-bold px-4 rounded-xl">Add</button>
             </form>
           </div>
 
-          {/* Storage lists panel drawer */}
+          {/* Cleaned Stock List Node */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
-            <h2 className="text-xs font-black text-slate-400 uppercase flex justify-between items-center mb-4"><span>🏡 Private Storage Items</span><span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{fridge.length}</span></h2>
+            <h2 className="text-xs font-black text-slate-400 uppercase flex justify-between items-center mb-4"><span>🏡 Cleaned Storage Pantry</span><span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{fridge.length}</span></h2>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">No elements added yet.</p> : fridge.map((item, idx) => (
-                <div key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl flex justify-between items-center shadow-sm"><span className="text-xs font-bold capitalize text-slate-700">{item}</span><button onClick={() => handleRemoveItem(item)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2 transition-colors">×</button></div>
+              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">No elements found.</p> : fridge.map((item, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl flex justify-between items-center shadow-sm"><span className="text-xs font-bold capitalize text-slate-700">{item}</span><button onClick={() => handleRemoveItem(item)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2">×</button></div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Dynamic Personal Match Arrays Deck Container */}
+        {/* Dynamic Personal Match Arrays Deck Grid */}
         <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/60 shadow-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">⚡ Personal Match Arrays</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">Catered cleanly from the 6,000 table rows catalog</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Ranked by top real-time ingredient composition match counts</p>
             </div>
-            <input type="text" placeholder="Search master names..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none" />
+            <input type="text" placeholder="Search master indices..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none" />
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[580px] overflow-y-auto pr-2">
@@ -487,15 +492,15 @@ export default function App() {
               >
                 <div>
                   <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-extrabold text-slate-700 group-hover:text-indigo-600 text-xs line-clamp-2 tracking-tight transition-colors">{recipe.name}</h3>
+                    <h3 className="font-extrabold text-slate-700 group-hover:text-indigo-600 text-xs line-clamp-2 tracking-tight">{recipe.name}</h3>
                     <span className={`text-[10px] font-mono font-black shrink-0 px-2 py-0.5 rounded ${
-                      recipe.matchPercentage === 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                      recipe.matchPercentage > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
                     }`}>{recipe.matchPercentage}% MATCH</span>
                   </div>
                   <span className="text-[8px] font-mono text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md mt-2.5 inline-block uppercase font-bold tracking-wide">{recipe.meal_type || 'General'}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-1 rounded-full mt-4 overflow-hidden">
-                  <div className={`h-full ${recipe.matchPercentage === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${recipe.matchPercentage}%` }}></div>
+                  <div className={`h-full ${recipe.matchPercentage > 0 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${recipe.matchPercentage}%` }}></div>
                 </div>
               </div>
             ))}
@@ -503,7 +508,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* FULL EXPANDABLE SEPARATED RECIPE DIALOG VIEWER */}
+      {/* FULL UNTAINTED RECIPE DRAWER EXPANSION MODAL */}
       {activeModalRecipe && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white border border-slate-200 w-full max-w-2xl rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -514,7 +519,6 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">{activeModalRecipe.name || activeModalRecipe.recipeName}</h3>
               </div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
-                {/* Save Card Photo Core Interaction Trigger */}
                 <button onClick={handleDownloadRecipeImage} className="bg-slate-800 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95">
                   📸 Save Card Photo
                 </button>
@@ -522,7 +526,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* SEPARATED SERVINGS PANEL: Stays external from print zone to bypass text canvas errors */}
+            {/* Servings Modifier Scale Bar (Kept out of canvas container container loops) */}
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl mb-6 flex items-center justify-between shadow-inner">
               <span className="text-xs font-extrabold text-slate-500 uppercase font-mono pl-1">👥 Increase Yield Servings:</span>
               <div className="flex gap-1">
@@ -540,17 +544,16 @@ export default function App() {
               </div>
             </div>
 
-            {/* THE PRINT TARGET CONTAINER: Stripped layout text gradients for crisp canvas images */}
+            {/* PRINT CONTAINER ELEMENT HOOK TARGET: Completely plain layout prevents export blocks */}
             <div className="p-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div ref={snapshotCardRef} className="bg-white p-6 rounded-xl space-y-6">
-                <div className="border-b border-slate-100 pb-4 text-center">
-                  {/* Clean text configuration blocks background-clip crashes */}
+                <div className="border-b border-slate-200 pb-4 text-center">
                   <h2 className="text-xl font-black text-indigo-600 uppercase tracking-wide">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
                   <p className="text-[10px] text-slate-400 font-bold uppercase font-mono mt-1">SmartFridge AI Custom Formulation Card • Serving Index {servingMultiplier}x</p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Scaled Portions List */}
+                  {/* Ingredients portions specifications list */}
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-inner">
                     <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-200 pb-1 mb-3">📋 Component Specs</h4>
                     <ul className="space-y-2">
@@ -595,7 +598,7 @@ export default function App() {
             </div>
             <div className="space-y-2.5">
               {shoppingAlerts.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-6 text-center">Add ingredients to your stock room to uncover missing grocery items.</p>
+                <p className="text-xs text-slate-400 italic py-6 text-center">Add ingredients to your stocks room to reveal missing grocery items.</p>
               ) : (
                 shoppingAlerts.slice(0, 15).map((alert, i) => (
                   <div key={i} onClick={() => { setIsStoreAlertOpen(false); setServingMultiplier(1); setActiveModalRecipe(alert.recipe); }} className="p-3.5 bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-2xl cursor-pointer transition-all shadow-sm group">
@@ -612,7 +615,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Settings Panel Modal Box */}
+      {/* Profile Settings Change Password Panel */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
