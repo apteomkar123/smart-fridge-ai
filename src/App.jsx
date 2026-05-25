@@ -30,32 +30,65 @@ export default function App() {
     if (!file) return;
 
     setLoading(true);
-    const reader = new FileReader();
-    
-    // Read the file as a standardized Base64 Data URL string
-    reader.readAsDataURL(file);
-    
-    reader.onloadend = async () => {
-      try {
-        const response = await fetch('/.netlify/functions/scan-receipt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: reader.result }) // Safely wrapped payload object
-        });
 
-        if (response.ok) {
-          const data = await response.json();
-          const insertPayload = data.added.map(item => ({ item_name: item.trim() }));
-          await supabase.from('fridge_inventory').upsert(insertPayload, { onConflict: 'item_name' });
-          await fetchAppData();
-        } else {
-          alert("Parsing verification failure.");
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      // Establish maximum bounding box dimensions for web-ready receipt scaling
+      const MAX_WIDTH = 1200;
+      const MAX_HEIGHT = 1600;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
         }
-      } catch (err) {
-        console.error("Upload error details:", err);
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
       }
-      setLoading(false);
+
+      // Draw the image onto a canvas to compress it
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to compressed JPEG data string (0.75 quality factor)
+      const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+
+      // Dispatch the compressed payload to your serverless function
+      sendImageToBackend(compressedBase64);
     };
+  };
+
+  // Separated helper function to handle the asynchronous network call
+  const sendImageToBackend = async (base64Data) => {
+    try {
+      const response = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const insertPayload = data.added.map(item => ({ item_name: item.trim() }));
+        await supabase.from('fridge_inventory').upsert(insertPayload, { onConflict: 'item_name' });
+        await fetchAppData();
+      } else {
+        alert("Parsing verification failure.");
+      }
+    } catch (err) {
+      console.error("Upload execution crash:", err);
+    }
+    setLoading(false);
   };
 
   const handleAddManualItem = async (e) => {
