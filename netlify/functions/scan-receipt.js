@@ -13,12 +13,7 @@ export const handler = async (event, context) => {
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // Safely unpack the incoming payload body string
     const bodyData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-    if (!bodyData || !bodyData.image) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image data payload' }) };
-    }
-    
     let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
 
     const imagePart = {
@@ -28,43 +23,38 @@ export const handler = async (event, context) => {
       },
     };
 
-    // Upgraded prompt template focusing purely on native multi-modal vision pattern matching
-    const prompt = `You are an advanced retail document OCR engine. Analyze this grocery receipt image step-by-step:
-1. Scan the very top header section of the receipt to dynamically identify the retail merchant name (e.g., Trader Joe's, Harris Teeter, Food Lion, etc.).
-2. Locate the central text block containing the line items of purchased goods. Ignore prices, quantity numbers, tax values, internal store SKUs, barcodes, or total balances.
-3. For each raw text item row, decode the abbreviations and retail short-hand into a clean, singular, plain English grocery ingredient name. 
-   - Examples: Convert "LENTIL RINGS SOUR CREAM" to "Lentils", "CREAMER OAT BROWN SUGAR" to "Oat Milk", "EGGS LARGE BROWN PASTURE" to "Eggs", "R-SALAD BABY SPINACH ORG" to "Spinach", "SOURDOUGH BREAD" to "Sourdough Bread".
+    const prompt = `You are a precise grocery receipt parsing engine. Analyze this image step-by-step:
+1. Scan the top header area to identify the retail store name (e.g., Trader Joe's).
+2. Read the purchased goods line-by-line, ignoring prices, quantities, savings, or subtotals.
+3. Decode any shorthand descriptions into clean, plain English singular ingredient names (e.g., "LENTIL RINGS SOUR CREAM" to "Lentils", "CREAMER OAT BROWN SUGAR" to "Oat Milk", "SOURDOUGH BREAD" to "Sourdough Bread").
 
-Return the final list STRICTLY as a valid JSON array of strings, like this: ["Lentils", "Oat Milk", "Eggs", "Spinach", "Sourdough Bread"].
-Do not include any conversational text, explanations, or markdown code blocks (\`\`\`). Output only the raw valid JSON array.`;
+Return the final list of clean ingredients strictly as a JSON array of strings, like this: ["Lentils", "Oat Milk", "Sourdough Bread"]. 
+Do not include markdown code block syntax formatting or conversational prose.`;
 
-    // Execute content generation without the unstable search tools configuration
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [prompt, imagePart],
       config: {
-        temperature: 0.1 // Low temperature ensures highly consistent, non-hallucinatory extraction
+        temperature: 0.1
       }
     });
 
     const returnedText = response.text.trim();
-    
-    // Fallback sanitation: Strip out any markdown wrappers if the model ignores instructions
-    let cleanJsonString = returnedText
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+    console.log("Raw Gemini Output:", returnedText); // Log to Netlify dashboard for tracing
 
-    // Isolate the core array brackets to protect against rogue outer text characters
-    const firstBracket = cleanJsonString.indexOf('[');
-    const lastBracket = cleanJsonString.lastIndexOf(']');
-    
-    if (firstBracket !== -1 && lastBracket !== -1) {
-      cleanJsonString = cleanJsonString.substring(firstBracket, lastBracket + 1);
+    // BULLETPROOF REGEX: Match everything inside and including the outer square brackets [ ... ]
+    const arrayRegex = /\[([\s\S]*?)\]/;
+    const match = returnedText.match(arrayRegex);
+
+    if (!match) {
+      return {
+        statusCode: 422,
+        body: JSON.stringify({ error: "Could not isolate a structural JSON array from the response layout.", raw: returnedText })
+      };
     }
 
-    // Convert the string cleanly into a valid JavaScript Array object
-    const cleanIngredients = JSON.parse(cleanJsonString);
+    // Parse the matched array string natively
+    const cleanIngredients = JSON.parse(match[0]);
 
     return {
       statusCode: 200,
