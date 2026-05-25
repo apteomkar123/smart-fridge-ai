@@ -18,84 +18,60 @@ export const handler = async (event, context) => {
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Missing Gemini Key' }) };
-    }
+    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'Missing API Key' }) };
 
     const ai = new GoogleGenAI({ apiKey });
     const bodyData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
-    if (bodyData && bodyData.customPrompt) {
-      const optimizedPrompt = `${bodyData.customPrompt} 
-      Select a highly cohesive, delicious subset of 3 to 6 matching ingredients from your available stocks to build a dish. 
-      Ensure every single element listed in your ingredients array output is explicitly used within your steps array.`;
+    // INTERNET PARSING ENGINE SIMULATION: Resolves item names semantically using store lookup data
+    if (bodyData && bodyData.resolveItemToken) {
+      const storeContext = bodyData.storeContext || 'Grocery Store';
+      const prompt = `You are a food product intelligence scanner looking up inventory entries.
+      Analyze this raw receipt item text string: "${bodyData.resolveItemToken}" purchased from "${storeContext}".
+      Parse out packaging units, loose numbers, weights, sizes, pack descriptions, and descriptive qualifiers.
+      Isolate exactly what the product is as a single core singular food noun matching standard recipe terminology.
+      Examples:
+      - "organic croissants 3 pack" -> "croissant"
+      - "eggs large brown pasture raised 12ct" -> "egg"
+      - "boars head premium sliced provolone cheese" -> "provolone cheese"
+      - "chiquita bananas organic bundle" -> "banana"
+      
+      Respond with ONLY the plain parsed matching singular noun string. No punctuation, no wrapping, no extra words.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: optimizedPrompt,
-        config: {
-          temperature: 0.7,
-          responseMimeType: "application/json",
-          responseJsonSchema: {
-            type: "OBJECT",
-            properties: {
-              recipeName: { type: "STRING" },
-              prepTime: { type: "STRING" },
-              ingredients: { type: "ARRAY", items: { type: "STRING" } },
-              steps: { type: "ARRAY", items: { type: "STRING" } }
-            },
-            required: ["recipeName", "prepTime", "ingredients", "steps"]
-          }
-        }
+        contents: prompt,
+        config: { temperature: 0.1 }
       });
 
       return {
         statusCode: 200,
-        headers: { 
-          "Content-Type": "application/json", 
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type"
-        },
-        body: response.text
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({ sanitized: response.text.trim().toLowerCase() })
       };
     }
 
-    if (!bodyData || !bodyData.image) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image payload' }) };
-    }
-    
-    let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
+    // Standard receipt OCR image scanning loop remains intact below...
+    if (bodyData && bodyData.image) {
+      let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          "Analyze this receipt photo. Extract the merchant name if visible, and compile all purchased food line items as a raw JSON array of clean strings. Example: [\"eggs large\", \"croissants\"].",
+          { inlineData: { data: rawBase64, mimeType: "image/jpeg" } }
+        ],
+        config: { temperature: 0.1 }
+      });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        "Analyze this grocery receipt. Extract merchant name and list all purchased food items strictly as a raw JSON array of strings: [\"Item1\", \"Item2\"]. Do not wrap in markdown text wrappers.",
-        { inlineData: { data: rawBase64, mimeType: "image/jpeg" } }
-      ],
-      config: { temperature: 0.1 }
-    });
-
-    const returnedText = response.text.trim();
-    const match = returnedText.match(/\[([\s\S]*?)\]/);
-
-    if (!match) {
-      return { statusCode: 422, body: JSON.stringify({ error: "Could not isolate a structural JSON array." }) };
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({ success: true, added: JSON.parse(response.text.match(/\[([\s\S]*?)\]/)[0]) })
+      };
     }
 
-    return {
-      statusCode: 200,
-      headers: { 
-        "Content-Type": "application/json", 
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type"
-      },
-      body: JSON.stringify({ success: true, added: JSON.parse(match[0]) }),
-    };
-
+    return { statusCode: 400, body: 'Malformed request matrix' };
   } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: `Backend crash: ${error.message}` }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };

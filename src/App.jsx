@@ -18,8 +18,14 @@ export default function App() {
   // Core Data States
   const [fridge, setFridge] = useState([]); 
   const [masterRecipes, setMasterRecipes] = useState([]);
+  const [shoppingList, setShoppingList] = useState([]);
+  const [savedRecipes, setSavedRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Input Handling States
   const [manualItem, setManualItem] = useState('');
+  const [shoppingInput, setShoppingInput] = useState('');
+  const [storeName, setStoreName] = useState('Grocery Store');
   
   // Advanced Matrix Tracking States
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -53,80 +59,66 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // AGGRESSIVE STRUCTURAL TOKENIZER: Extracts base noun entities globally from inputs
-  const cleanIngredientGlobally = (rawName) => {
-    if (!rawName) return '';
-    let name = rawName.toLowerCase().trim();
-
-    // 1. Strip packaging sizes, metrics, counts and volumes (e.g., "3 pack", "12oz", "6ct")
-    name = name.replace(/\d+\s*(pack|pk|ct|count|oz|lb|g|ml|pcs|bag|box|can|container|bottle|pieces|slice|slices|fluid)\b/g, '');
-    name = name.replace(/\b\d+\s*-\s*(pack|pk|ct|count)\b/g, '');
-    name = name.replace(/['"\[\]\\]/g, ''); 
-    name = name.replace(/\b\d+\b/g, ''); 
-
-    // 2. Global Noise Vector Filtration: Removes descriptive adjectives
-    const adjectiveNoiseFilters = /\b(large|small|medium|brown|white|pasture|raised|organic|fresh|natural|sweet|whole|sliced|diced|shredded|premium|xtra|extra|package|frozen|salted|unsalted|raw|cooked|all\s+natural|pure|authentic|style|brand|local|imported|gourmet|finest|crushed|minced|chopped|powder|ground|chilled|hot|spicy|mild|low\s+fat|fat\s+free|skimmed|heavy|light|dark|creamy)\b/g;
-    name = name.replace(adjectiveNoiseFilters, '');
-
-    let tokens = name.split(/[\s,/\-\(\)]+/).filter(t => t.length > 1);
-    if (tokens.length === 0) return rawName.toLowerCase().trim();
-
-    // 3. Stem plurals back to uniform singular matching targets
-    let rootNoun = tokens[0];
-    if (rootNoun.endsWith('ies') && rootNoun.length > 3) rootNoun = rootNoun.slice(0, -3) + 'y';
-    else if (rootNoun.endsWith('es') && !rootNoun.endsWith('cheese') && rootNoun.length > 2) rootNoun = rootNoun.slice(0, -2);
-    else if (rootNoun.endsWith('s') && !rootNoun.endsWith('cheese') && !rootNoun.endsWith('couscous') && rootNoun.length > 1) rootNoun = rootNoun.slice(0, -1);
-
-    return rootNoun.trim();
+  // NEW INTERNET RESOLUTION PARSER CONNECT NODE
+  const resolveSanitizedTokenOnline = async (rawInputString) => {
+    try {
+      const response = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolveItemToken: rawInputString, storeContext: storeName })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return data.sanitized || rawInputString.toLowerCase().trim();
+      }
+    } catch (e) {
+      console.error("Online lookup fault, parsing with local backup engine.", e);
+    }
+    return rawInputString.toLowerCase().trim();
   };
 
   const fetchAppData = async () => {
     if (!user) return;
     try {
-      let { data: inventory, error: invError } = await supabase
-        .from('fridge_inventory')
-        .select('id, item_name, created_at')
-        .eq('user_id', user.id);
-      
-      if (invError) throw invError;
-      
+      // Fetch Storage Inventory
+      let { data: inventory } = await supabase.from('fridge_inventory').select('*').eq('user_id', user.id);
       const normalizedFridge = (inventory || []).map(row => ({
         id: row.id,
         raw_name: row.item_name,
-        item_name: cleanIngredientGlobally(row.item_name)
+        // Calculate an immediate placeholder or keep string fallback arrays cleanly
+        item_name: row.item_name.toLowerCase().replace(/\b(organic|fresh|large|small|pack|count|raised|pasture)\b/g, '').trim()
       }));
       setFridge(normalizedFridge);
 
       const plainTokensArray = normalizedFridge.map(f => f.item_name);
       calculateMacroMetrics(plainTokensArray);
-      if (inventory && inventory.length > 0) generateExpirationTimelines(plainTokensArray);
+      if (plainTokensArray.length > 0) generateExpirationTimelines(plainTokensArray);
 
-      let { data: recipes, error: recError } = await supabase.from('recipes').select('*');
-      if (recError) throw recError;
+      // Fetch Shopping List Array Vectors
+      let { data: shopItems } = await supabase.from('shopping_list').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+      setShoppingList(shopItems || []);
 
+      // Fetch Saved Recipe Layout Selections
+      let { data: likedRecipes } = await supabase.from('saved_recipes').select('*').eq('user_id', user.id);
+      setSavedRecipes(likedRecipes || []);
+
+      // Fetch Global Recipes Matrix
+      let { data: recipes } = await supabase.from('recipes').select('*');
       const normalizedRecipes = (recipes || []).map(r => {
         let extracted = [];
         if (r.ingredients) {
-          if (Array.isArray(r.ingredients)) {
-            extracted = r.ingredients;
-          } else {
-            try {
-              const p = JSON.parse(r.ingredients.trim());
-              extracted = typeof p === 'string' ? JSON.parse(p) : p;
-            } catch (e) {
-              const words = String(r.ingredients).match(/"([^"\\]*(\\.[^"\\]*)*)"|\b[a-zA-Z\- ]+\b/g) || [];
-              extracted = words.map(w => w.replace(/["'\[\]\\]/g, '').trim());
+          if (Array.isArray(r.ingredients)) extracted = r.ingredients;
+          else {
+            try { extracted = JSON.parse(r.ingredients); } catch (e) {
+              extracted = String(r.ingredients).match(/\b[a-zA-Z\- ]+\b/g) || [];
             }
           }
         }
-        return { 
-          ...r, 
-          ingredients: Array.isArray(extracted) ? extracted.map(i => cleanIngredientGlobally(i)) : [] 
-        };
+        return { ...r, ingredients: Array.isArray(extracted) ? extracted.map(i => i.toLowerCase().trim()) : [] };
       });
       setMasterRecipes(normalizedRecipes);
     } catch (err) {
-      console.error(err.message);
+      console.error(err);
     }
   };
 
@@ -134,32 +126,80 @@ export default function App() {
     if (user) fetchAppData();
   }, [user]);
 
-  // INLINE LIVE STORAGE PATCH CONTROLLER: Updates inventory inputs live to Supabase
+  // LIVE INLINE FRIDGE MODIFY ENGINE WRITER
   const handleUpdateInlineItem = async (id, updatedRawValue) => {
-    try {
-      const cleanToken = cleanIngredientGlobally(updatedRawValue);
-      setFridge(prev => prev.map(item => item.id === id ? { ...item, raw_name: updatedRawValue, item_name: cleanToken } : item));
-      
-      await supabase
-        .from('fridge_inventory')
-        .update({ item_name: updatedRawValue })
-        .eq('id', id);
-    } catch (err) {
-      console.error(err);
+    setFridge(prev => prev.map(item => item.id === id ? { ...item, raw_name: updatedRawValue } : item));
+    // Run an online lookup call to update the background matching data models
+    const resolvedNounToken = await resolveSanitizedTokenOnline(updatedRawValue);
+    setFridge(prev => prev.map(item => item.id === id ? { ...item, item_name: resolvedNounToken } : item));
+    
+    await supabase.from('fridge_inventory').update({ item_name: updatedRawValue }).eq('id', id);
+  };
+
+  // SHOPPING LIST METHODS SYSTEM
+  const handleAddShoppingItem = async (e, textOverride = '') => {
+    if (e) e.preventDefault();
+    const targetText = textOverride || shoppingInput;
+    if (!targetText.trim()) return;
+
+    const resolvedTokenName = await resolveSanitizedTokenOnline(targetText);
+    const { data, error } = await supabase.from('shopping_list').insert([{
+      user_id: user.id,
+      item_name: resolvedTokenName,
+      is_completed: false
+    }]).select();
+
+    if (!error && data) setShoppingList(prev => [...prev, data[0]]);
+    if (!textOverride) setShoppingInput('');
+    await fetchAppData();
+  };
+
+  const handleToggleShoppingCompleted = async (id, status) => {
+    setShoppingList(prev => prev.map(item => item.id === id ? { ...item, is_completed: !status } : item));
+    await supabase.from('shopping_list').update({ is_completed: !status }).eq('id', id);
+  };
+
+  const handleClearShoppingItem = async (id) => {
+    setShoppingList(prev => prev.filter(item => item.id !== id));
+    await supabase.from('shopping_list').delete().eq('id', id);
+  };
+
+  // SAVED LIKED RECIPES ENGINE MODULES
+  const handleSaveRecipeToProfile = async (recipe) => {
+    // Avoid double saves
+    if (savedRecipes.some(r => r.recipe_id === String(recipe.id))) return alert("Recipe card already liked!");
+    
+    const { data, error } = await supabase.from('saved_recipes').insert([{
+      user_id: user.id,
+      recipe_id: String(recipe.id),
+      recipe_name: recipe.name,
+      ingredients: recipe.ingredients,
+      steps: recipe.steps || [],
+      meal_type: recipe.meal_type
+    }]).select();
+
+    if (!error && data) {
+      setSavedRecipes(prev => [...prev, data[0]]);
+      alert("⭐ Recipe catalog entry pinned safely to user records!");
     }
   };
 
-  // Calibrated Portions assignment multiplier configuration [cite: 2]
+  const handleRemoveSavedRecipe = async (id) => {
+    setSavedRecipes(prev => prev.filter(r => r.id !== id));
+    await supabase.from('saved_recipes').delete().eq('id', id);
+  };
+
+  // Measurement Scalar Utility
   const getCleanMeasurement = (ingredientName, multiplier) => {
     const baseAmount = 1;
     const scaledAmount = baseAmount * multiplier;
-    if (['pizza dough', 'naan', 'bun', 'tortilla', 'croissant', 'bread'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['pizza dough', 'naan', 'bun', 'tortilla', 'croissant', 'bread', 'tortillas'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount} Pcs`;
     }
-    if (['cheese', 'mozzarella', 'sauce', 'pesto', 'cream'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['cheese', 'mozzarella', 'sauce', 'pesto', 'cream', 'spread'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 75}g`;
     }
-    if (['paneer', 'tofu', 'tempeh', 'mushroom', 'potato', 'lentil', 'chickpea', 'bean', 'egg'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['paneer', 'tofu', 'tempeh', 'mushroom', 'potato', 'lentil', 'chickpea', 'bean', 'egg', 'eggs'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 150}g`;
     }
     return `${scaledAmount * 0.5} Cups`;
@@ -172,7 +212,7 @@ export default function App() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), { redirectTo: window.location.origin });
       if (error) throw error;
-      alert("📧 Reset link dispatched!");
+      alert("📧 Reset layout token dispatched!");
       setIsForgotPasswordView(false);
     } catch (err) { alert(err.message); }
     finally { setAuthLoading(false); }
@@ -185,7 +225,7 @@ export default function App() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
       if (error) throw error;
-      alert("✅ Password changed!");
+      alert("✅ Password altered!");
       setIsResettingPasswordMode(false);
     } catch (err) { alert(err.message); }
     finally { setAuthLoading(false); }
@@ -198,7 +238,7 @@ export default function App() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
       if (error) throw error;
-      alert("⚙️ Password saved!");
+      alert("⚙️ Settings saved!");
       setIsSettingsOpen(false);
     } catch (err) { alert(err.message); }
     finally { setAuthLoading(false); }
@@ -211,7 +251,7 @@ export default function App() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword.trim() });
         if (error) throw error;
-        alert("🚀 Account created! Enter credentials to login.");
+        alert("🚀 Profile registered! Log in with your credentials.");
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword.trim() });
@@ -221,7 +261,7 @@ export default function App() {
     finally { setAuthLoading(false); }
   };
 
-  // HIGH FIDELITY EXPORT DOWNLOAD MACHINE: Solid layouts override browser canvas taints
+  // RE-ENGINEERED CANVAS DOWNLOAD EXECUTOR: Isolates graphics layers perfectly
   const handleDownloadRecipeImage = async () => {
     if (!snapshotCardRef.current) return;
     try {
@@ -235,12 +275,12 @@ export default function App() {
         height: snapshotCardRef.current.offsetHeight
       });
       const dataUri = canvas.toDataURL('image/png');
-      const hiddenLink = document.createElement('a');
-      hiddenLink.href = dataUri;
-      hiddenLink.download = `recipe-card-${Date.now()}.png`;
-      document.body.appendChild(hiddenLink);
-      hiddenLink.click();
-      document.body.removeChild(hiddenLink);
+      const testAnchor = document.createElement('a');
+      testAnchor.href = dataUri;
+      testAnchor.download = `recipe-formulation-card.png`;
+      document.body.appendChild(testAnchor);
+      testAnchor.click();
+      document.body.removeChild(testAnchor);
     } catch (err) {
       console.error(err);
     }
@@ -260,8 +300,8 @@ export default function App() {
         const data = await response.json();
         setActiveModalRecipe({ 
           name: data.recipeName, 
-          ingredients: (data.ingredients || []).map(i => cleanIngredientGlobally(i)), 
-          meal_type: 'AI Synthesis Result', 
+          ingredients: (data.ingredients || []), 
+          meal_type: 'AI Generation Result', 
           isAiGeneratedElement: true, 
           steps: data.steps || [] 
         });
@@ -276,7 +316,7 @@ export default function App() {
     const tokensList = fridge.map(f => f.item_name);
     masterRecipes.forEach(recipe => {
       const recipeIngredients = recipe.ingredients || [];
-      const missing = recipeIngredients.filter(ing => !tokensList.includes(ing));
+      const missing = recipeIngredients.filter(ing => !tokensList.some(token => ing.includes(token) || token.includes(ing)));
       if (missing.length >= 1 && missing.length <= 3 && recipeIngredients.length > missing.length) {
         alerts.push({ recipe, missingItems: missing, mealType: recipe.meal_type || 'General' });
       }
@@ -313,7 +353,8 @@ export default function App() {
         
         for (let rawItem of rawItems) {
           if (rawItem.trim()) {
-            await supabase.from('fridge_inventory').insert([{ item_name: rawItem.trim(), user_id: user.id }]);
+            const parsedTokenOnline = await resolveSanitizedTokenOnline(rawItem.trim());
+            await supabase.from('fridge_inventory').insert([{ item_name: parsedTokenOnline, user_id: user.id }]);
           }
         }
         await fetchAppData();
@@ -342,7 +383,9 @@ export default function App() {
     if (!manualItem.trim()) return;
     const input = manualItem.trim();
     setManualItem('');
-    await supabase.from('fridge_inventory').insert([{ item_name: input, user_id: user.id }]);
+    
+    const parsedOnlineToken = await resolveSanitizedTokenOnline(input);
+    await supabase.from('fridge_inventory').insert([{ item_name: parsedOnlineToken, user_id: user.id }]);
     await fetchAppData();
   };
 
@@ -356,34 +399,26 @@ export default function App() {
     setNutritionMetrics({ protein: p, carbs: c, fat: f });
   };
 
-  const generateExpirationTimelines = (tokens) => {
-    const freshMap = {};
-    tokens.forEach(name => {
-      freshMap[name] = { daysLeft: 6, statusLabel: 'STABLE' };
-    });
-    setExpirationMap(freshMap);
-  };
-
   const getStaticRecipeSteps = (recipe) => {
     if (recipe && recipe.steps && recipe.steps.length > 0) return recipe.steps;
-    const itemsList = recipe && recipe.ingredients ? recipe.ingredients : ['ingredients'];
     return [
-      `Prep your primary base component selection (${itemsList[0] || 'vegetables'}).`,
-      `Heat 2 tbsp of olive oil or cooking fat in an artisan skillet layout over medium heat.`,
-      `Incorporate secondary structural elements: ${itemsList.slice(1).join(', ')}.`,
-      `Cook thoroughly for 8-10 minutes, adjust seasoning to taste, and serve.`
+      `Carefully prepare your primary base ingredients.`,
+      `Heat 2 tbsp of cooking oil in an artisan pan over medium heat channels.`,
+      `Incorporate secondary structural elements cleanly, cooking for 8-10 minutes.`,
+      `Garnish with fresh herbs, adjust seasoning lines, and serve immediate.`
     ];
   };
 
-  // DYNAMIC COMPOSITION SORTER LAYER: Computes fuzzy word cross intersections natively 
+  // HIGH-PERFORMANCE STRING AFFINITY MATRIX FILTERING ENGINE
   const tokensList = fridge.map(f => f.item_name);
   const processedRecipes = masterRecipes.map(recipe => {
     const recipeIngredients = recipe.ingredients || [];
     const total = recipeIngredients.length;
     
-    // Scan if cleaned tokens cross reference any structural components of database strings
+    // Evaluate if any of your active pantry words cross-reference the ingredient strings anywhere
     const ownedCount = recipeIngredients.filter(ing => {
-      return tokensList.some(token => ing.includes(token) || token.includes(ing));
+      const cleanIng = ing.toLowerCase().trim();
+      return tokensList.some(token => cleanIng.includes(token) || token.includes(cleanIng));
     }).length;
     
     const matchPercentage = total > 0 ? Math.round((ownedCount / total) * 100) : 0;
@@ -392,9 +427,7 @@ export default function App() {
     if (!recipeSearch) return true;
     return recipe.name && recipe.name.toLowerCase().includes(recipeSearch.toLowerCase());
   }).sort((a, b) => {
-    if (b.matchPercentage !== a.matchPercentage) {
-      return b.matchPercentage - a.matchPercentage;
-    }
+    if (b.matchPercentage !== a.matchPercentage) return b.matchPercentage - a.matchPercentage;
     return (a.name || '').localeCompare(b.name || '');
   });
 
@@ -432,7 +465,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans antialiased pb-12">
       
-      {/* MOBILE RESPONSIVE WRAPPING BAR: Bypasses border constraints seamlessly  */}
+      {/* HEADER SECTION WRAPPING REPAIR */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm w-full">
         <div className="text-center md:text-left">
           <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent tracking-tight">SmartFridge AI</h1>
@@ -440,34 +473,28 @@ export default function App() {
         </div>
         
         <div className="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto">
-          <button onClick={handleGenerateAiRecipe} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-indigo-100">
-            {aiGenerating ? "⚡ Processing..." : "🔮 AI Recipe"}
-          </button>
+          {/* Store Name Context Selection Dropdown */}
+          <select value={storeName} onChange={(e) => setStoreName(e.target.value)} className="bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase tracking-wide rounded-xl px-3 py-2 text-slate-600 focus:outline-none">
+            <option value="Chipotle">Chipotle</option>
+            <option value="Subway">Subway</option>
+            <option value="Domino's">Domino's</option>
+            <option value="Bharath Cafe">Bharath Cafe</option>
+            <option value="Curry Corner">Curry Corner</option>
+            <option value="Grocery Store">General Store</option>
+          </select>
+          <button onClick={handleGenerateAiRecipe} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-indigo-100">🔮 AI Recipe</button>
           <button onClick={triggerStoreTripPlanner} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider shadow-sm">🛒 Trip Planner</button>
-          
-          {/* COMPOSITE UNIFORM SAN-SERIF DESIGN KEY */}
-          <button onClick={() => setIsSettingsOpen(true)} className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-100 text-slate-600 font-sans text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2">
-            <span>⚙️</span> Settings
-          </button>
-          
-          <button onClick={handleSignOut} className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 font-bold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-slate-200/40">Sign Out</button>
+          <button onClick={() => setIsSettingsOpen(true)} className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-100 text-slate-600 font-sans text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2"><span>⚙️</span> Settings</button>
+          <button onClick={handleSignOut} className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 font-bold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider border border-slate-200/40">Sign Out</button>
         </div>
       </header>
 
-      {/* Main Grid Workspace */}
+      {/* Workspace Grid */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Control Column */}
         <div className="space-y-6 lg:col-span-1">
-          {/* Macros Card */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/60 shadow-sm">
-            <h2 className="text-[11px] font-black tracking-widest uppercase text-slate-400 mb-4">📊 Nutrient Allocation Monitor</h2>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-indigo-50/40 border border-indigo-100/60 p-3 rounded-2xl"><p className="text-[10px] text-indigo-500 font-extrabold uppercase">Protein</p><p className="text-xl font-black text-indigo-600 mt-1">{nutritionMetrics.protein}g</p></div>
-              <div className="bg-purple-50/40 border border-purple-100/60 p-3 rounded-2xl"><p className="text-[10px] text-purple-500 font-extrabold uppercase">Carbs</p><p className="text-xl font-black text-purple-600 mt-1">{nutritionMetrics.carbs}g</p></div>
-              <div className="bg-pink-50/40 border border-pink-100/60 p-3 rounded-2xl"><p className="text-[10px] text-pink-500 font-extrabold uppercase">Fats</p><p className="text-xl font-black text-pink-600 mt-1">{nutritionMetrics.fat}g</p></div>
-            </div>
-          </div>
-
-          {/* Optical Intake Scanner Node */}
+          {/* Scanner Node */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">📸 Receipt Intake Scanner</h2>
             <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-400 p-8 text-center bg-slate-50 rounded-2xl cursor-pointer transition-all group">
@@ -475,71 +502,109 @@ export default function App() {
               <p className="text-xs font-bold text-slate-600">Upload Grocery Receipt</p>
             </div>
             <form onSubmit={handleAddManualItem} className="flex gap-2 pt-5 mt-5 border-t border-slate-100">
-              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Add item (e.g. croissants 3 pack)..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 focus:outline-none" />
+              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Add manual item details..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none" />
               <button type="submit" className="bg-slate-800 text-white text-xs font-bold px-4 rounded-xl">Add</button>
             </form>
           </div>
 
           {/* DYNAMIC PANTRY INLINE GRID PANEL NODE */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
-            <h2 className="text-xs font-black text-slate-400 uppercase flex justify-between items-center mb-4"><span>🏡 Interactive Storage Pantry</span><span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{fridge.length}</span></h2>
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">No pantry tokens present.</p> : fridge.map((item) => (
+            <h2 className="text-xs font-black text-slate-400 uppercase flex justify-between items-center mb-4"><span>🏡 Storage Pantry Stock</span><span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{fridge.length}</span></h2>
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">Pantry empty.</p> : fridge.map((item) => (
                 <div key={item.id} className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl flex items-center justify-between gap-3 shadow-sm group">
                   <div className="flex-1 min-w-0">
-                    {/* EDITABLE DYNAMIC ENTRY FIELD */}
                     <input 
                       type="text" 
                       value={item.raw_name} 
                       onChange={(e) => handleUpdateInlineItem(item.id, e.target.value)}
                       className="w-full bg-transparent text-xs font-bold text-slate-700 tracking-tight capitalize border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none pb-0.5 transition-all"
-                      title="Click inside text box to alter database strings dynamically"
                     />
                     <div className="text-[9px] font-mono font-bold text-indigo-500/80 uppercase tracking-wider mt-0.5">Sanitized: <span className="text-slate-400 lowercase">{item.item_name || 'Empty'}</span></div>
                   </div>
-                  <button onClick={() => handleRemoveItem(item.id)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2 transition-colors">×</button>
+                  <button onClick={() => handleRemoveItem(item.id)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* NEW FEATURE: SHOPPING LIST MANAGER DRAWER */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">📝 Profile Shopping List</h2>
+            <form onSubmit={(e) => handleAddShoppingItem(e, '')} className="flex gap-2 mb-4">
+              <input type="text" value={shoppingInput} onChange={(e) => setShoppingInput(e.target.value)} placeholder="Add store purchase items..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none" />
+              <button type="submit" className="bg-slate-800 text-white text-xs font-bold px-3 rounded-xl">+</button>
+            </form>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {shoppingList.length === 0 ? <p className="text-xs text-slate-400 italic py-2">List empty.</p> : shoppingList.map((item) => (
+                <div key={item.id} className="bg-slate-50 border border-slate-200/40 p-2.5 rounded-xl flex justify-between items-center shadow-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input type="checkbox" checked={item.is_completed} onChange={() => handleToggleShoppingCompleted(item.id, item.is_completed)} className="accent-indigo-600 rounded cursor-pointer" />
+                    <span className={`text-xs font-bold capitalize truncate text-slate-700 ${item.is_completed ? 'line-through text-slate-300' : ''}`}>{item.item_name}</span>
+                  </div>
+                  <button onClick={() => handleClearShoppingItem(item.id)} className="text-slate-300 hover:text-red-500 font-mono text-xs px-1">×</button>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Catalog Match Display list frame */}
-        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/60 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">⚡ Personal Match Arrays</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">Ranked by top real-time ingredient composition match counts </p>
-            </div>
-            <input type="text" placeholder="Search master recipe names..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none" />
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[580px] overflow-y-auto pr-2">
-            {processedRecipes.slice(0, 40).map((recipe) => (
-              <div 
-                key={recipe.id || recipe.name} 
-                onClick={() => { setServingMultiplier(1); setActiveModalRecipe(recipe); }} 
-                className="p-4 bg-slate-50 hover:bg-white border border-slate-200/60 hover:border-indigo-400 hover:-translate-y-0.5 rounded-2xl cursor-pointer transition-all flex flex-col justify-between shadow-sm group animate-in fade-in slide-in-from-bottom-2 duration-150"
-              >
-                <div>
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-extrabold text-slate-700 group-hover:text-indigo-600 text-xs line-clamp-2 tracking-tight transition-colors">{recipe.name}</h3>
-                    <span className={`text-[10px] font-mono font-black shrink-0 px-2 py-0.5 rounded ${
-                      recipe.matchPercentage > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500'
-                    }`}>{recipe.matchPercentage}% MATCH</span>
+        {/* Right Main Grid Deck Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* NEW FEATURE: SAVED RECIPES PANEL BLOCK */}
+          {savedRecipes.length > 0 && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">⭐ Saved Liked Recipes ({savedRecipes.length})</h2>
+              <div className="flex flex-wrap gap-2">
+                {savedRecipes.map((recipe) => (
+                  <div key={recipe.id} className="bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-2xl flex items-center gap-3 shadow-sm hover:border-indigo-400 transition-all">
+                    <span onClick={() => { setServingMultiplier(1); setActiveModalRecipe(recipe); }} className="text-xs font-bold text-slate-700 cursor-pointer hover:text-indigo-600">{recipe.recipe_name}</span>
+                    <button onClick={() => handleRemoveSavedRecipe(recipe.id)} className="text-slate-300 hover:text-red-500 font-mono text-sm font-black">×</button>
                   </div>
-                  <span className="text-[8px] font-mono text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md mt-2.5 inline-block uppercase font-bold tracking-wide">{recipe.meal_type || 'General'}</span>
-                </div>
-                <div className="w-full bg-slate-200 h-1 rounded-full mt-4 overflow-hidden">
-                  <div className={`h-full ${recipe.matchPercentage > 0 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${recipe.matchPercentage}%` }}></div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Primary Match Deck Arrays Grid */}
+          <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/60 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">⚡ Personal Match Arrays</h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">Dynamically sorted against 6,000 unique entries</p>
+              </div>
+              <input type="text" placeholder="Search master recipe indexes..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none" />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[580px] overflow-y-auto pr-2">
+              {processedRecipes.slice(0, 40).map((recipe) => (
+                <div 
+                  key={recipe.id || recipe.name} 
+                  className="p-4 bg-slate-50 hover:bg-white border border-slate-200/60 hover:border-indigo-400 hover:-translate-y-0.5 rounded-2xl cursor-pointer transition-all flex flex-col justify-between shadow-sm group"
+                >
+                  <div onClick={() => { setServingMultiplier(1); setActiveModalRecipe(recipe); }}>
+                    <div className="flex justify-between items-start gap-2">
+                      <h3 className="font-extrabold text-slate-700 group-hover:text-indigo-600 text-xs line-clamp-2 tracking-tight transition-colors">{recipe.name}</h3>
+                      <span className={`text-[10px] font-mono font-black shrink-0 px-2 py-0.5 rounded ${recipe.matchPercentage > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500'}`}>{recipe.matchPercentage}% MATCH</span>
+                    </div>
+                    <span className="text-[8px] font-mono text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md mt-2.5 inline-block uppercase font-bold tracking-wide">{recipe.meal_type || 'General'}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center mt-4 pt-2 border-t border-slate-200/40">
+                    <div className="w-2/3 bg-slate-200 h-1 rounded-full overflow-hidden">
+                      <div className={`h-full ${recipe.matchPercentage > 0 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${recipe.matchPercentage}%` }}></div>
+                    </div>
+                    {/* Like Action Toggle Badge */}
+                    <button onClick={(e) => { e.stopPropagation(); handleSaveRecipeToProfile(recipe); }} className="text-xs hover:scale-110 transition-transform">⭐ Like</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
 
-      {/* DETAILED CARD MODAL EXTENSION PANELS */}
+      {/* FULL UNTAINTED SCREENSHOT CAPTURE MODAL OVERLAY */}
       {activeModalRecipe && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white border border-slate-200 w-full max-w-2xl rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -550,58 +615,57 @@ export default function App() {
                 <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">{activeModalRecipe.name || activeModalRecipe.recipeName}</h3>
               </div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <button onClick={handleDownloadRecipeImage} className="bg-slate-800 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95">
-                  📸 Save Card Photo
-                </button>
+                <button onClick={handleDownloadRecipeImage} className="bg-slate-800 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all">📸 Save Card Photo</button>
                 <button onClick={() => { setActiveModalRecipe(null); setServingMultiplier(1); }} className="bg-slate-100 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200">Close</button>
               </div>
             </div>
 
-            {/* Scale active portions dynamically configuration state [cite: 2] */}
+            {/* Serving Count Multiplier State adjustment switcher bar */}
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl mb-6 flex items-center justify-between shadow-inner">
-              <span className="text-xs font-extrabold text-slate-500 uppercase font-mono pl-1">👥 Scale Servings Multiplier:</span>
+              <span className="text-xs font-extrabold text-slate-500 uppercase font-mono pl-1">👥 Increase Yield Servings:</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(num => (
-                  <button 
-                    key={num} 
-                    onClick={() => setServingMultiplier(num)} 
-                    className={`w-9 h-9 rounded-xl font-mono text-xs font-black transition-all ${
-                      servingMultiplier === num ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {num}x
-                  </button>
+                  <button key={num} onClick={() => setServingMultiplier(num)} className={`w-9 h-9 rounded-xl font-mono text-xs font-black transition-all ${servingMultiplier === num ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>{num}x</button>
                 ))}
               </div>
             </div>
 
-            {/* PRINT DOM TARGET LAYER CONTAINER: Text plain structures keep files compiling flawlessly */}
+            {/* HIGH-FIDELITY PHOTO Blueprint SNAPSHOT CANVAS TARGET BOX CONTAINER */}
             <div className="p-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div ref={snapshotCardRef} className="bg-white p-6 rounded-xl space-y-6">
                 <div className="border-b border-slate-200 pb-4 text-center">
                   <h2 className="text-xl font-black text-indigo-600 uppercase tracking-wide">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase font-mono mt-1">SmartFridge AI Custom Blueprint Document • Serving Scaler {servingMultiplier}x [cite: 2]</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase font-mono mt-1">SmartFridge AI Formulation Document • Yield Index {servingMultiplier}x</p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Ingredients portions specs column [cite: 2] */}
+                  {/* Ingredients Component specs with interactive missing items tracking nodes */}
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-inner">
                     <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-200 pb-1 mb-3">📋 Component Specifications</h4>
-                    <ul className="space-y-2">
-                      {activeModalRecipe.ingredients?.map((ing, idx) => (
-                        <li key={idx} className="text-xs font-bold text-slate-700 capitalize flex flex-col border-b border-slate-200/40 pb-1.5">
-                          <span className="text-[8px] font-mono text-purple-500 font-black tracking-wide uppercase">
-                            {getCleanMeasurement(ing, servingMultiplier)}
-                          </span>
-                          <span className="text-slate-700 mt-0.5">{ing}</span>
-                        </li>
-                      ))}
+                    <ul className="space-y-3">
+                      {activeModalRecipe.ingredients?.map((ing, idx) => {
+                        const cleanIng = ing.toLowerCase().trim();
+                        const isOwned = tokensList.some(t => cleanIng.includes(t) || t.includes(cleanIng));
+                        return (
+                          <li key={idx} className="text-xs font-bold text-slate-700 capitalize flex flex-col border-b border-slate-200/40 pb-2">
+                            <span className="text-[8px] font-mono text-purple-500 font-black tracking-wide uppercase">{getCleanMeasurement(ing, servingMultiplier)}</span>
+                            <div className="flex justify-between items-center gap-1 mt-0.5">
+                              <span className={isOwned ? 'text-slate-700' : 'text-slate-400 font-semibold'}>{ing}</span>
+                              {/* NEW FEATURE ACTION BUTTON: Add ingredient directly to Shopping list instantly */}
+                              {!isOwned && (
+                                <button onClick={() => handleAddShoppingItem(null, ing)} className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 transition-colors shrink-0 font-sans tracking-tight">
+                                  + Buy item
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
 
-                  {/* Progressive culinary roadmap text directions column */}
                   <div className="md:col-span-2 space-y-3">
-                    <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-100 pb-1">🔥 Culinary Progression Matrix</h4>
+                    <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-100 pb-1">🔥 Preparation Progression Matrix</h4>
                     <ol className="space-y-2.5">
                       {(activeModalRecipe.isAiGeneratedElement ? activeModalRecipe.steps : getStaticRecipeSteps(activeModalRecipe)).map((step, idx) => (
                         <li key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl text-xs text-slate-600 flex gap-3 leading-relaxed">
@@ -619,7 +683,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Shopping Trip Planner Modal Box [cite: 3] */}
+      {/* Shopping Trip Planner Modal Box */}
       {isStoreAlertOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 w-full max-w-xl rounded-3xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
@@ -629,7 +693,7 @@ export default function App() {
             </div>
             <div className="space-y-2.5">
               {shoppingAlerts.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-6 text-center">Add matching core items to your stock room to reveal grocery store gap layouts[cite: 3].</p>
+                <p className="text-xs text-slate-400 italic py-6 text-center">Add core matching parameters to pantry stocks to compute market gap solutions.</p>
               ) : (
                 shoppingAlerts.slice(0, 15).map((alert, i) => (
                   <div key={i} onClick={() => { setIsStoreAlertOpen(false); setServingMultiplier(1); setActiveModalRecipe(alert.recipe); }} className="p-3.5 bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-2xl cursor-pointer transition-all shadow-sm group">
@@ -646,7 +710,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Internal Settings Modal Drawer */}
+      {/* Profile Settings Change Password panel drawer */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
