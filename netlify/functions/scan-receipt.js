@@ -11,16 +11,15 @@ export const handler = async (event, context) => {
       return { statusCode: 500, body: JSON.stringify({ error: 'Missing Gemini Key' }) };
     }
 
-    // Initialize the official Google Gen AI SDK
     const ai = new GoogleGenAI({ apiKey });
     
-    const base64Image = event.isBase64Encoded 
-      ? event.body 
-      : Buffer.from(event.body).toString('base64');
+    // Safely parse the Base64 data string out of the incoming request body
+    const bodyData = JSON.parse(event.body);
+    const rawBase64 = bodyData.image.split(',')[1]; // Strips out the metadata prefix (e.g., "data:image/jpeg;base64,")
 
     const imagePart = {
       inlineData: {
-        data: base64Image,
+        data: rawBase64,
         mimeType: "image/jpeg"
       },
     };
@@ -33,12 +32,11 @@ export const handler = async (event, context) => {
 
 Return the final results STRICTLY as a raw JSON array of strings containing only the clean, plain English ingredient names: ["Chicken", "Garlic", "Avocado"]. Do not include markdown code blocks, do not include prose, and ensure it is valid parsable JSON.`;
 
-    // Execute content generation using gemini-2.5-flash with Google Search Grounding active
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [prompt, imagePart],
       config: {
-        tools: [{ googleSearch: {} }], // Automatically triggers web verification lookup loops
+        tools: [{ googleSearch: {} }], // Keeps real-time web verification active
         temperature: 1.0
       }
     });

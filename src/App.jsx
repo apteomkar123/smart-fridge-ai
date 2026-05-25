@@ -31,14 +31,16 @@ export default function App() {
 
     setLoading(true);
     const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
+    
+    // Read the file as a standardized Base64 Data URL string
+    reader.readAsDataURL(file);
     
     reader.onloadend = async () => {
       try {
         const response = await fetch('/.netlify/functions/scan-receipt', {
           method: 'POST',
-          headers: { 'Content-Type': file.type },
-          body: reader.result
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: reader.result }) // Safely wrapped payload object
         });
 
         if (response.ok) {
@@ -50,7 +52,7 @@ export default function App() {
           alert("Parsing verification failure.");
         }
       } catch (err) {
-        console.error(err);
+        console.error("Upload error details:", err);
       }
       setLoading(false);
     };
