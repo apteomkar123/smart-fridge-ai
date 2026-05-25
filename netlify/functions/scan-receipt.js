@@ -25,11 +25,10 @@ export const handler = async (event, context) => {
     const ai = new GoogleGenAI({ apiKey });
     const bodyData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
-    // PIPELINE ROUTE A: AI Custom Recipe Generator
     if (bodyData && bodyData.customPrompt) {
       const optimizedPrompt = `${bodyData.customPrompt} 
       Select a highly cohesive, delicious subset of 3 to 6 matching ingredients from your available stocks to build a dish. 
-      Ensure every single element listed in your ingredients array output is explicitly used and referenced with concrete instructions within your steps array.`;
+      Ensure every single element listed in your ingredients array output is explicitly used within your steps array.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -37,7 +36,6 @@ export const handler = async (event, context) => {
         config: {
           temperature: 0.7,
           responseMimeType: "application/json",
-          // FIX: Corrected property parameter option name explicitly to enforce SDK structured schemas
           responseJsonSchema: {
             type: "OBJECT",
             properties: {
@@ -62,7 +60,6 @@ export const handler = async (event, context) => {
       };
     }
 
-    // PIPELINE ROUTE B: Optical Receipt Vision Processing
     if (!bodyData || !bodyData.image) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Missing image payload' }) };
     }
@@ -72,7 +69,7 @@ export const handler = async (event, context) => {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
-        "Analyze this grocery receipt. Extract merchant name and list all food items strictly as a raw JSON array of strings: [\"Item1\", \"Item2\"]. Do not wrap in markdown text wrappers.",
+        "Analyze this grocery receipt. Extract merchant name and list all purchased food items strictly as a raw JSON array of strings: [\"Item1\", \"Item2\"]. Do not wrap in markdown text wrappers.",
         { inlineData: { data: rawBase64, mimeType: "image/jpeg" } }
       ],
       config: { temperature: 0.1 }

@@ -33,7 +33,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeModalRecipe, setActiveModalRecipe] = useState(null);
 
-  // DYNAMIC SERVINGS TRACKING STATE
+  // Dynamic Servings Multiplier State
   const [servingMultiplier, setServingMultiplier] = useState(1);
 
   const snapshotCardRef = useRef(null);
@@ -73,8 +73,11 @@ export default function App() {
       calculateMacroMetrics(currentFridge);
       if (inventory && inventory.length > 0) generateExpirationTimelines(inventory);
 
-      // Fetch the 5,000 recipes from the database
-      let { data: recipes, error: recError } = await supabase.from('recipes').select('*');
+      // Fetch the recipes cleanly from your database table
+      let { data: recipes, error: recError } = await supabase
+        .from('recipes')
+        .select('*');
+        
       if (recError) throw recError;
 
       const normalizedRecipes = (recipes || []).map(r => {
@@ -90,7 +93,7 @@ export default function App() {
       });
       setMasterRecipes(normalizedRecipes);
     } catch (err) {
-      console.error(err.message);
+      console.error("Database streaming exception:", err.message);
     }
   };
 
@@ -98,18 +101,18 @@ export default function App() {
     if (user) fetchAppData();
   }, [user]);
 
-  // Dynamic Recipe Steps Multiplier Values
+  // Dynamic Ingredient Quantity Assignment Matrix
   const getCleanMeasurement = (ingredientName, multiplier) => {
     const baseAmount = 1;
     const scaledAmount = baseAmount * multiplier;
     
-    if (['pizza dough', 'naan bread', 'brioche bun', 'spinach tortilla'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['pizza dough', 'naan bread', 'brioche bun', 'spinach tortilla', 'corn tortillas'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount} Pcs`;
     }
     if (['mozzarella', 'cheese sauce', 'goat cheese', 'pepper jack cheese'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 75}g`;
     }
-    if (['paneer', 'tofu', 'tempeh', 'mushrooms', 'sweet potato cubes'].some(x => ingredientName.toLowerCase().includes(x))) {
+    if (['paneer', 'tofu', 'tempeh', 'mushrooms', 'sweet potato cubes', 'lentils', 'chickpeas', 'black beans', 'seitan'].some(x => ingredientName.toLowerCase().includes(x))) {
       return `${scaledAmount * 150}g`;
     }
     return `${scaledAmount * 0.5} Cups`;
@@ -124,11 +127,11 @@ export default function App() {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
-      alert("📧 Security password reset token dispatched! Please check your email inbox.");
+      alert("📧 Security password reset token dispatched!");
       setIsForgotPasswordView(false);
     } catch (err) {
       alert(`Recovery Fault: ${err.message}`);
-    } finally {
+    } {
       setAuthLoading(false);
     }
   };
@@ -145,7 +148,7 @@ export default function App() {
       setNewPasswordValue('');
     } catch (err) {
       alert(`Modification Fault: ${err.message}`);
-    } finally {
+    } {
       setAuthLoading(false);
     }
   };
@@ -157,12 +160,12 @@ export default function App() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
       if (error) throw error;
-      alert("🌟 Password altered cleanly from current session loops!");
+      alert("🌟 Password updated successfully!");
       setIsSettingsOpen(false);
       setNewPasswordValue('');
     } catch (err) {
       alert(`Internal Update Error: ${err.message}`);
-    } finally {
+    } {
       setAuthLoading(false);
     }
   };
@@ -179,7 +182,7 @@ export default function App() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email: cleanEmail, password: cleanPassword });
         if (error) throw error;
-        alert("🚀 Profile registered! Sign in with your credentials.");
+        alert("🚀 Profile registered successfully!");
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
@@ -187,28 +190,32 @@ export default function App() {
       }
     } catch (err) { 
       alert(`Identity Validation Refused: ${err.message}`);
-    } finally {
+    } {
       setAuthLoading(false);
     }
   };
 
+  // Fixed Deep-Canvas Snapshot Capture Downloader
   const handleDownloadRecipeImage = async () => {
     if (!snapshotCardRef.current) return;
     try {
       const canvas = await html2canvas(snapshotCardRef.current, {
         backgroundColor: '#ffffff',
-        scale: 3, 
-        logging: false,
-        useCORS: true
+        scale: 2, 
+        useCORS: true,
+        allowTaint: true,
+        logging: false
       });
       const imageUri = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
       downloadLink.href = imageUri;
-      downloadLink.download = `recipe-${(activeModalRecipe.name || activeModalRecipe.recipeName || 'download').replace(/\s+/g, '-').toLowerCase()}.png`;
+      downloadLink.download = `smartfridge-recipe.png`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      alert("Canvas image rendering restriction intercepted.");
+    }
   };
 
   const handleGenerateAiRecipe = async () => {
@@ -229,20 +236,21 @@ export default function App() {
           isAiGeneratedElement: true, 
           steps: data.steps || [] 
         });
-        setServingMultiplier(1); // Reset serving multiplier back to base configuration
+        setServingMultiplier(1);
       }
     } catch (err) { console.error(err); }
     setAiGenerating(false);
   };
 
-  // TRIP PLANNER REPAIR FIX: Dynamically queries aligned database ingredient rows
+  // Trip Planner Database Index Matching Logic Fixed
   const triggerStoreTripPlanner = () => {
     const alerts = [];
     masterRecipes.forEach(recipe => {
       const recipeIngredients = recipe.ingredients || [];
       const missing = recipeIngredients.filter(ing => !fridge.includes(ing.toLowerCase().trim()));
       
-      if (missing.length >= 1 && missing.length <= 2 && recipeIngredients.length > missing.length) {
+      // Captures matches where you need to buy 1-3 items to unlock the dish
+      if (missing.length >= 1 && missing.length <= 3 && recipeIngredients.length > missing.length) {
         alerts.push({ recipe, missingItems: missing, mealType: recipe.meal_type || 'General' });
       }
     });
@@ -257,10 +265,13 @@ export default function App() {
     setActiveModalRecipe(null);
   };
 
+  // FIXED: Corrected invalid '.document' selector syntax breaking database operations
   const handleRemoveItem = async (itemName) => {
-    setFridge(prev => prev.filter(item => item !== itemName));
-    await supabase.from('fridge_inventory').document.delete().eq('item_name', itemName).eq('user_id', user.id);
-    await fetchAppData();
+    try {
+      setFridge(prev => prev.filter(item => item !== itemName));
+      await supabase.from('fridge_inventory').delete().eq('item_name', itemName).eq('user_id', user.id);
+      await fetchAppData();
+    } catch (err) { console.error(err); }
   };
 
   const sendImageToBackend = async (base64Data) => {
@@ -340,12 +351,11 @@ export default function App() {
     ];
   };
 
-  // REPAIR PROFILE: Fixed ingredient verification algorithms matching against JSON matrices
+  // Real-Time Matrix Calculations against database table recipes
   const processedRecipes = masterRecipes.map(recipe => {
     const recipeIngredients = recipe.ingredients || [];
     const total = recipeIngredients.length;
     
-    // Check against what is actually inside the active user's fridge inventory loop array
     const ownedItems = recipeIngredients.filter(ing => fridge.includes(ing.toLowerCase().trim()));
     const owned = ownedItems.length;
     
@@ -365,8 +375,8 @@ export default function App() {
             <>
               <h2 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Recover Password</h2>
               <form onSubmit={handleForgotPasswordSubmit} className="space-y-4 mt-6">
-                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Type your email" />
-                <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest">{authLoading ? "Sending..." : "Send Reset Link"}</button>
+                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none" placeholder="Type your email" />
+                <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest">Send Reset Link</button>
               </form>
               <button onClick={() => setIsForgotPasswordView(false)} className="text-xs text-center block w-full text-indigo-600 font-bold mt-5 hover:underline">Return to Login</button>
             </>
@@ -377,7 +387,7 @@ export default function App() {
                 <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none" placeholder="Email Address" />
                 <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none" placeholder="Password" />
                 <div className="text-right"><button type="button" onClick={() => setIsForgotPasswordView(true)} className="text-[11px] text-slate-400 hover:text-indigo-600 transition-colors">Forgot Password?</button></div>
-                <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest text-white shadow-lg shadow-indigo-500/20">{authLoading ? "Verifying..." : (isSignUp ? "Register Account" : "Sign In")}</button>
+                <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest text-white shadow-lg shadow-indigo-500/20">{authLoading ? "Verifying..." : (isSignUp ? "Register" : "Sign In")}</button>
               </form>
               <button onClick={() => setIsSignUp(!isSignUp)} className="text-xs text-center block w-full text-indigo-600 font-bold mt-5 hover:underline">{isSignUp ? "Have an account? Login" : "Create Account"}</button>
             </>
@@ -390,75 +400,74 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans antialiased pb-12">
       
-      {/* MOBILE REPAIR FLEX LAYER HEADER WRAPPER */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
-        <div className="text-center md:text-left">
-          <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent tracking-tight">SmartFridge AI</h1>
+      {/* MOBILE RESPONSIVE NAV BAR OVERHAUL */}
+      <header className="bg-white/80 border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md px-4 sm:px-6 py-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-sm">
+        <div className="text-center lg:text-left">
+          <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent tracking-tight">SmartFridge AI</h1>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">Account Profile: <span className="text-slate-600 normal-case font-semibold">{user.email}</span></p>
         </div>
         
-        {/* Responsive action grid preventing clip breaks */}
-        <div className="flex flex-wrap justify-center items-center gap-2 w-full md:w-auto">
-          <button onClick={handleGenerateAiRecipe} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-extrabold text-[10px] sm:text-[11px] px-3 sm:px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-indigo-100">
-            {aiGenerating ? "⚡ Processing..." : "🔮 AI Recipe"}
+        {/* Dynamic wrapping row that prevents screen clipping overflows */}
+        <div className="flex flex-wrap items-center justify-center gap-2 w-full lg:w-auto">
+          <button onClick={handleGenerateAiRecipe} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-indigo-100">
+            {aiGenerating ? "⚡ Synthesizing..." : "🔮 AI Recipe"}
           </button>
-          <button onClick={triggerStoreTripPlanner} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-[10px] sm:text-[11px] px-3 sm:px-4 py-2.5 rounded-xl uppercase tracking-wider shadow-md">🛒 Trip Planner</button>
+          <button onClick={triggerStoreTripPlanner} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider shadow-sm transition-all">🛒 Run Trip Planner</button>
           
-          {/* REPAIRED SETTINGS FONT DECLARATION ENGINE */}
-          <button onClick={() => setIsSettingsOpen(true)} className="bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors font-sans text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
-            <span>⚙️</span> <span className="hidden sm:inline">Settings</span>
+          {/* UNIFORM SETTINGS FONT BUTTON */}
+          <button onClick={() => setIsSettingsOpen(true)} className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors font-sans text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2">
+            <span>⚙️</span> Settings
           </button>
           
-          <button onClick={handleSignOut} className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 font-bold text-[10px] sm:text-[11px] px-3 sm:px-4 py-2.5 rounded-xl uppercase tracking-wider border border-slate-200/40">Sign Out</button>
+          <button onClick={handleSignOut} className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 font-bold text-[11px] px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all border border-slate-200/40">Sign Out</button>
         </div>
       </header>
 
-      {/* Main Workspace */}
+      {/* Main Grid Workspace */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         <div className="space-y-6 lg:col-span-1">
-          {/* Macros Monitor */}
+          {/* Nutrition Monitors */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-[11px] font-black tracking-widest uppercase text-slate-400 mb-4">📊 Nutrient Allocation Monitor</h2>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-indigo-50/40 border border-indigo-100/60 p-2.5 rounded-2xl"><p className="text-[10px] text-indigo-500 font-extrabold uppercase">Protein</p><p className="text-lg font-black text-indigo-600 mt-1">{nutritionMetrics.protein}g</p></div>
-              <div className="bg-purple-50/40 border border-purple-100/60 p-2.5 rounded-2xl"><p className="text-[10px] text-purple-500 font-extrabold uppercase">Carbs</p><p className="text-lg font-black text-purple-600 mt-1">{nutritionMetrics.carbs}g</p></div>
-              <div className="bg-pink-50/40 border border-pink-100/60 p-2.5 rounded-2xl"><p className="text-[10px] text-pink-500 font-extrabold uppercase">Fats</p><p className="text-lg font-black text-pink-600 mt-1">{nutritionMetrics.fat}g</p></div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-indigo-50/40 border border-indigo-100/60 p-3 rounded-2xl"><p className="text-[10px] text-indigo-500 font-extrabold uppercase">Protein</p><p className="text-xl font-black text-indigo-600 mt-1">{nutritionMetrics.protein}g</p></div>
+              <div className="bg-purple-50/40 border border-purple-100/60 p-3 rounded-2xl"><p className="text-[10px] text-purple-500 font-extrabold uppercase">Carbs</p><p className="text-xl font-black text-purple-600 mt-1">{nutritionMetrics.carbs}g</p></div>
+              <div className="bg-pink-50/40 border border-pink-100/60 p-3 rounded-2xl"><p className="text-[10px] text-pink-500 font-extrabold uppercase">Fats</p><p className="text-xl font-black text-pink-600 mt-1">{nutritionMetrics.fat}g</p></div>
             </div>
           </div>
 
-          {/* Scanner Box */}
+          {/* Optical Scanner Node */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">📸 Receipt Intake Scanner</h2>
-            <div className="relative border-2 border-dashed border-slate-200 p-6 text-center bg-slate-50 rounded-2xl cursor-pointer">
+            <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-400 p-8 text-center bg-slate-50 rounded-2xl cursor-pointer transition-all group">
               <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
               <p className="text-xs font-bold text-slate-600">Upload Grocery Receipt</p>
             </div>
-            <form onSubmit={handleAddManualItem} className="flex gap-2 pt-4 mt-4 border-t border-slate-100">
-              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Type item token..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none" />
+            <form onSubmit={handleAddManualItem} className="flex gap-2 pt-5 mt-5 border-t border-slate-100">
+              <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Type manual ingredient..." className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 focus:outline-none" />
               <button type="submit" className="bg-slate-800 text-white text-xs font-bold px-4 rounded-xl">Add</button>
             </form>
           </div>
 
-          {/* Storage Box */}
+          {/* Storage list block */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm">
             <h2 className="text-xs font-black text-slate-400 uppercase flex justify-between items-center mb-4"><span>🏡 Private Storage Items</span><span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{fridge.length}</span></h2>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">Storage empty.</p> : fridge.map((item, idx) => (
-                <div key={idx} className="bg-slate-50 border border-slate-200/40 p-2.5 rounded-xl flex justify-between items-center shadow-sm"><span className="text-xs font-bold capitalize text-slate-700">{item}</span><button onClick={() => handleRemoveItem(item)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2">×</button></div>
+              {fridge.length === 0 ? <p className="text-xs text-slate-400 italic py-4">No data vectors found.</p> : fridge.map((item, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl flex justify-between items-center shadow-sm"><span className="text-xs font-bold capitalize text-slate-700">{item}</span><button onClick={() => handleRemoveItem(item)} className="text-slate-300 hover:text-red-500 font-mono text-sm px-2">×</button></div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Aligned Match Array Deck */}
+        {/* Database Matches Catalog Display */}
         <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/60 shadow-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">⚡ Personal Match Arrays</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">Calibrated directly against the 5,000 catalog entries</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Filtering rows seamlessly from database</p>
             </div>
-            <input type="text" placeholder="Filter indices..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-indigo-500" />
+            <input type="text" placeholder="Search catalog codes..." value={recipeSearch} onChange={(e) => setRecipeSearch(e.target.value)} className="w-full sm:w-64 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs text-slate-700 focus:outline-none" />
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[580px] overflow-y-auto pr-2">
@@ -471,8 +480,7 @@ export default function App() {
                 <div>
                   <div className="flex justify-between items-start gap-2">
                     <h3 className="font-extrabold text-slate-700 group-hover:text-indigo-600 text-xs line-clamp-2 tracking-tight transition-colors">{recipe.name}</h3>
-                    {/* WORKING REALTIME PERCENT COMPOSITION DISPLAY BADGE */}
-                    <span className={`text-[10px] font-mono font-black shrink-0 px-1.5 py-0.5 rounded ${
+                    <span className={`text-[10px] font-mono font-black shrink-0 px-2 py-0.5 rounded ${
                       recipe.matchPercentage === 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
                     }`}>{recipe.matchPercentage}% MATCH</span>
                   </div>
@@ -487,31 +495,33 @@ export default function App() {
         </div>
       </main>
 
-      {/* FULL EXPANDABLE RECIPE DETAILED MODAL VIEWER */}
+      {/* FULL DETAILED CARD EXPAND MODAL VIEW */}
       {activeModalRecipe && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white border border-slate-200 w-full max-w-2xl rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all">
+          <div className="bg-white border border-slate-200 w-full max-w-2xl rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b border-slate-100 pb-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b border-slate-100 pb-4 mb-5">
               <div>
                 <span className="bg-indigo-50 text-indigo-600 font-mono text-[9px] px-2 py-0.5 rounded-md uppercase font-black">{activeModalRecipe.meal_type}</span>
                 <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">{activeModalRecipe.name || activeModalRecipe.recipeName}</h3>
               </div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <button onClick={handleDownloadRecipeImage} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md">📸 Save Card Photo</button>
+                <button onClick={handleDownloadRecipeImage} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95">
+                  📸 Save Card Photo
+                </button>
                 <button onClick={() => { setActiveModalRecipe(null); setServingMultiplier(1); }} className="bg-slate-100 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200">Close</button>
               </div>
             </div>
 
-            {/* DYNAMIC SCALE CONTROLLERS */}
-            <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-2xl mb-6 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono pl-2">👥 Scale Active Yield Servings:</span>
+            {/* DYNAMIC SCALE MULTIPLIER SELECTION BAR */}
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl mb-6 flex items-center justify-between shadow-inner">
+              <span className="text-xs font-extrabold text-slate-500 uppercase font-mono pl-1">👥 Scaled Servings Multiplier:</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(num => (
                   <button 
                     key={num} 
                     onClick={() => setServingMultiplier(num)} 
-                    className={`w-8 h-8 rounded-xl font-mono text-xs font-black transition-all ${
+                    className={`w-9 h-9 rounded-xl font-mono text-xs font-black transition-all ${
                       servingMultiplier === num ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
@@ -521,40 +531,41 @@ export default function App() {
               </div>
             </div>
 
-            {/* PHOTO PRINT CANVAS HOOK TARGET */}
-            <div ref={snapshotCardRef} className="bg-white border border-slate-100 p-6 rounded-2xl space-y-6">
-              <div className="border-b border-slate-100 pb-4 text-center">
-                <h2 className="text-xl font-black text-indigo-600 uppercase tracking-wide">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase font-mono mt-1">SmartFridge AI Formulation Document • Yield Category {servingMultiplier}x</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* CALIBRATED SCALABLE VOLUME GENERATORS */}
-                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
-                  <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-200 pb-1 mb-3">📋 Component Specs</h4>
-                  <ul className="space-y-2">
-                    {activeModalRecipe.ingredients?.map((ing, idx) => (
-                      <li key={idx} className="text-xs font-bold text-slate-700 capitalize flex flex-col border-b border-slate-200/40 pb-1.5">
-                        {/* Scaled Volume Generation Text */}
-                        <span className="text-[8px] font-mono text-purple-500 font-black tracking-wide uppercase">
-                          {getCleanMeasurement(ing, servingMultiplier)}
-                        </span>
-                        <span className="text-slate-700 mt-0.5">{ing}</span>
-                      </li>
-                    ))}
-                  </ul>
+            {/* RIGID GRAPHICS PANEL USED BY HTML2CANVAS */}
+            <div className="p-1 bg-white rounded-2xl border border-slate-100">
+              <div ref={snapshotCardRef} className="bg-white p-6 rounded-2xl space-y-6">
+                <div className="border-b border-slate-100 pb-4 text-center">
+                  <h2 className="text-xl font-black text-indigo-600 uppercase tracking-wide">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase font-mono mt-1">SmartFridge AI Custom Menu Layout • Yield Capacity {servingMultiplier}x</p>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* CALIBRATED DYNAMIC PORTIONS MATRIX */}
+                  <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl shadow-inner">
+                    <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-200 pb-1 mb-3">📋 Component Specs</h4>
+                    <ul className="space-y-2">
+                      {activeModalRecipe.ingredients?.map((ing, idx) => (
+                        <li key={idx} className="text-xs font-bold text-slate-700 capitalize flex flex-col border-b border-slate-200/40 pb-1.5">
+                          <span className="text-[8px] font-mono text-purple-500 font-black tracking-wide uppercase">
+                            {getCleanMeasurement(ing, servingMultiplier)}
+                          </span>
+                          <span className="text-slate-700 mt-0.5">{ing}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                <div className="md:col-span-2 space-y-3">
-                  <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-100 pb-1">🔥 Preparation Progression Matrix</h4>
-                  <ol className="space-y-2.5">
-                    {(activeModalRecipe.isAiGeneratedElement ? activeModalRecipe.steps : getStaticRecipeSteps(activeModalRecipe)).map((step, idx) => (
-                      <li key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl text-xs text-slate-600 flex gap-3 leading-relaxed">
-                        <span className="font-mono font-black text-indigo-600 bg-white border border-slate-200 w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-sm">{idx + 1}</span>
-                        <p className="font-semibold text-slate-600">{step}</p>
-                      </li>
-                    ))}
-                  </ol>
+                  <div className="md:col-span-2 space-y-3">
+                    <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b border-slate-100 pb-1">🔥 Preparation Progression</h4>
+                    <ol className="space-y-2.5">
+                      {(activeModalRecipe.isAiGeneratedElement ? activeModalRecipe.steps : getStaticRecipeSteps(activeModalRecipe)).map((step, idx) => (
+                        <li key={idx} className="bg-slate-50 border border-slate-200/40 p-3 rounded-xl text-xs text-slate-600 flex gap-3 leading-relaxed">
+                          <span className="font-mono font-black text-indigo-600 bg-white border border-slate-200 w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-sm">{idx + 1}</span>
+                          <p className="font-semibold text-slate-600">{step}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
               </div>
             </div>
@@ -563,17 +574,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Shopping Trip Planner Modal */}
+      {/* Shopping Trip Planner Modal Box */}
       {isStoreAlertOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 w-full max-w-xl rounded-3xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">🔮 Market Procurement Matrix</h3>
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">🔮 Market Procurement Vector</h3>
               <button onClick={() => setIsStoreAlertOpen(false)} className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200/60">Dismiss</button>
             </div>
             <div className="space-y-2.5">
               {shoppingAlerts.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-6 text-center">Add ingredients to your fridge to reveal optimized recipe gaps.</p>
+                <p className="text-xs text-slate-400 italic py-6 text-center">Add ingredients to your fridge to populate missing store gaps.</p>
               ) : (
                 shoppingAlerts.slice(0, 15).map((alert, i) => (
                   <div key={i} onClick={() => { setIsStoreAlertOpen(false); setServingMultiplier(1); setActiveModalRecipe(alert.recipe); }} className="p-3.5 bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-2xl cursor-pointer transition-all shadow-sm group">
@@ -590,7 +601,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Internal settings modal box */}
+      {/* Profile credential configurations options panel drawer */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
@@ -603,7 +614,7 @@ export default function App() {
                 <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">New System Password</label>
                 <input type="password" required value={newPasswordValue} onChange={(e) => setNewPasswordValue(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-xs" placeholder="••••••••" />
               </div>
-              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wide shadow-sm">Save New Password</button>
+              <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wide shadow-sm">Save New Password</button>
             </form>
           </div>
         </div>
