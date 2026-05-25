@@ -40,7 +40,7 @@ export default function App() {
     fetchAppData();
   }, []);
 
-  // Dispatch payload to Netlify background container
+  // Dispatch payload to Netlify background container with payload deduplication
   const sendImageToBackend = async (base64Data) => {
     try {
       const response = await fetch('/.netlify/functions/scan-receipt', {
@@ -51,9 +51,16 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        const insertPayload = data.added.map(item => ({ item_name: item.trim() }));
         
-        // Save payload into Supabase database row structures
+        // Lowercase and trim all returned text values to safely handle hidden formatting mismatches
+        const cleanItems = data.added.map(item => item.trim().toLowerCase());
+        
+        // Remove duplicate entries locally before pushing to Postgres to prevent ON CONFLICT constraint loops
+        const uniqueItems = [...new Set(cleanItems)];
+        
+        // Map unique array strings directly into table layout syntax structures
+        const insertPayload = uniqueItems.map(item => ({ item_name: item }));
+        
         const { error } = await supabase
           .from('fridge_inventory')
           .upsert(insertPayload, { onConflict: 'item_name' });
@@ -73,7 +80,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // Handler: Compress image client-side to protect Netlify's 6MB limit
+  // Handler: Compress image client-side to protect Netlify's 6MB payload limit
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -107,10 +114,10 @@ export default function App() {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      // Convert to compressed web data stream
+      // Convert image data structure to a fast web data string
       const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
 
-      // Pass down to the networking wrapper
+      // Hand off to the networking engine
       sendImageToBackend(compressedBase64);
     };
   };
@@ -122,7 +129,7 @@ export default function App() {
 
     const { error } = await supabase
       .from('fridge_inventory')
-      .upsert([{ item_name: manualItem.trim() }], { onConflict: 'item_name' });
+      .upsert([{ item_name: manualItem.trim().toLowerCase() }], { onConflict: 'item_name' });
 
     if (error) {
       alert(`Supabase Manual Add Error: ${error.message}\nDetails: ${error.details}`);
@@ -140,7 +147,7 @@ export default function App() {
         !fridge.includes(ing.toLowerCase().trim())
       ) : [];
       
-      // Flag recipes needing 1 or 2 extra elements from market runs
+      // Filter recipes needing exactly 1 or 2 more target tracking items from market runs
       if (missing.length >= 1 && missing.length <= 2) {
         alerts.push({
           recipeName: recipe.name,
@@ -153,7 +160,7 @@ export default function App() {
     setIsStoreAlertOpen(true);
   };
 
-  // Calculation: Ingredient coverage index processing
+  // Calculation: Ingredient coverage matrix processing
   const processedRecipes = masterRecipes.map(recipe => {
     const totalIngredients = recipe.ingredients ? recipe.ingredients.length : 0;
     const itemsWeHave = recipe.ingredients 
