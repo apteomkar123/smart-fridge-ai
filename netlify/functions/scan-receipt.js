@@ -12,6 +12,43 @@ export const handler = async (event, context) => {
     }
 
     const ai = new GoogleGenAI({ apiKey });
+
+    // ... (keep the API key and setup lines at the top the same)
+
+let rawBase64 = "";
+
+try {
+  // Handle both stringified JSON and pre-parsed object bodies gracefully
+  const bodyData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+  
+  if (bodyData && bodyData.image) {
+    // If it includes the metadata prefix (e.g., "data:image/jpeg;base64,"), strip it
+    rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
+  } else {
+    // Fallback if the body itself is just the raw data string
+    rawBase64 = event.body.includes(',') ? event.body.split(',')[1] : event.body;
+  }
+} catch (e) {
+  // If JSON parsing fails entirely, treat the raw body string as the data target
+  rawBase64 = event.body.includes(',') ? event.body.split(',')[1] : event.body;
+}
+
+// Ensure we actually have data before continuing
+if (!rawBase64) {
+  return {
+    statusCode: 400,
+    body: JSON.stringify({ error: "Missing image data payload in request body." })
+  };
+}
+
+const imagePart = {
+  inlineData: {
+    data: rawBase64,
+    mimeType: "image/jpeg"
+  },
+};
+
+// ... (keep the rest of your prompt and ai.models.generateContent code the same)
     
     // Safely parse the Base64 data string out of the incoming request body
     const bodyData = JSON.parse(event.body);
