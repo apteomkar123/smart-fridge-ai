@@ -11,9 +11,9 @@ export const handler = async (event, context) => {
       return { statusCode: 500, body: JSON.stringify({ error: 'Missing Gemini Key' }) };
     }
 
+    // Initialize the official Google Gen AI SDK
     const ai = new GoogleGenAI({ apiKey });
     
-    // Parse the image format payload coming from client processing blocks
     const base64Image = event.isBase64Encoded 
       ? event.body 
       : Buffer.from(event.body).toString('base64');
@@ -25,29 +25,36 @@ export const handler = async (event, context) => {
       },
     };
 
-    const prompt = `Analyze this grocery receipt picture. Extract only the distinct raw food ingredients, meats, condiments, or produce purchased. 
-Clean up chaotic retail checkout abbreviations into plain, clear English item names (e.g., transform 'CHKN BRST' or 'ORG CHK BRST' to 'Chicken Breast', and 'ORNGS 3LB' to 'Oranges'). 
-Return the result STRICTLY as a raw JSON array of strings like ["Chicken Breast", "Garlic", "Oranges"]. 
-Do not wrap it in markdown code blocks, do not include prose, and do not include pricing.`;
+    const prompt = `Analyze this grocery receipt picture step-by-step:
+1. Scan the very top header area of the image to identify the merchant/store name (e.g., Trader Joe's, Harris Teeter, Food Lion, Target, Walmart, Whole Foods, etc.).
+2. Extract each individual item row purchased from the receipt.
+3. For each extracted line item, perform a contextual query combining the store name and the item abbreviation to determine the clean, raw, singular ingredient name (e.g., if the line says 'TJ ORG CHK' from 'Trader Joe's', search or resolve this to 'Chicken').
+4. Strip away pricing, transactional metadata, or store specific internal SKUs.
 
+Return the final results STRICTLY as a raw JSON array of strings containing only the clean, plain English ingredient names: ["Chicken", "Garlic", "Avocado"]. Do not include markdown code blocks, do not include prose, and ensure it is valid parsable JSON.`;
+
+    // Execute content generation using gemini-2.5-flash with Google Search Grounding active
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [prompt, imagePart],
+      config: {
+        tools: [{ googleSearch: {} }], // Automatically triggers web verification lookup loops
+        temperature: 1.0
+      }
     });
 
-    // Strip markdown formatting safeguards if present
     const cleanJsonString = response.text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const newItems = JSON.parse(cleanJsonString);
+    const cleanIngredients = JSON.parse(cleanJsonString);
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: true, added: newItems }),
+      body: JSON.stringify({ success: true, added: cleanIngredients }),
     };
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: `Processing failure: ${error.message}` }),
+      body: JSON.stringify({ error: `Parsing and grounding failure: ${error.message}` }),
     };
   }
 };
