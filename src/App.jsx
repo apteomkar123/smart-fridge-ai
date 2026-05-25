@@ -83,10 +83,12 @@ export default function App() {
         await supabase.from('fridge_inventory').upsert(insertPayload, { onConflict: 'item_name' });
         await fetchAppData();
       } else {
-        alert("Parsing verification failure.");
+        // Read the exact error text body from the serverless function crash
+        const errorText = await response.text();
+        alert(`Parsing verification failure (Status ${response.status}): ${errorText}`);
       }
     } catch (err) {
-      console.error("Upload execution crash:", err);
+      alert(`Network/Client Error: ${err.message}`);
     }
     setLoading(false);
   };
