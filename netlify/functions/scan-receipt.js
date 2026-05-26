@@ -18,25 +18,15 @@ export const handler = async (event, context) => {
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'Missing API Key' }) };
+    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'Missing API Key Mapping' }) };
 
     const ai = new GoogleGenAI({ apiKey });
     const bodyData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
-    // INTERNET PARSING ENGINE SIMULATION: Resolves item names semantically using store lookup data
+    // 1. CHANNELS GATE A: Inline Lookup Sanitizer
     if (bodyData && bodyData.resolveItemToken) {
       const storeContext = bodyData.storeContext || 'Grocery Store';
-      const prompt = `You are a food product intelligence scanner looking up inventory entries.
-      Analyze this raw receipt item text string: "${bodyData.resolveItemToken}" purchased from "${storeContext}".
-      Parse out packaging units, loose numbers, weights, sizes, pack descriptions, and descriptive qualifiers.
-      Isolate exactly what the product is as a single core singular food noun matching standard recipe terminology.
-      Examples:
-      - "organic croissants 3 pack" -> "croissant"
-      - "eggs large brown pasture raised 12ct" -> "egg"
-      - "boars head premium sliced provolone cheese" -> "provolone cheese"
-      - "chiquita bananas organic bundle" -> "banana"
-      
-      Respond with ONLY the plain parsed matching singular noun string. No punctuation, no wrapping, no extra words.`;
+      const prompt = `Analyze this raw receipt entry: "${bodyData.resolveItemToken}" bought at "${storeContext}". Isolate what the food item is as a single core singular common noun matching standard recipe terms. Strip weights, pack sizing numbers, brand names, and qualifiers. Return ONLY the plain text word noun. Examples: "Organic Brown Eggs 12ct" -> "egg", "sliced provolone cheese 8oz" -> "provolone cheese".`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -51,26 +41,45 @@ export const handler = async (event, context) => {
       };
     }
 
-    // Standard receipt OCR image scanning loop remains intact below...
-    if (bodyData && bodyData.image) {
+    // 2. CHANNELS GATE B: AI Recipe Generator Core Integration
+    if (bodyData && bodyData.customPrompt) {
+      const prompt = `${bodyData.customPrompt} Formulate a creative vegetarian recipe using these items. You must respond with a strict raw JSON object string mapping exactly these properties: { "recipeName": "string name", "ingredients": ["clean item strings"], "steps": ["step 1 description string", "step 2 description string"] }. Do not wrap inside markdown code block formatting backticks.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { temperature: 0.2 }
+      });
+
+      const cleanJsonString = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        body: cleanJsonString
+      };
+    }
+
+    // 3. CHANNELS GATE C: Standard Base64 Image Receipt Processing OCR Matrix
+    if (bodyData && bodyData.image && bodyData.image.trim() !== "") {
       let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
-          "Analyze this receipt photo. Extract the merchant name if visible, and compile all purchased food line items as a raw JSON array of clean strings. Example: [\"eggs large\", \"croissants\"].",
+          "Compile all purchased grocery line items from this receipt as a single flat raw JSON array of text strings. Example: [\"eggs\", \"milk\"]. No extra words or wrapping markdown wrappers.",
           { inlineData: { data: rawBase64, mimeType: "image/jpeg" } }
         ],
         config: { temperature: 0.1 }
       });
 
+      const parsedText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify({ success: true, added: JSON.parse(response.text.match(/\[([\s\S]*?)\]/)[0]) })
+        body: JSON.stringify({ success: true, added: JSON.parse(parsedText) })
       };
     }
 
-    return { statusCode: 400, body: 'Malformed request matrix' };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Malformed payload mapping variables' }) };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
