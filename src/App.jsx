@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import html2canvas from 'html2canvas';
 
@@ -72,34 +72,59 @@ export default function App() {
     }
   };
 
-  // ASYNCHRONOUS BACKGROUND INTERNET LOOKUP ENGINE
-  const resolveSanitizedTokenOnline = async (rawInputString) => {
+  // RESTORED PRIMARY AUTH METHOD FIXER
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
     try {
-      const response = await fetch('/.netlify/functions/scan-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolveItemToken: rawInputString, storeContext: storeName })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.sanitized) return data.sanitized;
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword.trim() });
+        if (error) throw error;
+        alert("🚀 PROFILE PINNED SAFELY! LOG IN WITH YOUR NEW CREDENTIALS.");
+        setIsSignUp(false);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword.trim() });
+        if (error) throw error;
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) { 
+      alert(err.message); 
+    } finally { 
+      setAuthLoading(false); 
     }
-    return cleanIngredientLocally(rawInputString);
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!authEmail.trim()) return alert("Enter email.");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), { redirectTo: window.location.origin });
+      if (error) throw error;
+      alert("📧 Reset layout link deployed!");
+      setIsForgotPasswordView(false);
+    } catch (err) { alert(err.message); }
+  };
+
+  const handleChangePasswordInternally = async (e) => {
+    e.preventDefault();
+    if (newPasswordValue.trim().length < 6) return alert("Min 6 characters required.");
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPasswordValue.trim() });
+      if (error) throw error;
+      alert("⚙️ System credentials updated!");
+      setIsSettingsOpen(false);
+    } catch (err) { alert(err.message); }
   };
 
   const fetchAppData = async () => {
     if (!user) return;
     try {
-      // 1. Fetch Pantry Inventory with User ID Bounds to Avoid Security Rule Crashes
-      let { data: inventory, error: invErr } = await supabase
+      // 1. Fetch Pantry Inventory with User ID Validation
+      let { data: inventory, error: invError } = await supabase
         .from('fridge_inventory')
         .select('*')
         .eq('user_id', user.id);
         
-      if (invErr) console.warn("Pantry query warning:", invErr.message);
+      if (invError) console.warn("Pantry query warning:", invError.message);
 
       const normalizedFridge = (inventory || []).map(row => {
         const rawNameField = row.item_name || row.item || row.name || '';
@@ -117,23 +142,16 @@ export default function App() {
       if (plainTokensArray.length > 0) generateExpirationTimelines(plainTokensArray);
 
       // 2. Fetch User Shopping List
-      let { data: shopItems } = await supabase
-        .from('shopping_list')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+      let { data: shopItems } = await supabase.from('shopping_list').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
       setShoppingList(shopItems || []);
 
-      // 3. Fetch User Saved Recipes Vector Block
-      let { data: likedRecipes } = await supabase
-        .from('saved_recipes')
-        .select('*')
-        .eq('user_id', user.id);
+      // 3. Fetch User Saved Recipes
+      let { data: likedRecipes } = await supabase.from('saved_recipes').select('*').eq('user_id', user.id);
       setSavedRecipes(likedRecipes || []);
 
-      // 4. Load 6,000 Catalog Recipe Rows Completely In Sub-Process
-      let { data: recipes, error: recErr } = await supabase.from('recipes').select('*');
-      if (recErr) throw recErr;
+      // 4. Download Global Recipes Catalog Matrix
+      let { data: recipes, error: recError } = await supabase.from('recipes').select('*');
+      if (recError) throw recError;
 
       const normalizedRecipes = (recipes || []).map(r => {
         let extracted = [];
@@ -141,14 +159,26 @@ export default function App() {
           if (Array.isArray(r.ingredients)) extracted = r.ingredients;
           else {
             try { extracted = JSON.parse(r.ingredients); } catch (e) {
-              extracted = String(r.ingredients).match(/\b[a-zA-Z\- ]+\b/g) || [];
+              extracted = String(r.ingredients).match(/"([^"\\]*(\\.[^"\\]*)*)"|\b[a-zA-Z\- ]+\b/g) || [];
             }
           }
         }
+        
+        let functionalSteps = [];
+        if (r.steps) {
+          if (Array.isArray(r.steps)) functionalSteps = r.steps;
+          else {
+            try { functionalSteps = JSON.parse(r.steps); } catch (e) {
+              functionalSteps = [String(r.steps)];
+            }
+          }
+        }
+
         return { 
           ...r, 
-          name: r.name || 'Untitled Recipe Card',
-          ingredients: Array.isArray(extracted) ? extracted.map(i => cleanIngredientLocally(i)).filter(Boolean) : [] 
+          name: r.name || 'Untitled Recipe Formulation',
+          ingredients: Array.isArray(extracted) ? extracted.map(i => i.replace(/["'\[\]\\]/g, '').trim()).filter(Boolean) : [],
+          steps: functionalSteps
         };
       });
       setMasterRecipes(normalizedRecipes);
@@ -161,7 +191,6 @@ export default function App() {
     if (user) fetchAppData();
   }, [user]);
 
-  // INLINE LIVE PANTRY STATE UPDATER
   const handleUpdateInlineItem = async (id, updatedRawValue) => {
     try {
       setFridge(prev => (prev || []).map(item => item.id === id ? { ...item, raw_name: updatedRawValue, item_name: cleanIngredientLocally(updatedRawValue) } : item));
@@ -171,7 +200,6 @@ export default function App() {
     }
   };
 
-  // SHOPPING LIST METHODS SYSTEM
   const handleAddShoppingItem = async (e, textOverride = '') => {
     if (e) e.preventDefault();
     const targetText = textOverride || shoppingInput;
@@ -210,7 +238,6 @@ export default function App() {
     }
   };
 
-  // SAVED RECIPES SELECTIONS
   const handleSaveRecipeToProfile = async (recipe) => {
     try {
       if ((savedRecipes || []).some(r => r.recipe_id === String(recipe.id))) return alert("Recipe catalog card already liked!");
@@ -218,9 +245,9 @@ export default function App() {
       const { data, error } = await supabase.from('saved_recipes').insert([{
         user_id: user.id,
         recipe_id: String(recipe.id),
-        recipe_name: recipe.name || 'Custom Formulation',
-        ingredients: recipe.ingredients || [],
-        steps: recipe.steps || [],
+        recipe_name: recipe.name,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
         meal_type: recipe.meal_type || 'General'
       }]).select();
 
@@ -242,7 +269,6 @@ export default function App() {
     }
   };
 
-  // HIGH-FIDELITY VIEWPORT SNAPSHOT CAPTURE MACHINE
   const handleDownloadRecipeImage = async () => {
     if (!snapshotCardRef.current) return;
     try {
@@ -253,19 +279,21 @@ export default function App() {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        width: element.offsetWidth || 600,
-        height: element.offsetHeight || 500,
-        windowWidth: 800
+        width: element.getBoundingClientRect().width || 640,
+        height: element.getBoundingClientRect().height || 580,
+        scrollX: 0,
+        scrollY: -window.scrollY
       });
+      
       const dataUri = canvas.toDataURL('image/png');
-      const virtualAnchor = document.createElement('a');
-      virtualAnchor.href = dataUri;
-      virtualAnchor.download = `recipe-card-${Date.now()}.png`;
-      document.body.appendChild(virtualAnchor);
-      virtualAnchor.click();
-      document.body.removeChild(virtualAnchor);
+      const downloader = document.createElement('a');
+      downloader.href = dataUri;
+      downloader.download = `${(activeModalRecipe.name || 'recipe-card').toLowerCase().replace(/\s+/g, '-')}.png`;
+      document.body.appendChild(downloader);
+      downloader.click();
+      document.body.removeChild(downloader);
     } catch (err) {
-      console.error("Canvas redrawing exception handled cleanly:", err);
+      console.error("Canvas export exception bypassed: ", err);
     }
   };
 
@@ -297,9 +325,14 @@ export default function App() {
   const triggerStoreTripPlanner = () => {
     const alerts = [];
     const tokensList = (fridge || []).map(f => f.item_name).filter(Boolean);
+    
     (masterRecipes || []).forEach(recipe => {
       const recipeIngredients = recipe.ingredients || [];
-      const missing = recipeIngredients.filter(ing => !tokensList.some(token => token && ing && (ing.includes(token) || token.includes(ing))));
+      const missing = recipeIngredients.filter(ing => {
+        const cleanIng = cleanIngredientLocally(ing);
+        return !tokensList.some(token => cleanIng.includes(token) || token.includes(cleanIng));
+      });
+      
       if (missing.length >= 1 && missing.length <= 3 && recipeIngredients.length > missing.length) {
         alerts.push({ recipe, missingItems: missing, mealType: recipe.meal_type || 'General' });
       }
@@ -388,6 +421,33 @@ export default function App() {
     setExpirationMap(freshMap);
   };
 
+  const parseRecipeIngredientMeasurements = (ingredientString, multiplier) => {
+    if (!ingredientString) return '';
+    const numericTokenMatch = ingredientString.match(/^([0-9\/\.\s\-½⅓¼¾⅛⅖⅗⅘⅙⅚]+)/);
+    
+    if (numericTokenMatch) {
+      const rawNumberString = numericTokenMatch[1].trim();
+      let baseVal = parseFloat(rawNumberString);
+      
+      if (isNaN(baseVal)) {
+        if (rawNumberString.includes('½')) baseVal = 0.5;
+        else if (rawNumberString.includes('¼')) baseVal = 0.25;
+        else if (rawNumberString.includes('¾')) baseVal = 0.75;
+        else baseVal = 1.0; 
+      }
+      
+      const scaledVal = baseVal * multiplier;
+      const restOfIngredient = ingredientString.substring(numericTokenMatch[0].length).trim();
+      return `${scaledVal} ${restOfIngredient}`;
+    }
+    
+    const baseQuantityValue = 1 * multiplier;
+    if (['pizza', 'naan', 'bun', 'tortilla', 'croissant', 'bread', 'roti', 'paratha', 'egg', 'paneer'].some(x => ingredientString.toLowerCase().includes(x))) {
+      return `${baseQuantityValue} Pcs ${ingredientString}`;
+    }
+    return `${baseQuantityValue * 0.5} Cups ${ingredientString}`;
+  };
+
   const getStaticRecipeSteps = (recipe) => {
     if (recipe && recipe.steps && recipe.steps.length > 0) return recipe.steps;
     return [
@@ -398,32 +458,34 @@ export default function App() {
     ];
   };
 
-  // INSULATED WORD AFFINITY COMPLEX DECK INTERSECTION SORT ENGINE
-  const tokensListArray = Array.isArray(fridge) ? fridge.map(f => f.item_name).filter(Boolean) : [];
-  
-  const processedRecipes = (masterRecipes || []).map(recipe => {
-    const recipeIngredients = recipe.ingredients || [];
-    const total = recipeIngredients.length;
+  // 🛡️ MEMOIZATION RENDERING GUARD LAYER
+  const processedRecipes = useMemo(() => {
+    const tokensListArray = (fridge || []).map(f => f.item_name).filter(Boolean);
     
-    const ownedCount = recipeIngredients.filter(ing => {
-      const cleanIng = String(ing || '').toLowerCase().trim();
-      if (!cleanIng) return false;
-      return tokensListArray.some(token => token && (cleanIng.includes(token) || token.includes(cleanIng)));
-    }).length;
-    
-    const matchPercentage = total > 0 ? Math.round((ownedCount / total) * 100) : 0;
-    return { ...recipe, matchPercentage, ownedCount, totalCount: total };
-  }).filter(recipe => {
-    if (!recipeSearch) return true;
-    return recipe.name && recipe.name.toLowerCase().includes(recipeSearch.toLowerCase());
-  }).sort((a, b) => {
-    if (b.matchPercentage !== a.matchPercentage) return b.matchPercentage - a.matchPercentage;
-    return (a.name || '').localeCompare(b.name || '');
-  });
+    return (masterRecipes || []).map(recipe => {
+      const recipeIngredients = recipe.ingredients || [];
+      const total = recipeIngredients.length;
+      
+      const ownedCount = recipeIngredients.filter(ing => {
+        const cleanIng = String(ing || '').toLowerCase().trim();
+        if (!cleanIng) return false;
+        return tokensListArray.some(token => token && (cleanIng.includes(token) || token.includes(cleanIng)));
+      }).length;
+      
+      const matchPercentage = total > 0 ? Math.round((ownedCount / total) * 100) : 0;
+      return { ...recipe, matchPercentage, ownedCount, totalCount: total };
+    }).filter(recipe => {
+      if (!recipeSearch) return true;
+      return recipe.name && recipe.name.toLowerCase().includes(recipeSearch.toLowerCase());
+    }).sort((a, b) => {
+      if (b.matchPercentage !== a.matchPercentage) return b.matchPercentage - a.matchPercentage;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [fridge, masterRecipes, recipeSearch]);
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans tracking-tight antialiased flex items-center justify-center p-6 select-none">
+      <div className="min-h-screen bg-slate-955 text-slate-100 font-sans font-black tracking-tight antialiased flex items-center justify-center p-6 select-none uppercase">
         <div className="bg-slate-900 border-4 border-slate-800 p-8 rounded-none w-full max-w-md shadow-2xl relative">
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600"></div>
           {isForgotPasswordView ? (
@@ -453,16 +515,16 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans tracking-tight antialiased pb-12 selection:bg-amber-500 selection:text-slate-950 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans font-black tracking-tight antialiased pb-12 selection:bg-amber-500 selection:text-slate-950 w-full overflow-x-hidden uppercase">
       
-      {/* HIGH CONTRAST BOLD NAVIGATION TOPBAR HEADER BLOCK */}
+      {/* HEADER SECTION WRAPPING REPAIR */}
       <header className="bg-slate-900 border-b-4 border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 w-full shadow-xl">
         <div className="text-center md:text-left">
           <h1 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-sans">SmartFridge AI</h1>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-0.5 font-sans">Profile Matrix: <span className="text-amber-500 font-bold normal-case font-sans">{user.email}</span></p>
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-0.5 font-sans normal-case">Profile Matrix: <span className="text-amber-500 font-bold font-sans">{user.email}</span></p>
         </div>
         
-        <div className="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto font-sans">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto font-sans">
           <select value={storeName} onChange={(e) => setStoreName(e.target.value)} className="bg-slate-950 border-2 border-slate-800 text-[11px] font-black uppercase tracking-widest px-3 py-2.5 text-slate-300 focus:border-amber-500 focus:outline-none rounded-none cursor-pointer font-sans">
             <option value="Chipotle">Chipotle Matrix</option>
             <option value="Subway">Subway Station</option>
@@ -509,7 +571,7 @@ export default function App() {
                       onChange={(e) => handleUpdateInlineItem(item.id, e.target.value)}
                       className="w-full bg-transparent text-xs font-black text-slate-100 uppercase tracking-tight border-b-2 border-transparent hover:border-slate-800 focus:border-amber-500 focus:outline-none pb-0.5 transition-colors font-sans"
                     />
-                    <div className="text-[9px] font-mono font-black text-slate-500 uppercase tracking-widest mt-0.5 font-sans">Sanitized Noun: <span className="text-amber-500 normal-case font-bold font-sans">{item.item_name || 'Empty'}</span></div>
+                    <div className="text-[9px] font-mono font-black text-slate-500 uppercase tracking-widest mt-0.5 font-sans normal-case">Sanitized Noun: <span className="text-amber-500 font-bold font-sans">{item.item_name || 'Empty'}</span></div>
                   </div>
                   <button onClick={() => handleRemoveItem(item.id)} className="text-slate-600 hover:text-red-500 font-mono text-base font-black px-2 font-sans">×</button>
                 </div>
@@ -540,7 +602,7 @@ export default function App() {
 
         {/* Right Columns Layout Workspace */}
         <div className="lg:col-span-2 space-y-6 font-sans">
-          {/* Pinned Recipes Container */}
+          {/* Saved Liked Recipes Card Row */}
           {savedRecipes && savedRecipes.length > 0 && (
             <div className="bg-slate-900 p-6 rounded-none border-2 border-slate-800 shadow-xl font-sans">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 font-sans">⭐ Saved Liked Recipes ({savedRecipes.length})</h2>
@@ -608,7 +670,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Servings scaler */}
+            {/* Servings multiplier */}
             <div className="bg-slate-950 border-2 border-slate-800 p-3 rounded-none mb-6 flex items-center justify-between shadow-inner font-sans">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1 font-sans">👥 Adjust Servings Yield Index:</span>
               <div className="flex gap-1 font-sans">
@@ -618,7 +680,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Snapshot Print Card */}
+            {/* Card Blueprint Area */}
             <div className="p-2 bg-white rounded-none border-2 border-slate-200 font-sans">
               <div ref={snapshotCardRef} className="bg-white p-6 space-y-6 font-sans">
                 <div className="border-b-2 border-slate-200 pb-4 text-center font-sans">
@@ -634,10 +696,11 @@ export default function App() {
                         const cleanIng = String(ing || '').toLowerCase().trim();
                         const isOwned = tokensListArray.some(token => token && (cleanIng.includes(token) || token.includes(cleanIng)));
                         return (
-                          <li key={idx} className="text-xs font-black text-slate-900 capitalize flex flex-col border-b-2 border-slate-200 pb-2 font-sans">
-                            <span className="text-[8px] font-mono text-indigo-600 font-black tracking-wide uppercase font-mono">{getCleanMeasurement(ing, servingMultiplier)}</span>
-                            <div className="flex justify-between items-center gap-1 mt-0.5 font-sans">
-                              <span className={isOwned ? 'text-slate-900 font-sans' : 'text-slate-400 font-semibold font-sans'}>{ing}</span>
+                          <li key={idx} className="text-xs font-black text-slate-900 capitalize flex flex-col border-b border-slate-200 pb-2 font-sans">
+                            <span className="text-[11px] font-sans text-indigo-600 font-black tracking-wide uppercase">
+                              {parseRecipeIngredientMeasurements(ing, servingMultiplier)}
+                            </span>
+                            <div className="flex justify-between items-center gap-1 mt-1 font-sans">
                               {!isOwned && (
                                 <button data-html2canvas-ignore="true" onClick={() => handleAddShoppingItem(null, ing)} className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 font-sans font-black uppercase tracking-wider border border-amber-200 shrink-0">
                                   + Buy item
@@ -653,7 +716,7 @@ export default function App() {
                   <div className="md:col-span-2 space-y-3 font-sans">
                     <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b-2 border-slate-200 pb-1 font-mono">🔥 Preparation Progression Matrix</h4>
                     <ol className="space-y-2.5 font-sans">
-                      {getStaticRecipeSteps(activeModalRecipe).map((step, idx) => (
+                      {(activeModalRecipe.steps || getStaticRecipeSteps(activeModalRecipe)).map((step, idx) => (
                         <li key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-none text-xs text-slate-700 flex gap-3 leading-relaxed font-sans">
                           <span className="font-mono font-black text-slate-900 bg-white border-2 border-slate-300 w-5 h-5 rounded-none flex items-center justify-center shrink-0 shadow-sm font-mono">{idx + 1}</span>
                           <p className="font-bold text-slate-700 font-sans">{step}</p>
@@ -696,7 +759,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Internal user settings box */}
+      {/* Internal settings view */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 font-sans">
           <div className="bg-white border-4 border-slate-200 p-6 rounded-none w-full max-w-sm shadow-2xl font-sans">
