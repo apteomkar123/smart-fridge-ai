@@ -14,6 +14,17 @@
 	}
 }
 
+@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
+
+/* Apply it to a specific class or heading */
+.logo-text {
+  font-family: 'Yellowtail', cursive;
+  font-size: 3rem; /* Adjust size as needed */
+  color: #ffffff; /* Matches the white script in your icon */
+  letter-spacing: 0.05em;
+  text-transform: none; /* Keeps the cursive capitalization natural */
+}
+
 @keyframes floatUp {
 	0% { transform: translateY(6px); opacity: 0; }
 	100% { transform: translateY(0); opacity: 1; }
