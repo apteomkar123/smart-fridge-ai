@@ -135,6 +135,24 @@ export const RecipeProvider = ({ children, fridge }) => {
     finally { setAiGenerating(false); }
   };
 
+    const processedRecipes = useMemo(() => {
+      const pantryTokens = new Set((fridge || []).flatMap(f => normalizeIngredientTokens(f.item_name)));
+      const scored = masterRecipes.map(recipe => {
+        const cleaned = recipe.cleanedIngredients || [];
+        const matchCount = cleaned.filter(ing => normalizeIngredientTokens(ing).some(t => pantryTokens.has(t))).length;
+        const matchPercentage = Math.round((matchCount / (cleaned.length || 1)) * 100);
+        return { ...recipe, matchPercentage };
+      });
+
+      return scored
+        .filter(r => {
+          const s = debouncedRecipeSearch.toLowerCase();
+          return !s || r.name.toLowerCase().includes(s) || r.cleanedIngredients.some(i => i.includes(s));
+        })
+        .filter(r => matchesRecipeFilter(r, activeFilter))
+        .sort((a, b) => b.matchPercentage - a.matchPercentage);
+    }, [fridge, masterRecipes, debouncedRecipeSearch, activeFilter]);
+
   const triggerStoreTripPlanner = useCallback(() => {
     const pantryTokens = (fridge || []).map(f => f.item_name).filter(Boolean);
     const alerts = processedRecipes
@@ -174,23 +192,6 @@ export const RecipeProvider = ({ children, fridge }) => {
     }
   };
 
-  const processedRecipes = useMemo(() => {
-    const pantryTokens = new Set((fridge || []).flatMap(f => normalizeIngredientTokens(f.item_name)));
-    const scored = masterRecipes.map(recipe => {
-      const cleaned = recipe.cleanedIngredients || [];
-      const matchCount = cleaned.filter(ing => normalizeIngredientTokens(ing).some(t => pantryTokens.has(t))).length;
-      const matchPercentage = Math.round((matchCount / (cleaned.length || 1)) * 100);
-      return { ...recipe, matchPercentage };
-    });
-
-    return scored
-      .filter(r => {
-        const s = debouncedRecipeSearch.toLowerCase();
-        return !s || r.name.toLowerCase().includes(s) || r.cleanedIngredients.some(i => i.includes(s));
-      })
-      .filter(r => matchesRecipeFilter(r, activeFilter))
-      .sort((a, b) => b.matchPercentage - a.matchPercentage);
-  }, [fridge, masterRecipes, debouncedRecipeSearch, activeFilter]);
 
   const filteredSavedRecipes = useMemo(() => {
     if (!savedRecipes) return [];

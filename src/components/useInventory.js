@@ -12,7 +12,8 @@ export const useInventory = (user, household) => {
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState('');
   const [isScanningBarcode, setIsScanningBarcode] = useState(false);
-  const [storeName, setStoreName] = useState('General Grocery');
+    const [barcodeInput, setBarcodeInput] = useState('');
+    const [storeName, setStoreName] = useState('General Grocery');
   const [error, setError] = useState(null);
 
   const calculateMacroMetrics = useCallback((tokens) => {
@@ -286,6 +287,8 @@ export const useInventory = (user, household) => {
     barcodeLoading,
     barcodeResult,
     isScanningBarcode,
+      barcodeInput,
+      setBarcodeInput,
     storeName,
     setIsScanningBarcode,
     handleAddManualItem,
