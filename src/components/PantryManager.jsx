@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X } from 'lucide-react';
+import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X, Users, User } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export default function PantryManager({ fridge, handleAddManualItem, handleUpdateInlineItem, handleRemoveItem, receiptLoading, handleFileUpload, barcodeInput, setBarcodeInput, handleBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
+export default function PantryManager({ fridge, activeHousehold, handleAddManualItem, handleUpdateInlineItem, handleRemoveItem, receiptLoading, handleFileUpload, barcodeInput, setBarcodeInput, handleBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
   const [manualItem, setManualItem] = useState('');
+  const [isShared, setIsShared] = useState(false);
+
   const isExpiringSoon = (date) => {
     if (!date) return false;
     const today = new Date();
     const expiry = new Date(date);
     const diff = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-    return diff <= 7 && diff > 0; // Expiring within 7 days
+    return diff <= 7 && diff > 0;
   };
 
   useEffect(() => {
@@ -17,26 +19,29 @@ export default function PantryManager({ fridge, handleAddManualItem, handleUpdat
     if (isScanningBarcode) {
       html5QrCode = new Html5Qrcode("barcode-scanner-region");
       const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-      
       html5QrCode.start(
-        { facingMode: "environment" }, 
-        config, 
-        (decodedText) => {
-          handleBarcodeLookup(decodedText);
-        },
-        () => {} // Ignore parse errors
+        { facingMode: "environment" },
+        config,
+        (decodedText) => { handleBarcodeLookup(decodedText); },
+        () => {}
       ).catch((err) => {
         console.error("Scanner error:", err);
         setIsScanningBarcode(false);
       });
     }
-
     return () => {
       if (html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().catch(err => console.error("Error stopping scanner", err));
       }
     };
   }, [isScanningBarcode, handleBarcodeLookup, setIsScanningBarcode]);
+
+  const submitItem = (e) => {
+    e.preventDefault();
+    if (!manualItem.trim()) return;
+    handleAddManualItem(manualItem, isShared);
+    setManualItem('');
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -48,11 +53,34 @@ export default function PantryManager({ fridge, handleAddManualItem, handleUpdat
             <p className="text-[12px] text-slate-500">Scan receipts, lookup barcodes, or add pantry items manually.</p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); handleAddManualItem(manualItem); setManualItem(''); }} className="flex gap-2">
-            <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Add manually..." className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm" />
-            <button type="submit" className="bg-[#6BAEE0] text-white p-4 rounded-2xl shadow-lg shadow-blue-100 active:scale-90 transition-all">
-              <Plus size={20} />
-            </button>
+          <form onSubmit={submitItem} className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualItem}
+                onChange={(e) => setManualItem(e.target.value)}
+                placeholder="Add manually..."
+                className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm"
+              />
+              <button type="submit" className="bg-[#6BAEE0] text-white p-4 rounded-2xl shadow-lg shadow-blue-100 active:scale-90 transition-all">
+                <Plus size={20} />
+              </button>
+            </div>
+
+            {activeHousehold && (
+              <button
+                type="button"
+                onClick={() => setIsShared(s => !s)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-bold transition-all border ${
+                  isShared
+                    ? 'bg-sky-50 text-[#6BAEE0] border-sky-200'
+                    : 'bg-white text-slate-400 border-blue-50 hover:border-sky-200'
+                }`}
+              >
+                {isShared ? <Users size={13} /> : <User size={13} />}
+                {isShared ? `Shared with ${activeHousehold.name}` : 'Personal (just me)'}
+              </button>
+            )}
           </form>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -69,9 +97,9 @@ export default function PantryManager({ fridge, handleAddManualItem, handleUpdat
             </button>
           </div>
 
-          <button 
-            type="button" 
-            onClick={() => setIsScanningBarcode(true)} 
+          <button
+            type="button"
+            onClick={() => setIsScanningBarcode(true)}
             className="w-full bg-sky-50 text-[#1F6FB8] border border-sky-100 px-5 py-4 rounded-2xl text-xs font-bold hover:bg-sky-100 transition-all shadow-sm text-center flex items-center justify-center gap-2"
           >
             <Camera size={16} /> Scan with Camera
@@ -82,9 +110,7 @@ export default function PantryManager({ fridge, handleAddManualItem, handleUpdat
               <div className="bg-white/10 backdrop-blur-2xl rounded-[3rem] w-full max-w-md overflow-hidden relative shadow-2xl border border-white/20">
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
                   <h3 className="text-sm font-bold text-white tracking-tight">Scan Barcode</h3>
-                  <button onClick={() => setIsScanningBarcode(false)} className="text-white/40 hover:text-white transition-colors">
-                    <X size={20} />
-                  </button>
+                  <button onClick={() => setIsScanningBarcode(false)} className="text-white/40 hover:text-white transition-colors"><X size={20} /></button>
                 </div>
                 <div className="relative aspect-square bg-black overflow-hidden">
                   <div id="barcode-scanner-region" className="w-full h-full"></div>
@@ -111,19 +137,32 @@ export default function PantryManager({ fridge, handleAddManualItem, handleUpdat
           <h2 className="text-[14px] font-bold text-slate-400">Pantry Stock</h2>
           <span className="bg-blue-50 text-[#6BAEE0] border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black">{fridge.length} items</span>
         </div>
-        
+
         <div className="grid gap-3">
           {fridge.length === 0 ? (
             <p className="text-xs text-slate-400 font-medium italic text-center py-10">Your pantry is empty</p>
           ) : (
             fridge.map((item) => (
               <div key={item.id} className="bg-white border border-blue-50 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm group hover:shadow-md transition-all">
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <input type="text" defaultValue={item.raw_name} onBlur={(e) => handleUpdateInlineItem(item.id, e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-800 border-b border-transparent hover:border-blue-100 focus:border-sky-400 focus:outline-none pb-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      defaultValue={item.raw_name}
+                      onBlur={(e) => handleUpdateInlineItem(item.id, e.target.value)}
+                      className="flex-1 bg-transparent text-xs font-bold text-slate-800 border-b border-transparent hover:border-blue-100 focus:border-sky-400 focus:outline-none pb-1 min-w-0"
+                    />
+                    {item.household_id && activeHousehold && (
+                      <span className="shrink-0 flex items-center gap-1 text-[9px] font-black text-[#6BAEE0] bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        <Users size={9} /> Shared
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[9px] font-mono font-black text-slate-300 uppercase">
                       Sanitized: <span className="text-[#6BAEE0]">{item.item_name}</span>
-                      {item.expiry_date && <span className="ml-2">Exp: {new Date(item.expiry_date).toLocaleDateString()}</span>}</span>
+                      {item.expiry_date && <span className="ml-2">Exp: {new Date(item.expiry_date).toLocaleDateString()}</span>}
+                    </span>
                     {isExpiringSoon(item.expiry_date) && <AlertCircle size={10} className="text-orange-400 animate-pulse" />}
                   </div>
                 </div>

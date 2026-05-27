@@ -127,15 +127,28 @@ export const useInventory = (user, household) => {
     setLoading(true);
     setError(null);
     try {
-      let { data: inventory, error: invError } = await supabase.from('fridge_inventory').select('*').eq('user_id', user.id);
-      if (invError) throw invError;
+      // Personal items (no household) + shared items from active household
+      const { data: personal, error: pErr } = await supabase
+        .from('fridge_inventory').select('*')
+        .eq('user_id', user.id).is('household_id', null);
+      if (pErr) throw pErr;
 
-      const normalizedFridge = (inventory || []).map(row => ({
+      let shared = [];
+      if (household?.id) {
+        const { data: sharedItems, error: sErr } = await supabase
+          .from('fridge_inventory').select('*')
+          .eq('household_id', household.id);
+        if (!sErr) shared = sharedItems || [];
+      }
+
+      const inventory = [...(personal || []), ...shared];
+      const normalizedFridge = inventory.map(row => ({
         id: row.id,
         raw_name: row.item_name,
         item_name: cleanIngredientLocally(row.item_name),
         expiry_date: row.expiry_date,
-        price: row.price || 0
+        price: row.price || 0,
+        household_id: row.household_id || null
       })).filter(item => item.raw_name);
       setFridge(normalizedFridge);
       calculateMacroMetrics(normalizedFridge.map(f => f.item_name));
@@ -159,20 +172,21 @@ export const useInventory = (user, household) => {
     fetchAppData();
   }, [fetchAppData]);
 
-  const handleAddManualItem = useCallback(async (itemName) => {
+  const handleAddManualItem = useCallback(async (itemName, isShared = false) => {
     if (!itemName || !itemName.trim() || !user) return;
 
     const sanitized = await resolveSanitizedTokenOnline(itemName);
     if (!sanitized) return;
 
+    const sharedHouseholdId = isShared && household?.id ? household.id : null;
     const tempId = `temp-${Date.now()}`;
-    setFridge(prev => [...prev, { id: tempId, raw_name: itemName, item_name: sanitized }]);
+    setFridge(prev => [...prev, { id: tempId, raw_name: itemName, item_name: sanitized, household_id: sharedHouseholdId }]);
     triggerHaptic(50);
 
     const newItem = {
       item_name: sanitized,
       user_id: user.id,
-      household_id: household?.id || null
+      household_id: sharedHouseholdId
     };
 
     const savedData = await performMutation('fridge_inventory', 'INSERT', newItem);

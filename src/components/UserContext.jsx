@@ -11,34 +11,39 @@ export const useUser = () => {
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [household, setHousehold] = useState(null);
+  const [households, setHouseholds] = useState([]);
+  const [activeHousehold, setActiveHousehold] = useState(null);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const fetchHousehold = async (householdId) => {
-    if (!householdId) return;
-    const { data: hh } = await supabase.from('households')
-      .select('*')
-      .eq('id', householdId)
-      .single();
-    setHousehold(hh || null);
+  const fetchHouseholds = async (ids, activeId) => {
+    if (!ids || ids.length === 0) {
+      setHouseholds([]);
+      setActiveHousehold(null);
+      return;
+    }
+    const { data: hhs } = await supabase.from('households').select('*').in('id', ids);
+    const list = hhs || [];
+    setHouseholds(list);
+    setActiveHousehold(list.find(h => h.id === activeId) || list[0] || null);
   };
 
   const loadUserState = async (authUser) => {
     if (!authUser) {
       setUser(null);
-      setHousehold(null);
+      setHouseholds([]);
+      setActiveHousehold(null);
       setUserName('');
       return;
     }
     setUser(authUser);
-    const metadata = authUser.user_metadata || {};
-    setUserName(metadata.name || '');
-    if (metadata.household_id) {
-      await fetchHousehold(metadata.household_id);
-    } else {
-      setHousehold(null);
-    }
+    const meta = authUser.user_metadata || {};
+    setUserName(meta.name || '');
+
+    // Support both old single household_id and new household_ids array
+    const ids = meta.household_ids || (meta.household_id ? [meta.household_id] : []);
+    const activeId = meta.active_household_id || ids[0] || null;
+    await fetchHouseholds(ids, activeId);
   };
 
   useEffect(() => {
@@ -56,31 +61,12 @@ export const UserProvider = ({ children }) => {
 
   const handleUpdateProfileName = async (newName) => {
     if (!user || !newName.trim()) return;
-    const { data, error } = await supabase.auth.updateUser({
-      data: { name: newName.trim() }
-    });
-    if (!error && data.user) {
-      setUserName(data.user.user_metadata?.name || '');
-    }
-  };
-
-  const handleJoinHousehold = async (code) => {
-    const { data: hh, error } = await supabase.from('households')
-      .select('*')
-      .eq('invite_code', code.trim().toUpperCase())
-      .single();
-
-    if (error || !hh) return alert("Invalid invite code");
-
-    const { error: metaError } = await supabase.auth.updateUser({
-      data: { household_id: hh.id }
-    });
-    if (!metaError) setHousehold(hh);
+    const { data, error } = await supabase.auth.updateUser({ data: { name: newName.trim() } });
+    if (!error && data.user) setUserName(data.user.user_metadata?.name || '');
   };
 
   const handleCreateHousehold = async (name) => {
-    if (!name || !name.trim()) return alert("Please enter a name for your household.");
-
+    if (!name || !name.trim()) return alert('Please enter a name for your household.');
     const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { data: hh, error: hhError } = await supabase
       .from('households')
@@ -90,41 +76,66 @@ export const UserProvider = ({ children }) => {
     if (hhError) return alert(hhError.message);
 
     if (hh && user) {
+      const meta = user.user_metadata || {};
+      const currentIds = meta.household_ids || (meta.household_id ? [meta.household_id] : []);
       const { error: metaError } = await supabase.auth.updateUser({
-        data: { household_id: hh.id }
+        data: { household_ids: [...currentIds, hh.id], active_household_id: hh.id }
       });
-      if (metaError) {
-        alert(`Created household "${hh.name}", but failed to link your profile. Error: ${metaError.message}`);
-        return;
-      }
-      setHousehold(hh);
+      if (metaError) return alert(`Household created but not linked: ${metaError.message}`);
+      setHouseholds(prev => [...prev, hh]);
+      setActiveHousehold(hh);
     }
+  };
+
+  const handleJoinHousehold = async (code) => {
+    const { data: hh, error } = await supabase.from('households')
+      .select('*')
+      .eq('invite_code', code.trim().toUpperCase())
+      .single();
+    if (error || !hh) return alert('Invalid invite code');
+
+    const meta = user.user_metadata || {};
+    const currentIds = meta.household_ids || (meta.household_id ? [meta.household_id] : []);
+    if (currentIds.includes(hh.id)) return alert("You're already in this household");
+
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: { household_ids: [...currentIds, hh.id], active_household_id: hh.id }
+    });
+    if (!metaError) {
+      setHouseholds(prev => [...prev, hh]);
+      setActiveHousehold(hh);
+    }
+  };
+
+  const handleSetActiveHousehold = async (householdId) => {
+    const { error } = await supabase.auth.updateUser({ data: { active_household_id: householdId } });
+    if (!error) setActiveHousehold(households.find(h => h.id === householdId) || null);
   };
 
   const handleUpdateBudgetLimit = async (newLimit) => {
-    if (!household) return;
+    if (!activeHousehold) return;
     const limitVal = parseFloat(newLimit) || 0;
-    const { error } = await supabase.from('households')
-      .update({ budget_limit: limitVal })
-      .eq('id', household.id);
-
+    const { error } = await supabase.from('households').update({ budget_limit: limitVal }).eq('id', activeHousehold.id);
     if (!error) {
-      setHousehold(prev => ({ ...prev, budget_limit: limitVal }));
+      const updated = { ...activeHousehold, budget_limit: limitVal };
+      setActiveHousehold(updated);
+      setHouseholds(prev => prev.map(h => h.id === activeHousehold.id ? updated : h));
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const handleSignOut = async () => { await supabase.auth.signOut(); };
 
   return (
     <UserContext.Provider value={{
       user,
-      household,
+      household: activeHousehold,   // backward-compat alias used throughout the app
+      households,
+      activeHousehold,
       userName,
       handleUpdateProfileName,
       handleJoinHousehold,
       handleCreateHousehold,
+      handleSetActiveHousehold,
       handleUpdateBudgetLimit,
       handleSignOut,
       loading

@@ -43,21 +43,23 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
       const response = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          customPrompt: `Suggest a common vegetarian substitute for "${ingredient}" in the context of a recipe. Return ONLY the name of the substitute.` 
+        body: JSON.stringify({
+          customPrompt: `Suggest a common vegetarian substitute for "${ingredient}" in a recipe.`
         })
       });
+      if (!response.ok) throw new Error(`Server error ${response.status}`);
       const text = await response.text();
       let parsed;
       try {
         parsed = JSON.parse(text);
       } catch (e) {
-        // Fallback for non-JSON or malformed AI text
         parsed = { recipeName: text.replace(/["{}]/g, '').trim() };
       }
-      const subValue = parsed.recipeName || parsed.substitutions?.[ingredient] || "Try another swap";
-      setSubstitutes(prev => ({ ...prev, [ingredient]: subValue }));
-    } catch (err) { console.error(err); }
+      const subValue = (parsed.recipeName || '').trim();
+      if (subValue) setSubstitutes(prev => ({ ...prev, [ingredient]: subValue }));
+    } catch (err) {
+      console.error('Swap failed:', err);
+    }
     setLoadingSub(null);
   };
 

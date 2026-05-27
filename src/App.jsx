@@ -15,6 +15,7 @@ import { RecipeProvider, useRecipes } from './components/RecipeContext';
 import { useInventory } from './components/useInventory';
 
 function AppContent({ inventory }) {
+  const { household: activeHousehold } = useUser();
   const {
     fridge,
     shoppingList,
@@ -68,6 +69,7 @@ function AppContent({ inventory }) {
           {activeTab === 'pantry' && (
             <PantryManager
               fridge={fridge}
+              activeHousehold={activeHousehold}
               handleAddManualItem={handleAddManualItem}
               handleUpdateInlineItem={handleUpdateInlineItem}
               handleRemoveItem={handleRemoveItem}
