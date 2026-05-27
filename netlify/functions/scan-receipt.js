@@ -29,7 +29,7 @@ export const handler = async (event, context) => {
       const prompt = `Analyze this raw receipt entry: "${bodyData.resolveItemToken}" bought at "${storeContext}". Isolate what the food item is as a single core singular common noun matching standard recipe terms. Strip weights, pack sizing numbers, brand names, and qualifiers. Return ONLY the plain text word noun. Examples: "Organic Brown Eggs 12ct" -> "egg", "sliced provolone cheese 8oz" -> "provolone cheese".`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash-lite',
         contents: prompt,
         config: { temperature: 0.1 }
       });
@@ -37,25 +37,26 @@ export const handler = async (event, context) => {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify({ sanitized: response.text.replace(/["'#*`]/g, '').trim().toLowerCase() })
+        body: JSON.stringify({ sanitized: (response.text || '').replace(/["'#*`]/g, '').trim().toLowerCase() })
       };
     }
 
     // 2. CHANNELS GATE B: AI Recipe Generator Core Integration
     if (bodyData && bodyData.customPrompt) {
       const text = bodyData.customPrompt.toLowerCase();
-      const isRecipeRequest = text.includes('recipe') || text.includes('cook') || text.includes('meal') || text.includes('generate');
+      const isSubstitutionRequest = text.includes('substitute') || text.includes('substitution') || text.includes('swap');
+      const isRecipeRequest = !isSubstitutionRequest && (text.includes('recipe') || text.includes('cook') || text.includes('meal') || text.includes('generate'));
       const prompt = isRecipeRequest
         ? `${bodyData.customPrompt}. Generate a creative vegetarian recipe. Return ONLY a valid JSON object: { "recipeName": "string", "ingredients": ["string"], "steps": ["string"] }.`
         : `${bodyData.customPrompt}. Suggest a substitution. Return ONLY a valid JSON object: { "recipeName": "substitution_name" }.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash-lite',
         contents: prompt,
         config: { temperature: 0.2 }
       });
 
-      const cleanJsonString = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const cleanJsonString = (response.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -67,7 +68,7 @@ export const handler = async (event, context) => {
     if (bodyData && bodyData.image && bodyData.image.trim() !== "") {
       let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash-lite',
         contents: [
           "Read the receipt image and identify the store or merchant name at the top.",
           "Return only a single JSON object with two keys: storeName (string) and items (array of item strings).",
@@ -77,7 +78,7 @@ export const handler = async (event, context) => {
         config: { temperature: 0.1 }
       });
 
-      const rawOutput = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const rawOutput = (response.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
       let parsedResult = { storeName: 'General Grocery', items: [] };
       try {
         parsedResult = JSON.parse(rawOutput);

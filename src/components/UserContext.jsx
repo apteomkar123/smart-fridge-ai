@@ -15,67 +15,67 @@ export const UserProvider = ({ children }) => {
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const fetchHousehold = async (householdId) => {
+    if (!householdId) return;
+    const { data: hh } = await supabase.from('households')
+      .select('*')
+      .eq('id', householdId)
+      .single();
+    setHousehold(hh || null);
+  };
+
+  const loadUserState = async (authUser) => {
+    if (!authUser) {
+      setUser(null);
+      setHousehold(null);
+      setUserName('');
+      return;
+    }
+    setUser(authUser);
+    const metadata = authUser.user_metadata || {};
+    setUserName(metadata.name || '');
+    if (metadata.household_id) {
+      await fetchHousehold(metadata.household_id);
+    } else {
+      setHousehold(null);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfileAndHousehold(session.user.id);
-      }
+      loadUserState(session?.user || null);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfileAndHousehold(session.user.id);
-      } else {
-        setUser(null);
-        setHousehold(null);
-        setUserName('');
-      }
+      loadUserState(session?.user || null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfileAndHousehold = async (userId) => {
-    const { data: profile } = await supabase.from('profiles')
-      .select('household_id, name, full_name')
-      .eq('id', userId)
-      .single();
-      
-    if (profile) {
-      setUserName(profile.name || profile.full_name || '');
-      if (profile.household_id) {
-        const { data: hh } = await supabase.from('households')
-          .select('*')
-          .eq('id', profile.household_id)
-          .single();
-        setHousehold(hh);
-      }
-    }
-  };
-
   const handleUpdateProfileName = async (newName) => {
     if (!user || !newName.trim()) return;
-    const { data, error } = await supabase.from('profiles')
-      .update({ name: newName.trim() })
-      .eq('id', user.id)
-      .select()
-      .single();
-      
-    if (!error && data) setUserName(data.name);
+    const { data, error } = await supabase.auth.updateUser({
+      data: { name: newName.trim() }
+    });
+    if (!error && data.user) {
+      setUserName(data.user.user_metadata?.name || '');
+    }
   };
 
   const handleJoinHousehold = async (code) => {
     const { data: hh, error } = await supabase.from('households')
       .select('*')
-      .eq('invite_code', code)
+      .eq('invite_code', code.trim().toUpperCase())
       .single();
-      
+
     if (error || !hh) return alert("Invalid invite code");
-    await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id);
-    setHousehold(hh);
+
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: { household_id: hh.id }
+    });
+    if (!metaError) setHousehold(hh);
   };
 
   const handleCreateHousehold = async (name) => {
@@ -90,15 +90,14 @@ export const UserProvider = ({ children }) => {
     if (hhError) return alert(hhError.message);
 
     if (hh && user) {
-      const { error: profError } = await supabase
-        .from('profiles')
-        .update({ household_id: hh.id })
-        .eq('id', user.id);
-      if (profError) {
-        alert(`Created household "${hh.name}", but failed to link your profile. Error: ${profError.message}`);
+      const { error: metaError } = await supabase.auth.updateUser({
+        data: { household_id: hh.id }
+      });
+      if (metaError) {
+        alert(`Created household "${hh.name}", but failed to link your profile. Error: ${metaError.message}`);
         return;
       }
-      await fetchProfileAndHousehold(user.id);
+      setHousehold(hh);
     }
   };
 
@@ -108,7 +107,7 @@ export const UserProvider = ({ children }) => {
     const { error } = await supabase.from('households')
       .update({ budget_limit: limitVal })
       .eq('id', household.id);
-    
+
     if (!error) {
       setHousehold(prev => ({ ...prev, budget_limit: limitVal }));
     }
@@ -119,16 +118,16 @@ export const UserProvider = ({ children }) => {
   };
 
   return (
-    <UserContext.Provider value={{ 
-      user, 
-      household, 
-      userName, 
-      handleUpdateProfileName, 
-      handleJoinHousehold, 
+    <UserContext.Provider value={{
+      user,
+      household,
+      userName,
+      handleUpdateProfileName,
+      handleJoinHousehold,
       handleCreateHousehold,
       handleUpdateBudgetLimit,
       handleSignOut,
-      loading 
+      loading
     }}>
       {children}
     </UserContext.Provider>

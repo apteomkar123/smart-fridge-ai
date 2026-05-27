@@ -2,10 +2,9 @@ It seems to me that AI features aren't working. Check on that.
 
 -----------------------------------------
 
-BUGS TO FIX
+BUGS TO FIX. YOU TOLD ME YOU FIXED THESE PROBLEMS. THEN WHY IS IT STILL NOT WORKING? FIX THEM, AND MAKE SURE THEY'RE FIXED
 -------------
 When I create household, I get an error saying: Failed to link your profile. Error: Could not find teh table "public.profiles" in the schema cache
 Personal name doesn't get saved and added to the greeting. Greeting should greet "Chef" if there's no personal name
 Swapping ingredient doesn't work from a recipe card
 AI recipe generator gives server error 502
-Carry along the tags and filter over to the saved recipes tab
