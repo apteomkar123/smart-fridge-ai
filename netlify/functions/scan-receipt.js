@@ -65,17 +65,29 @@ export const handler = async (event, context) => {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
-          "Compile all purchased grocery line items from this receipt as a single flat raw JSON array of text strings. Example: [\"eggs\", \"milk\"]. No extra words or wrapping markdown wrappers.",
+          "Read the receipt image and identify the store or merchant name at the top.",
+          "Return only a single JSON object with two keys: storeName (string) and items (array of item strings).",
+          "Do not include any extra text, markdown, or explanation.",
           { inlineData: { data: rawBase64, mimeType: "image/jpeg" } }
         ],
         config: { temperature: 0.1 }
       });
 
-      const parsedText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const rawOutput = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let parsedResult = { storeName: 'General Grocery', items: [] };
+      try {
+        parsedResult = JSON.parse(rawOutput);
+      } catch (parseError) {
+        const itemsMatch = rawOutput.match(/\[(.*)\]/s);
+        if (itemsMatch) {
+          try { parsedResult.items = JSON.parse(itemsMatch[0]); } catch (e) { parsedResult.items = []; }
+        }
+      }
+
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify({ success: true, added: JSON.parse(parsedText) })
+        body: JSON.stringify({ success: true, added: Array.isArray(parsedResult.items) ? parsedResult.items : [], storeName: parsedResult.storeName || 'General Grocery' })
       };
     }
 

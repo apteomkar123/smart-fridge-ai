@@ -1,8 +1,10 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  environment = { NODE_VERSION = "22" }
+  functions = "netlify/functions"
 
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = []
+[dev]
+  command = "npm run dev"
+  port = 8888
+  targetPort = 5193    
+  publish = "dist"
