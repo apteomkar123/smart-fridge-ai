@@ -3,3 +3,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom UI tweaks: liquid glass and subtle animations */
+@layer components {
+	.liquid-card {
+		background: rgba(255,255,255,0.06);
+		border-radius: 16px;
+		border: 1px solid rgba(255,255,255,0.08);
+		backdrop-filter: blur(6px) saturate(120%);
+	}
+}
+
+@keyframes floatUp {
+	0% { transform: translateY(6px); opacity: 0; }
+	100% { transform: translateY(0); opacity: 1; }
+}
+
+.fade-in-up {
+	animation: floatUp 320ms ease-out both;
+}
+
+.soft-shadow {
+	box-shadow: 0 8px 30px rgba(2,6,23,0.5);
+}
+
+/* Button focus outline for accessibility */
+.focus-sky:focus {
+	outline: 2px solid rgba(99,102,241,0.15);
+	outline-offset: 2px;
+}

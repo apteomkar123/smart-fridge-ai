@@ -171,6 +171,27 @@ export default function App() {
     };
   };
 
+  const generateLocalCreativeRecipe = (pantryItems) => {
+    const unique = Array.from(new Set(pantryItems.map(p => cleanIngredientLocally(p)).filter(Boolean)));
+    const take = unique.slice(0, 8);
+    const name = `${take[0] ? take[0].split(' ')[0] : 'Pantry'} ${take[1] ? take[1].split(' ')[0] : 'Mix'} Bowl`;
+    const ingredients = take.map(i => i);
+    const steps = [
+      `Prep the following: ${ingredients.join(', ')}.`,
+      'Combine in a skillet with oil over medium heat.',
+      'Simmer briefly until flavors meld and texture is pleasant.',
+      'Adjust seasoning and serve warm.'
+    ];
+    return {
+      id: `local-ai-${Date.now()}`,
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      meal_type: 'Creative',
+      ingredients,
+      cleanedIngredients: ingredients.map(cleanIngredientLocally).filter(Boolean),
+      steps
+    };
+  };
+
   const formatIngredientMeasurement = (ingredientString, multiplier) => {
     const lower = String(ingredientString).toLowerCase();
     const nameOnly = ingredientString.replace(/^[0-9\/\.\s\-½⅓¼¾⅛]+/, '').trim();
@@ -180,8 +201,12 @@ export default function App() {
     if (/\b(tsp|teaspoon|teaspoons|garlic|ginger|salt|pepper|spice|herb)\b/.test(lower)) return `${0.5 * multiplier} tsp ${nameOnly}`;
     if (/\b(flour|rice|lentil|sugar|pasta|beans)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
     if (/\b(onion|tomato|potato|carrot|apple)\b/.test(lower)) return `${1 * multiplier} medium ${nameOnly}`;
-    if (/\b(paneer|tofu|cheese|yogurt)\b/.test(lower)) return `${100 * multiplier} g ${nameOnly}`;
-    return `${1 * multiplier} piece ${nameOnly}`;
+    if (/\b(paneer|tofu|cheese|yogurt)\b/.test(lower)) {
+      // convert grams to ounces (approx)
+      const oz = Math.max(1, Math.round((100 * multiplier) / 28.35));
+      return `${oz} oz ${nameOnly}`;
+    }
+    return `${1 * multiplier} each ${nameOnly}`;
   };
 
   const resolveSanitizedTokenOnline = async (rawInputString) => {
@@ -390,9 +415,20 @@ export default function App() {
   const handleAddShoppingItem = async (e, textOverride = '') => {
     if (e) e.preventDefault();
     const targetText = textOverride || shoppingInput;
-    if (!targetText.trim()) return;
+    if (!targetText || !targetText.trim()) return;
 
     const resolvedTokenName = cleanIngredientLocally(targetText);
+    if (!resolvedTokenName) return;
+
+    // Prevent duplicates (case-insensitive) in local state first
+    const alreadyLocal = (shoppingList || []).some(i => String(i.item_name || '').toLowerCase() === resolvedTokenName.toLowerCase());
+    if (alreadyLocal) {
+      alert('Item already in list');
+      if (!textOverride) setShoppingInput('');
+      return;
+    }
+
+    // Insert into Supabase
     const { data, error } = await supabase.from('shopping_list').insert([{
       user_id: user.id,
       item_name: resolvedTokenName,
@@ -500,14 +536,25 @@ export default function App() {
     setAiGenerating(true);
     try {
       const aiRecipe = await fetchCreativeRecipeFromAi(pantryItems);
-      setActiveModalRecipe(aiRecipe);
+      // If AI returns same as existing top match, fallback to a local creative generator
+      const topMatch = processedRecipes[0] || {};
+      const aiIsSameAsTop = aiRecipe && topMatch && ((aiRecipe.name && topMatch.name && aiRecipe.name.toLowerCase() === topMatch.name.toLowerCase()) ||
+        (Array.isArray(aiRecipe.cleanedIngredients) && Array.isArray(topMatch.cleanedIngredients) && aiRecipe.cleanedIngredients.join('|') === topMatch.cleanedIngredients.join('|')));
+      if (aiIsSameAsTop) {
+        const local = generateLocalCreativeRecipe(pantryItems);
+        setActiveModalRecipe(local);
+      } else {
+        setActiveModalRecipe(aiRecipe);
+      }
       setActiveTab('recipes');
       setServingMultiplier(1);
     } catch (err) {
       console.error(err);
       const topMatch = processedRecipes[0] || null;
       if (!topMatch) return alert('No recipes available yet.');
-      setActiveModalRecipe({ ...topMatch, meal_type: topMatch.meal_type || 'Suggested Meal' });
+      // Fallback local creative if AI fails
+      const local = generateLocalCreativeRecipe(pantryItems);
+      setActiveModalRecipe(local || { ...topMatch, meal_type: topMatch.meal_type || 'Suggested Meal' });
       setActiveTab('recipes');
       setServingMultiplier(1);
     } finally {
@@ -769,44 +816,25 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans font-black tracking-tight antialiased pb-12 selection:bg-amber-500 selection:text-slate-950 w-full overflow-x-hidden uppercase">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans font-semibold tracking-tight antialiased pb-12 selection:bg-sky-500 selection:text-white w-full overflow-x-hidden uppercase">
       <header className="bg-slate-900 border-b-4 border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 w-full shadow-xl">
         <div>
-          <h1 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">SmartFridge AI</h1>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-0.5 normal-case">Signed in as <span className="text-amber-500 font-bold">{user.email}</span> <span className="text-slate-400 ml-3">Recipes loaded: {recipeCount}</span></p>
+          <h1 className="text-3xl font-semibold uppercase tracking-tighter bg-gradient-to-r from-sky-500 to-indigo-600 bg-clip-text text-transparent">SmartFridge AI</h1>
+          <p className="text-slate-200 text-[12px] normal-case mt-0.5">Signed in as <span className="text-sky-400 font-bold">{user.email}</span></p>
         </div>
         <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto">
           {storeName && storeName !== 'General Grocery' && (
             <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3 py-2 border-2 border-slate-800 bg-slate-950 rounded-none">Scanned store: {storeName}</div>
           )}
-          <button onClick={handleGenerateAiRecipe} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] px-5 py-2.5 uppercase tracking-widest rounded-none">Cook Something</button>
-          <button onClick={triggerStoreTripPlanner} className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-black text-[11px] px-5 py-2.5 uppercase tracking-widest border-2 border-slate-700 rounded-none">Shopping Helper</button>
-          <button onClick={handleSignOut} className="bg-slate-950 hover:bg-red-950 border-2 border-slate-800 text-slate-400 font-black text-[11px] px-4 py-2.5 uppercase tracking-widest rounded-none">Sign Out</button>
+          <button onClick={handleGenerateAiRecipe} className="bg-sky-500 hover:bg-sky-600 text-white font-semibold text-[11px] px-5 py-2.5 uppercase tracking-widest rounded-md">Cook Something</button>
+          <button onClick={triggerStoreTripPlanner} className="bg-white/5 hover:bg-white/10 text-white font-semibold text-[11px] px-5 py-2.5 uppercase tracking-widest border border-white/10 rounded-md">Shopping Helper</button>
+          <button onClick={handleSignOut} className="bg-transparent hover:bg-red-50 border border-white/10 text-white font-semibold text-[11px] px-4 py-2.5 uppercase tracking-widest rounded-md">Sign Out</button>
         </div>
       </header>
 
       <main className="w-full flex justify-center px-4 sm:px-6 py-8">
         <div className="w-full max-w-4xl">
-        <div className="bg-slate-800 border border-amber-500 p-4 rounded-none mb-8 text-slate-300">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-amber-400 font-black mb-2">Debug Preview: Top Recipe Matches</div>
-              <div className="text-[9px] uppercase tracking-widest text-slate-400 flex flex-wrap gap-3">
-                <span>Pantry items: {fridge ? fridge.length : 0}</span>
-                <span>Recipes loaded: {recipeCount}</span>
-                <span>Current tab: {activeTab}</span>
-              </div>
-            </div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-400">Best match: {processedRecipes[0]?.name || 'None'}</div>
-          </div>
-          <ol className="mt-4 space-y-2 text-[10px] text-slate-200 list-decimal list-inside">
-            {processedRecipes.slice(0, 5).map((recipe, idx) => (
-              <li key={`${recipe.id || recipe.name}-${idx}`} className="border-t border-slate-700 pt-2">
-                <span className="font-black text-amber-300">{recipe.name}</span> — <span className="text-slate-300">{recipe.matchPercentage}%</span> — <span className="text-slate-400">{recipe.ownedCount}/{recipe.totalCount} owned</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {/* Debug preview removed */}
 
         <div className="flex flex-wrap gap-2 justify-center mb-8">
           {['recipes','pantry','saved'].map((tab) => (
@@ -845,16 +873,16 @@ export default function App() {
           </div>
 
           <div className="bg-slate-900 p-6 border-2 border-slate-800 shadow-xl">
-            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">📝 Profile Shopping List</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-300 mb-4">📝 Profile Shopping List</h2>
             <form onSubmit={(e) => handleAddShoppingItem(e, '')} className="flex gap-2 mb-4">
               <input type="text" value={shoppingInput} onChange={(e) => setShoppingInput(e.target.value)} placeholder="Type target shopping items..." className="flex-1 bg-slate-950 border-2 border-slate-800 px-4 py-2.5 text-xs font-black text-slate-100 uppercase focus:border-amber-500 focus:outline-none" />
-              <button type="submit" className="bg-amber-500 text-slate-950 text-xs font-black px-4 rounded-none">+</button>
+              <button type="submit" className="bg-sky-500 text-white text-xs font-semibold px-4 rounded-md">+</button>
             </form>
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {!shoppingList || shoppingList.length === 0 ? <p className="text-xs text-slate-500 font-black uppercase tracking-wider italic py-2">No shopping items yet. Add things you need next time.</p> : shoppingList.map((item) => (
                 <div key={item.id} className="bg-slate-950 border-2 border-slate-800 p-2.5 flex justify-between items-center shadow-md">
                   <div className="flex items-center gap-2 min-w-0">
-                    <input type="checkbox" checked={item.is_completed || false} onChange={() => handleToggleShoppingCompleted(item.id, item.is_completed)} className="accent-amber-500 h-4 w-4 rounded-none cursor-pointer" />
+                    <input type="checkbox" checked={item.is_completed || false} onChange={() => handleToggleShoppingCompleted(item.id, item.is_completed)} className="accent-sky-500 h-4 w-4 rounded-md cursor-pointer" />
                     <span className={`text-xs font-black uppercase tracking-tight truncate text-slate-200 ${item.is_completed ? 'line-through text-slate-600' : ''}`}>{item.item_name}</span>
                   </div>
                   <button onClick={() => handleClearShoppingItem(item.id)} className="text-slate-600 hover:text-red-500 font-mono text-xs font-bold px-1">×</button>
@@ -884,19 +912,19 @@ export default function App() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[580px] overflow-y-auto pr-2">
               {processedRecipes.slice(0, 20).map((recipe) => (
-                <div key={recipe.id || recipe.name} className="p-4 bg-slate-950 hover:bg-slate-900 border-2 border-slate-800 hover:border-amber-500 rounded-none cursor-pointer transition-all flex flex-col justify-between shadow-xl group">
+                <div key={recipe.id || recipe.name} className="liquid-card fade-in-up p-4 cursor-pointer transition-transform transform hover:scale-105 flex flex-col justify-between shadow-lg group">
                   <div onClick={() => { setServingMultiplier(1); setActiveModalRecipe(recipe); }}>
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className="font-black uppercase tracking-tight text-slate-100 group-hover:text-amber-400 text-xs line-clamp-2 leading-tight">{recipe.name}</h3>
-                      <span className="text-[10px] font-mono font-black shrink-0 px-2 py-0.5 bg-slate-900 border border-slate-800 text-amber-400">{recipe.matchPercentage}% MATCH</span>
+                      <h3 className="font-semibold uppercase tracking-tight text-slate-100 group-hover:text-sky-300 text-xs line-clamp-2 leading-tight">{recipe.name}</h3>
+                      <span className="text-[10px] font-mono font-semibold shrink-0 px-2 py-0.5 bg-white/5 border border-white/6 text-sky-300">{recipe.matchPercentage}% MATCH</span>
                     </div>
-                    <span className="text-[8px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 mt-2.5 inline-block uppercase font-black tracking-widest">{recipe.meal_type || 'General'}</span>
+                    <span className="text-[8px] font-mono text-slate-300 bg-white/5 border border-white/6 px-2 py-0.5 mt-2.5 inline-block uppercase font-semibold tracking-widest">{recipe.meal_type || 'General'}</span>
                   </div>
                   <div className="flex justify-between items-center mt-4 pt-2 border-t border-slate-800">
-                    <div className="w-2/3 bg-slate-900 h-1.5 border border-slate-800">
-                      <div className="h-full bg-amber-500" style={{ width: `${recipe.matchPercentage}%` }}></div>
+                      <div className="w-2/3 bg-white/5 h-1.5 border border-white/6">
+                      <div className="h-full bg-sky-500" style={{ width: `${recipe.matchPercentage}%` }}></div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleSaveRecipeToProfile(recipe); }} className="text-[10px] uppercase font-black text-amber-500 hover:text-amber-400 tracking-wider">⭐ Like</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleSaveRecipeToProfile(recipe); }} className="text-[10px] uppercase font-semibold text-sky-500 hover:text-sky-400 tracking-wider">⭐ Like</button>
                   </div>
                 </div>
               ))}
@@ -929,50 +957,58 @@ export default function App() {
 
       {activeModalRecipe && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-slate-900 border-4 border-slate-800 w-full max-w-2xl rounded-none p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b-2 border-slate-800 pb-4 mb-5">
+          <div className="w-full max-w-2xl">
+            <div className="liquid-card p-6 rounded-xl soft-shadow relative max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b border-white/6 pb-4 mb-5">
               <div>
                 <span className="bg-slate-950 border border-slate-800 text-amber-500 font-mono text-[9px] px-2 py-0.5 uppercase font-black tracking-widest">{activeModalRecipe.meal_type}</span>
                 <h3 className="text-2xl font-black text-slate-100 uppercase tracking-tighter mt-1">{activeModalRecipe.name || activeModalRecipe.recipeName}</h3>
               </div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <button onClick={handleDownloadRecipeImage} className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-4 py-2.5 uppercase tracking-widest rounded-none shadow-md">📸 Save Card Photo</button>
-                <button onClick={() => { setActiveModalRecipe(null); setServingMultiplier(1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black px-4 py-2.5 uppercase border-2 border-slate-700 rounded-none">Close</button>
+                <button onClick={handleDownloadRecipeImage} className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold px-4 py-2.5 uppercase tracking-widest rounded-md shadow-md">📸 Save Card</button>
+                <button onClick={() => { setActiveModalRecipe(null); setServingMultiplier(1); }} className="bg-transparent hover:bg-white/5 text-white text-xs font-semibold px-4 py-2.5 uppercase border border-white/6 rounded-md">Close</button>
               </div>
             </div>
-
-            <div className="bg-slate-950 border-2 border-slate-800 p-3 rounded-none mb-6 flex items-center justify-between shadow-inner">
+            
+            <div className="bg-white/6 border border-white/6 p-3 rounded-lg mb-6 flex items-center justify-between shadow-inner">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">👥 Adjust Servings Yield Index:</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(num => (
-                  <button key={num} onClick={() => setServingMultiplier(num)} className={`w-9 h-9 font-mono text-xs font-black rounded-none ${servingMultiplier === num ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-900 border-2 border-slate-800 text-slate-400 hover:bg-slate-800'}`}>{num}x</button>
+                  <button key={num} onClick={() => setServingMultiplier(num)} className={`w-9 h-9 font-mono text-xs font-semibold rounded-md ${servingMultiplier === num ? 'bg-sky-500 text-white shadow-md' : 'bg-white/5 border border-white/6 text-slate-200 hover:bg-white/10'}`}>{num}x</button>
                 ))}
               </div>
             </div>
 
-            <div className="p-2 bg-white rounded-none border-2 border-slate-200">
-              <div ref={snapshotCardRef} className="bg-white p-6 space-y-6 text-slate-900">
-                <div className="border-b-2 border-slate-200 pb-4 text-center">
-                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">SmartFridge AI Formulation Document • Serving Index {servingMultiplier}x</p>
+            <div className="p-2 bg-transparent">
+              <div ref={snapshotCardRef} className="bg-white p-6 space-y-6 text-slate-900 rounded-lg">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-slate-900 uppercase tracking-tight">{activeModalRecipe.name || activeModalRecipe.recipeName}</h2>
+                  <p className="text-[12px] text-slate-500 mt-1">Serving Index {servingMultiplier}x • {activeModalRecipe.meal_type || 'General'}</p>
                 </div>
-                
+
+                {/* Optional image */}
+                {(activeModalRecipe.image || activeModalRecipe.thumbnail || activeModalRecipe.strMealThumb) && (
+                  <div className="w-full h-48 rounded-lg overflow-hidden">
+                    <img src={activeModalRecipe.image || activeModalRecipe.thumbnail || activeModalRecipe.strMealThumb} alt={activeModalRecipe.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-slate-50 border-2 border-slate-200 p-4 rounded-none shadow-inner">
-                    <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b-2 border-slate-200 pb-1 mb-3">📋 Component Specifications</h4>
+                    <div className="bg-white/6 border border-white/6 p-4 rounded-lg soft-shadow">
+                    <h4 className="text-[9px] font-semibold uppercase text-slate-400 font-mono border-b border-white/6 pb-1 mb-3">📋 Component Specifications</h4>
                     <ul className="space-y-3">
                       {(activeModalRecipe.ingredients || []).map((ing, idx) => {
                         const cleanIng = cleanIngredientLocally(ing);
                         const isOwned = (fridge || []).map(f => f.item_name).filter(Boolean).some(token => cleanIng.includes(token) || token.includes(cleanIng));
                         return (
                           <li key={idx} className="text-xs font-black text-slate-900 capitalize flex flex-col border-b border-slate-200 pb-2">
-                            <span className="text-[11px] font-sans text-indigo-600 font-black tracking-wide uppercase">
+                            <span className="text-[11px] font-sans text-sky-500 font-semibold tracking-wide uppercase">
                               {parseRecipeIngredientMeasurements(ing, servingMultiplier)}
                             </span>
                             <div className="flex justify-between items-center gap-1 mt-1">
                               <span className={isOwned ? 'text-slate-900' : 'text-slate-400 font-semibold'}>{ing}</span>
                               {!isOwned && (
-                                <button data-html2canvas-ignore="true" onClick={() => handleAddShoppingItem(null, ing)} className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 font-black uppercase border border-amber-200 shrink-0">
+                                <button data-html2canvas-ignore="true" onClick={() => handleAddShoppingItem(null, cleanIngredientLocally(ing))} className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-800 px-1.5 py-0.5 font-semibold uppercase border border-blue-200 shrink-0">
                                   + Buy item
                                 </button>
                               )}
@@ -985,11 +1021,11 @@ export default function App() {
 
                   <div className="md:col-span-2 space-y-3">
                     <h4 className="text-[9px] font-black uppercase text-slate-400 font-mono border-b-2 border-slate-200 pb-1">🔥 Preparation Progression Matrix</h4>
-                    <ol className="space-y-2.5">
+                    <ol className="space-y-3">
                       {getStaticRecipeSteps(activeModalRecipe).map((step, idx) => (
-                        <li key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-none text-xs text-slate-700 flex gap-3 leading-relaxed">
-                          <span className="font-mono font-black text-slate-900 bg-white border-2 border-slate-300 w-5 h-5 flex items-center justify-center shrink-0 shadow-sm">{idx + 1}</span>
-                          <p className="font-bold text-slate-700">{step}</p>
+                        <li key={idx} className="bg-white/5 border border-white/6 p-3 rounded-md text-sm text-slate-200 flex gap-3 leading-relaxed items-start">
+                          <span className="font-mono font-semibold text-white bg-sky-500 w-6 h-6 flex items-center justify-center rounded-md shadow-sm">{idx + 1}</span>
+                          <p className="">{step}</p>
                         </li>
                       ))}
                     </ol>

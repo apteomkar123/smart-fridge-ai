@@ -1,0 +1,9 @@
+Units need to be american Units
+Items added to list from the recipe should only add the ingredient, not the amount, and should not be able to be added more than once. If it's already in the list, then show the user a message that says already in list. 
+The AI recipe generator is just showing the top suggested recipe instead of actually generating one.
+Take out the debug preview at the top
+Make the interface more sleek and modern, use a more gentler text and a blue and white theme.
+Take out the number of recipes loaded from the top of the page
+Add animations to make the app look more dynamic
+Make the recipe card look better, it looks to industrial right now
+Use a modern design language, use more round and take inspiration from Apple's Liquid Glass UI 
