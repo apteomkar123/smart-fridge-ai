@@ -4,9 +4,9 @@ import { useUser } from './UserContext';
 
 import { useRecipes } from './RecipeContext';
 
-export default function Header({ triggerStoreTripPlanner }) {
+export default function Header() {
   const { user, userName, handleSignOut } = useUser();
-  const { handleGenerateAiRecipe } = useRecipes();
+  const { handleGenerateAiRecipe, triggerStoreTripPlanner } = useRecipes();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
 

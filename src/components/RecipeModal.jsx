@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Share2, Play, RefreshCw, Plus } from 'lucide-react';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
+import { parseRecipeIngredientMeasurements, cleanIngredientLocally } from '../utils/recipeUtils';
 
 export default function RecipeModal({ onStartCooking, addedItems, onAddIngredient }) {
   const { household } = useUser();
@@ -9,7 +10,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
     activeModalRecipe: recipe, 
     multiplier, 
     setMultiplier, 
-    setActiveModalRecipe: onClose 
+    setActiveModalRecipe: setModal 
   } = useRecipes();
 
   const [substitutes, setSubstitutes] = useState({});
@@ -70,7 +71,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
           </div>
           <div className="flex gap-2">
             <button onClick={handleShare} className="p-3 bg-white border border-blue-100 rounded-2xl text-[#6BAEE0] hover:bg-sky-50 transition-colors"><Share2 size={20} /></button>
-            <button onClick={onClose} className="p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
+            <button onClick={() => setModal(null)} className="p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
           </div>
         </div>
 
@@ -81,7 +82,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
               {recipe.ingredients.map((ing, idx) => (
                 <div key={idx} className="flex flex-col border-b border-blue-50 pb-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-700">{substitutes[ing] || ing}</span>
+                    <span className="text-xs font-bold text-slate-700">{substitutes[ing] || parseRecipeIngredientMeasurements(ing, multiplier)}</span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => getSubstitution(ing)}
@@ -90,8 +91,8 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
                       >
                         <RefreshCw size={12} className={loadingSub === ing ? 'animate-spin' : ''} />
                       </button>
-                      {!addedItems.has(ing) && (
-                        <button onClick={() => onAddIngredient(ing)} className="bg-sky-50 text-[#6BAEE0] p-1 rounded-md"><Plus size={12} /></button>
+                      {!addedItems.has(cleanIngredientLocally(ing)) && (
+                        <button onClick={() => onAddIngredient(cleanIngredientLocally(ing))} className="bg-sky-50 text-[#6BAEE0] p-1 rounded-md"><Plus size={12} /></button>
                       )}
                     </div>
                   </div>

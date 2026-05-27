@@ -7,7 +7,7 @@ import {
   getStaticRecipeSteps, 
   matchesRecipeFilter,
   isVegetarianIngredient
-} from './recipeUtils';
+} from '../utils/recipeUtils';
 
 const RecipeContext = createContext();
 
@@ -23,11 +23,30 @@ export const RecipeProvider = ({ children, fridge }) => {
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [recipeSearch, setRecipeSearch] = useState('');
   const [activeFilter, setFilter] = useState('all');
+  const [savedSearch, setSavedSearch] = useState('');
+  const [savedFilter, setSavedFilter] = useState('all');
+
+  // Debounced search states to prevent heavy filtering on every keystroke
+  const [debouncedRecipeSearch, setDebouncedRecipeSearch] = useState('');
+  const [debouncedSavedSearch, setDebouncedSavedSearch] = useState('');
+
   const [aiGenerating, setAiGenerating] = useState(false);
   const [activeModalRecipe, setActiveModalRecipe] = useState(null);
   const [multiplier, setMultiplier] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [shoppingAlerts, setShoppingAlerts] = useState([]);
+  const [isStoreAlertOpen, setIsStoreAlertOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedRecipeSearch(recipeSearch), 300);
+    return () => clearTimeout(handler);
+  }, [recipeSearch]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSavedSearch(savedSearch), 300);
+    return () => clearTimeout(handler);
+  }, [savedSearch]);
 
   const fetchOnlineRecipes = async () => {
     const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -81,6 +100,16 @@ export const RecipeProvider = ({ children, fridge }) => {
 
   useEffect(() => { loadRecipes(); }, [loadRecipes]);
 
+  // Deep Linking logic: auto-open recipe from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const recipeId = params.get('recipe');
+    if (recipeId && masterRecipes.length > 0) {
+      const match = masterRecipes.find(r => String(r.id) === recipeId);
+      if (match) setActiveModalRecipe(match);
+    }
+  }, [masterRecipes]);
+
   const handleGenerateAiRecipe = async () => {
     const pantry = (fridge || []).map(f => cleanIngredientLocally(f.item_name)).filter(Boolean);
     if (pantry.length === 0) return alert("Pantry is empty");
@@ -106,6 +135,23 @@ export const RecipeProvider = ({ children, fridge }) => {
     finally { setAiGenerating(false); }
   };
 
+  const triggerStoreTripPlanner = useCallback(() => {
+    const pantryTokens = (fridge || []).map(f => f.item_name).filter(Boolean);
+    const alerts = processedRecipes
+      .filter(recipe => recipe.matchPercentage > 10 && recipe.matchPercentage < 100)
+      .slice(0, 20)
+      .map(recipe => {
+        const missingItems = (recipe.ingredients || []).map(cleanIngredientLocally).filter(ing => {
+          return !pantryTokens.some(token => token && (ing.includes(token) || token.includes(ing)));
+        }).slice(0, 5);
+        return { recipe, missingItems, mealType: recipe.meal_type || 'General' };
+      })
+      .filter(alert => alert.missingItems.length > 0);
+
+    setShoppingAlerts(alerts);
+    setIsStoreAlertOpen(true);
+  }, [fridge, processedRecipes]);
+
   const onSaveRecipe = async (recipe) => {
     if (!user) return;
     if (savedRecipes.some(r => r.recipe_id === String(recipe.id))) return;
@@ -120,6 +166,14 @@ export const RecipeProvider = ({ children, fridge }) => {
     if (!err && data) setSavedRecipes(prev => [...prev, data[0]]);
   };
 
+  const onRemoveSavedRecipe = async (pkId) => {
+    if (!user) return;
+    const { error } = await supabase.from('saved_recipes').delete().eq('id', pkId);
+    if (!error) {
+      setSavedRecipes(prev => prev.filter(r => r.id !== pkId));
+    }
+  };
+
   const processedRecipes = useMemo(() => {
     const pantryTokens = new Set((fridge || []).flatMap(f => normalizeIngredientTokens(f.item_name)));
     const scored = masterRecipes.map(recipe => {
@@ -131,30 +185,60 @@ export const RecipeProvider = ({ children, fridge }) => {
 
     return scored
       .filter(r => {
-        const s = recipeSearch.toLowerCase();
+        const s = debouncedRecipeSearch.toLowerCase();
         return !s || r.name.toLowerCase().includes(s) || r.cleanedIngredients.some(i => i.includes(s));
       })
       .filter(r => matchesRecipeFilter(r, activeFilter))
       .sort((a, b) => b.matchPercentage - a.matchPercentage);
-  }, [fridge, masterRecipes, recipeSearch, activeFilter]);
+  }, [fridge, masterRecipes, debouncedRecipeSearch, activeFilter]);
+
+  const filteredSavedRecipes = useMemo(() => {
+    if (!savedRecipes) return [];
+    return savedRecipes
+      .filter(r => {
+        const s = debouncedSavedSearch.toLowerCase();
+        const name = r.recipe_name || '';
+        const ings = r.ingredients || [];
+        return !s || name.toLowerCase().includes(s) || ings.some(i => i.toLowerCase().includes(s));
+      })
+      .filter(r => {
+        if (savedFilter === 'all') return true;
+        const normalized = {
+          meal_type: r.meal_type,
+          name: r.recipe_name,
+          cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : []
+        };
+        return matchesRecipeFilter(normalized, savedFilter);
+      });
+  }, [savedRecipes, debouncedSavedSearch, savedFilter]);
 
   return (
     <RecipeContext.Provider value={{
       processedRecipes,
       savedRecipes,
+      filteredSavedRecipes,
       recipeSearch,
       setRecipeSearch,
       activeFilter,
       setFilter,
+      savedSearch,
+      setSavedSearch,
+      savedFilter,
+      setSavedFilter,
       aiGenerating,
       handleGenerateAiRecipe,
       onSaveRecipe,
+      onRemoveSavedRecipe,
       activeModalRecipe,
-      setActiveModalRecipe,
+      setActiveModalRecipe: (val) => setActiveModalRecipe(val || null),
       multiplier,
       setMultiplier,
       loading,
-      error
+      error,
+      shoppingAlerts,
+      isStoreAlertOpen,
+      setIsStoreAlertOpen,
+      triggerStoreTripPlanner
     }}>
       {children}
     </RecipeContext.Provider>

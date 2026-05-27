@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export default function PantryManager({ fridge, handleAddManualItem, manualItem, setManualItem, handleUpdateInlineItem, handleRemoveItem, receiptLoading, handleFileUpload, barcodeInput, setBarcodeInput, handleBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
+export default function PantryManager({ fridge, handleAddManualItem, handleUpdateInlineItem, handleRemoveItem, receiptLoading, handleFileUpload, barcodeInput, setBarcodeInput, handleBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
+  const [manualItem, setManualItem] = useState('');
   const isExpiringSoon = (date) => {
     if (!date) return false;
     const today = new Date();

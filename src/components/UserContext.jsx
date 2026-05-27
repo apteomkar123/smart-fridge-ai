@@ -79,10 +79,27 @@ export const UserProvider = ({ children }) => {
   };
 
   const handleCreateHousehold = async (name) => {
-    const { data: hh } = await supabase.from('households').insert([{ name }]).select().single();
+    if (!name || !name.trim()) return alert("Please enter a name for your household.");
+    const { data: hh, error: hhError } = await supabase.from('households').insert([{ name: name.trim() }]).select().single();
+    if (hhError) return alert(hhError.message);
+
     if (hh) {
-      await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id);
+      const { error: profError } = await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id);
+      if (profError) return alert("Created household, but failed to join. Please try joining with code.");
       setHousehold(hh);
+      await fetchProfileAndHousehold(user.id); // Ensure state is refreshed immediately
+    }
+  };
+
+  const handleUpdateBudgetLimit = async (newLimit) => {
+    if (!household) return;
+    const limitVal = parseFloat(newLimit) || 0;
+    const { error } = await supabase.from('households')
+      .update({ budget_limit: limitVal })
+      .eq('id', household.id);
+    
+    if (!error) {
+      setHousehold(prev => ({ ...prev, budget_limit: limitVal }));
     }
   };
 
@@ -98,6 +115,7 @@ export const UserProvider = ({ children }) => {
       handleUpdateProfileName, 
       handleJoinHousehold, 
       handleCreateHousehold,
+      handleUpdateBudgetLimit,
       handleSignOut,
       loading 
     }}>

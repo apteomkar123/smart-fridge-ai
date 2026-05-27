@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Copy, Plus, Home } from 'lucide-react';
+import { useUser } from './UserContext';
 
-export default function HouseholdSettings({ household, user, profileName, onUpdateName, onCreate, onJoin }) {
+export default function HouseholdSettings() {
+  const { 
+    household, 
+    user, 
+    userName: profileName, 
+    handleUpdateProfileName: onUpdateName, 
+    handleCreateHousehold: onCreate, 
+    handleJoinHousehold: onJoin 
+  } = useUser();
+
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [displayName, setDisplayName] = useState(profileName || '');

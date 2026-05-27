@@ -5,6 +5,7 @@ export default function CookingMode({ steps, onClose }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [speechRecognition, setSpeechRecognition] = useState(null);
+  const isMounted = useRef(true);
   const utteranceRef = useRef(null);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function CookingMode({ steps, onClose }) {
       };
 
       recognition.onend = () => {
-        if (isListening) {
+        if (isListening && isMounted.current) { // Check if still active and mounted
           recognition.start();
         }
       };
@@ -51,6 +52,7 @@ export default function CookingMode({ steps, onClose }) {
     utteranceRef.current.lang = 'en-US';
 
     return () => {
+      isMounted.current = false;
       if (speechRecognition) speechRecognition.stop();
       if (utteranceRef.current) speechSynthesis.cancel();
     };

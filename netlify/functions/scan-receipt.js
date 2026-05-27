@@ -29,7 +29,7 @@ export const handler = async (event, context) => {
       const prompt = `Analyze this raw receipt entry: "${bodyData.resolveItemToken}" bought at "${storeContext}". Isolate what the food item is as a single core singular common noun matching standard recipe terms. Strip weights, pack sizing numbers, brand names, and qualifiers. Return ONLY the plain text word noun. Examples: "Organic Brown Eggs 12ct" -> "egg", "sliced provolone cheese 8oz" -> "provolone cheese".`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: prompt,
         config: { temperature: 0.1 }
       });
@@ -37,16 +37,19 @@ export const handler = async (event, context) => {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify({ sanitized: response.text.trim().toLowerCase() })
+        body: JSON.stringify({ sanitized: response.text.replace(/["'#*`]/g, '').trim().toLowerCase() })
       };
     }
 
     // 2. CHANNELS GATE B: AI Recipe Generator Core Integration
     if (bodyData && bodyData.customPrompt) {
-      const prompt = `${bodyData.customPrompt} Formulate a creative vegetarian recipe using these items. If an essential ingredient is missing but a common substitute exists within the pantry list provided, prioritize that substitute. Respond with a strict raw JSON object: { "recipeName": "string", "ingredients": ["item strings"], "steps": ["step strings"], "substitutions": {"original": "replacement"} }. Do not wrap inside markdown code block formatting backticks.`;
+      // Logic Fix: Check if this is a recipe request or a single substitution request
+      const isRecipeRequest = bodyData.customPrompt.toLowerCase().includes('recipe');
+      const prompt = isRecipeRequest && mulate a creative vegetarian recipe. Respond with a strict raw JSON object: { "recipeName": "string", "ingredients": ["item strings"], "steps": ["step strings"] }.`
+        : `${bodyData.customPrompt} Respond with a strict raw JSON object: { "recipeName": "substitution_name" }.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: prompt,
         config: { temperature: 0.2 }
       });
@@ -63,7 +66,7 @@ export const handler = async (event, context) => {
     if (bodyData && bodyData.image && bodyData.image.trim() !== "") {
       let rawBase64 = bodyData.image.includes(',') ? bodyData.image.split(',')[1] : bodyData.image;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: [
           "Read the receipt image and identify the store or merchant name at the top.",
           "Return only a single JSON object with two keys: storeName (string) and items (array of item strings).",

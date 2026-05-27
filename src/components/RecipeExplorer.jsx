@@ -10,7 +10,9 @@ export default function RecipeExplorer() {
     activeFilter, 
     setFilter, 
     setActiveModalRecipe: onOpenRecipe, 
-    onSaveRecipe 
+    onSaveRecipe,
+    onRemoveSavedRecipe,
+    savedRecipes
   } = useRecipes();
   const filters = ['all', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'vegetarian', 'vegan'];
 
@@ -59,7 +61,20 @@ export default function RecipeExplorer() {
               <div className="h-1.5 flex-1 bg-blue-50 rounded-full overflow-hidden mr-4">
                 <div className="h-full bg-[#6BAEE0]/60 rounded-full transition-all duration-1000" style={{ width: `${recipe.matchPercentage}%` }} />
               </div>
-              <button onClick={(e) => { e.stopPropagation(); onSaveRecipe(recipe); }} className="text-slate-300 hover:text-amber-400 transition-colors"><Star size={18} /></button>
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  const savedRecord = savedRecipes?.find(sr => sr.recipe_id === String(recipe.id));
+                  if (savedRecord) {
+                    onRemoveSavedRecipe(savedRecord.id);
+                  } else {
+                    onSaveRecipe(recipe);
+                  }
+                }} 
+                className={`transition-colors ${savedRecipes?.some(sr => sr.recipe_id === String(recipe.id)) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}
+              >
+                <Star size={18} fill={savedRecipes?.some(sr => sr.recipe_id === String(recipe.id)) ? "currentColor" : "none"} />
+              </button>
             </div>
           </div>
         ))}

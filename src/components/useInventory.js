@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { cleanIngredientLocally, triggerHaptic } from '../components/recipeUtils';
+import { cleanIngredientLocally, triggerHaptic } from '../utils/recipeUtils';
+import { put, getAll, remove, OBJECT_STORES } from '../utils/dbUtils';
 
 export const useInventory = (user, household) => {
   const [fridge, setFridge] = useState([]);
@@ -44,6 +45,83 @@ export const useInventory = (user, household) => {
     localStorage.setItem('hungry_shopping_v1', JSON.stringify(shoppingList));
   }, [shoppingList]);
 
+  const performMutation = useCallback(async (table, action, data, id_value = null) => {
+    if (navigator.onLine) {
+      try {
+        let error;
+        if (action === 'INSERT') ({ error } = await supabase.from(table).insert([data]));
+        else if (action === 'DELETE') ({ error } = await supabase.from(table).delete().eq('id', id_value));
+        else if (action === 'UPDATE') ({ error } = await supabase.from(table).update(data).eq('id', id_value));
+        
+        if (!error) return true;
+      } catch (e) {
+        console.error("Supabase mutation failed, queuing...", e);
+      }
+    }
+
+    await put(OBJECT_STORES.SYNC_QUEUE, { table, action, data, id_value, timestamp: Date.now() });
+    return false;
+  }, []);
+
+  const syncOfflineChanges = useCallback(async () => {
+    if (!navigator.onLine || !user) return;
+
+    try {
+      const queue = await getAll(OBJECT_STORES.SYNC_QUEUE);
+      if (!queue || queue.length === 0) return;
+
+      for (const task of queue) {
+        let error;
+
+        // Conflict Resolution Strategy: Last Intent Wins (Remote vs Local)
+        if (task.action === 'UPDATE' || task.action === 'DELETE') {
+          const { data: remoteMetadata } = await supabase
+            .from(task.table)
+            .select('updated_at')
+            .eq('id', task.id_value)
+            .single();
+
+          if (remoteMetadata && new Date(remoteMetadata.updated_at).getTime() > task.timestamp) {
+            await remove(OBJECT_STORES.SYNC_QUEUE, task.id);
+            continue;
+          }
+        }
+
+        if (task.action === 'INSERT') ({ error } = await supabase.from(task.table).insert([task.data]));
+        else if (task.action === 'DELETE') ({ error } = await supabase.from(task.table).delete().eq('id', task.id_value));
+        else if (task.action === 'UPDATE') ({ error } = await supabase.from(task.table).update(task.data).eq('id', task.id_value));
+
+        if (!error) await remove(OBJECT_STORES.SYNC_QUEUE, task.id);
+      }
+      fetchAppData();
+    } catch (e) {
+      console.error("Sync process failed", e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    window.addEventListener('online', syncOfflineChanges);
+    syncOfflineChanges();
+    return () => window.removeEventListener('online', syncOfflineChanges);
+  }, [syncOfflineChanges]);
+
+  const resolveSanitizedTokenOnline = useCallback(async (rawInputString) => {
+    const localToken = cleanIngredientLocally(rawInputString);
+    if (!rawInputString || !rawInputString.trim()) return localToken;
+    try {
+      const response = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolveItemToken: rawInputString, storeContext: storeName })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return cleanIngredientLocally(data.sanitized || '') || localToken;
+      }
+    } catch (e) { console.error('Resolve error:', e); }
+    return localToken;
+  }, [storeName]);
+
   const fetchAppData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -56,7 +134,8 @@ export const useInventory = (user, household) => {
         id: row.id,
         raw_name: row.item_name,
         item_name: cleanIngredientLocally(row.item_name),
-        expiry_date: row.expiry_date
+        expiry_date: row.expiry_date,
+        price: row.price || 0
       })).filter(item => item.raw_name);
       setFridge(normalizedFridge);
       calculateMacroMetrics(normalizedFridge.map(f => f.item_name));
@@ -80,81 +159,104 @@ export const useInventory = (user, household) => {
     fetchAppData();
   }, [fetchAppData]);
 
-  const handleAddManualItem = async (itemName) => {
-    const sanitized = cleanIngredientLocally(itemName);
+  const handleAddManualItem = useCallback(async (itemName) => {
+    setLoading(true);
+    const sanitized = await resolveSanitizedTokenOnline(itemName);
     if (!sanitized) return;
-    await supabase.from('fridge_inventory').insert([{ 
+
+    const newItem = { 
       item_name: sanitized, 
       user_id: user.id,
       household_id: household?.id || null 
-    }]);
+    };
+
+    setFridge(prev => [...prev, { ...newItem, id: `temp-${Date.now()}`, raw_name: itemName }]);
     triggerHaptic(50);
-    fetchAppData();
-  };
 
-  const handleRemoveItem = async (id) => {
+    const success = await performMutation('fridge_inventory', 'INSERT', newItem);
+    if (success) fetchAppData();
+    setLoading(false);
+  }, [user, household, resolveSanitizedTokenOnline, performMutation, fetchAppData]);
+
+  const handleRemoveItem = useCallback(async (id) => {
     setFridge(prev => prev.filter(item => item.id !== id));
-    await supabase.from('fridge_inventory').delete().eq('id', id);
-  };
+    const success = await performMutation('fridge_inventory', 'DELETE', null, id);
+    if (success) fetchAppData();
+  }, [performMutation, fetchAppData]);
 
-  const handleAddShoppingItem = async (itemName, price = 0) => {
+  const handleAddShoppingItem = useCallback(async (itemName, price = 0) => {
+    if (!itemName) return;
     const sanitized = cleanIngredientLocally(itemName);
     if (!sanitized) return;
     
     const alreadyLocal = shoppingList.some(i => i.item_name.toLowerCase() === sanitized.toLowerCase());
     if (alreadyLocal) return alert('Item already in list');
 
-    const { data, error } = await supabase.from('shopping_list').insert([{
+    const newItem = {
       user_id: user.id,
       household_id: household?.id || null,
       item_name: sanitized,
       is_completed: false,
       price
-    }]).select();
+    };
 
-    if (!error && data) setShoppingList(prev => [...prev, data[0]]);
-  };
+    setShoppingList(prev => [...prev, { ...newItem, id: `temp-${Date.now()}` }]);
 
-  const handleToggleShoppingCompleted = async (id, status) => {
+    const success = await performMutation('shopping_list', 'INSERT', newItem);
+    if (success) fetchAppData();
+  }, [user, household, performMutation, fetchAppData, shoppingList]);
+
+  const handleToggleShoppingCompleted = useCallback(async (id, status) => {
     setShoppingList(prev => prev.map(item => item.id === id ? { ...item, is_completed: !status } : item));
-    await supabase.from('shopping_list').update({ is_completed: !status }).eq('id', id);
-  };
+    const success = await performMutation('shopping_list', 'UPDATE', { is_completed: !status }, id);
+    if (success) fetchAppData();
+  }, [performMutation, fetchAppData]);
 
-  const handleClearShoppingItem = async (id) => {
+  const handleClearShoppingItem = useCallback(async (id) => {
     setShoppingList(prev => prev.filter(item => item.id !== id));
-    await supabase.from('shopping_list').delete().eq('id', id);
-  };
+    const success = await performMutation('shopping_list', 'DELETE', null, id);
+    if (success) fetchAppData();
+  }, [performMutation, fetchAppData]);
 
-  const handleBarcodeLookup = async (barcode) => {
+  const handleBarcodeLookup = useCallback(async (barcode) => {
     setBarcodeLoading(true);
+    setBarcodeResult('');
     try {
       const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      if (!response.ok) throw new Error('API error');
       const data = await response.json();
-      if (data?.status === 1) {
-        const name = data.product.product_name || data.product.brands;
+      if (data?.status === 1 && data.product) {
+        const name = data.product.product_name || data.product.brands || '';
         await handleAddManualItem(name);
         setBarcodeResult(`Added ${name}`);
+        try { await new Audio('/sounds/success.mp3').play(); } catch(e){}
+        triggerHaptic(100);
+        setBarcodeInput('');
         setIsScanningBarcode(false);
-      } else {
-        setBarcodeResult("Product not found");
-      }
+      } else { setBarcodeResult("Product not found"); }
     } catch (e) {
       setBarcodeResult("Lookup failed");
     } finally {
       setBarcodeLoading(false);
     }
-  };
+  }, [handleAddManualItem, setIsScanningBarcode, setBarcodeInput]);
 
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = useCallback(async (file) => {
     if (!file) return;
     setReceiptLoading(true);
-    
-    const reader = new FileReader();
-    reader.onload = async (event) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600; 
+      canvas.height = (img.height / img.width) * 600 || 800;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const base64Data = canvas.toDataURL('image/jpeg', 0.75);
       try {
+        await put(OBJECT_STORES.RECEIPT_IMAGES, { id: `receipt-${Date.now()}`, imageData: base64Data, timestamp: Date.now() });
         const response = await fetch('/.netlify/functions/scan-receipt', {
           method: 'POST',
-          body: JSON.stringify({ image: event.target.result })
+          body: JSON.stringify({ image: base64Data })
         });
         const data = await response.json();
         if (data.storeName) setStoreName(data.storeName);
@@ -163,18 +265,17 @@ export const useInventory = (user, household) => {
             await handleAddManualItem(item);
           }
         }
-      } finally {
-        setReceiptLoading(false);
-      }
+      } catch(e) { console.error(e); }
+      finally { setReceiptLoading(false); }
     };
-    reader.readAsDataURL(file);
-  };
+  }, [user, household, handleAddManualItem, setStoreName]);
 
-  const handleUpdateInlineItem = async (id, newName) => {
+  const handleUpdateInlineItem = useCallback(async (id, newName) => {
     const sanitized = cleanIngredientLocally(newName);
     setFridge(prev => prev.map(item => item.id === id ? { ...item, raw_name: newName, item_name: sanitized } : item));
-    await supabase.from('fridge_inventory').update({ item_name: sanitized }).eq('id', id);
-  };
+    const success = await performMutation('fridge_inventory', 'UPDATE', { item_name: sanitized }, id);
+    if (success) fetchAppData();
+  }, [performMutation, fetchAppData]);
 
   return {
     fridge,

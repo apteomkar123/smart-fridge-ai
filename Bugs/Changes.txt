@@ -1,0 +1,17 @@
+It seems to me that AI features aren't working. Check on that.
+
+-----------------------------------------
+
+BUGS TO FIX
+-------------
+Household feature has disappeared
+Screen still goes completely blank when I close a recipe card out with the x button
+AI Recipe generator not working
+When I try to manually add to the shopping list, nothing gets added, nothing happens
+Recipe cards don't open in shopping suggestions
+Ingredient swap doesn't work when an ingredient isn't available
+Adding items to the shopping cart through the recipe card doesn't work either
+The whole app reloads when I remove a recipe from my favorites list
+When a star a recipe, the star should turn yellow to signify that it's been starred
+
+
