@@ -362,46 +362,6 @@ function MainApp() {
     if (user) fetchAppData();
   }, [user]);
 
-  const handleUpdateInlineItem = async (id, updatedRawValue) => {
-    setFridge(prev => (prev || []).map(item => item.id === id ? { ...item, raw_name: updatedRawValue, item_name: cleanIngredientLocally(updatedRawValue) } : item));
-    await supabase.from('fridge_inventory').update({ item_name: updatedRawValue }).eq('id', id); // Ensure DB column name matches
-  };
-
-  const handleAddShoppingItem = async (e, textOverride = '', price = 0) => {
-    if (e) e.preventDefault();
-    const targetText = textOverride || shoppingInput;
-    if (!targetText || !targetText.trim()) return;
-
-    const resolvedTokenName = cleanIngredientLocally(targetText);
-    if (!resolvedTokenName) return;
-
-    const alreadyLocal = (shoppingList || []).some(i => String(i.item_name || '').toLowerCase() === resolvedTokenName.toLowerCase());
-    if (alreadyLocal) {
-      alert('Item already in list');
-      return;
-    }
-
-    const { data, error } = await supabase.from('shopping_list').insert([{
-      user_id: user.id,
-      household_id: household?.id || null,
-      item_name: resolvedTokenName,
-      is_completed: false,
-      price: price // Include price
-    }]).select();
-
-    if (!error && data) setShoppingList(prev => [...(prev || []), data[0]]);
-  };
-
-  const handleToggleShoppingCompleted = async (id, status) => {
-    setShoppingList(prev => (prev || []).map(item => item.id === id ? { ...item, is_completed: !status } : item));
-    await supabase.from('shopping_list').update({ is_completed: !status }).eq('id', id);
-  };
-
-  const handleClearShoppingItem = async (id) => {
-    setShoppingList(prev => (prev || []).filter(item => item.id !== id));
-    await supabase.from('shopping_list').delete().eq('id', id);
-  };
-
   const handleSaveRecipeToProfile = async (recipe) => {
     if ((savedRecipes || []).some(r => r.recipe_id === String(recipe.id))) return alert("Recipe already liked!");
     const { data, error } = await supabase.from('saved_recipes').insert([{

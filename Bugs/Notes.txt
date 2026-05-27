@@ -50,8 +50,17 @@ Add the scan receipt feature back in.
 Add a scan barcode feature. The barcode should be search online to figure out what it is and added to the pantry.
 The header needs to be centered on the desktop browswer, it looks fine on the mobile browser but may need something to specify to center the header.
 The personal name feature isn't working. 
-
-
+Implement a background sync for IndexedDB data with Supabase, so changes made offline are automatically uploaded when the user comes online
+Implement an IndexedDB wrapper in a new dbUtils.js file to handle larger offline datasets and image caching for receipt scans.
+Refactor RecipeExplorer.jsx and RecipeModal.jsx to use the UserContext and a new useRecipes hook for managing recipe data and search filters. 
+Add error handling and offline persistence to the useInventory hook using local storage or IndexedDB.
+Help me create a custom hook called useInventory that manages the fridge and shopping list data fetching and state updates currently in App.jsx. 
+Implement a global state using React Context to provide the user and household data to all components without passing them as props
+Refactor the App.jsx file by extracting the authentication logic into a separate AuthManager.jsx component and the recipe-related utility functions into a recipeUtils.js file
+Update the logic in App.jsx to read the recipe and household ID from the URL parameters on load, so shared links actually open the correct recipe. 
+Add a sound effect that plays specifically when the barcode scanner successfully identifies a product
+Implement the missing Share Recipe button logic to generate a unique link for the current household. 
+Customize the html5-qrcode scanner UI to match the Apple Liquid Glass design better, like adding a scanning line animation?
 
 
 TESTED
