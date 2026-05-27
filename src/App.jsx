@@ -2,7 +2,7 @@
 import { supabase } from './supabaseClient';
 import domtoimage from 'dom-to-image-more';
 import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2 } from 'lucide-react';
-import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic } from './utils/recipeUtils';
+import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
 import RecipeExplorer from './components/RecipeExplorer';
