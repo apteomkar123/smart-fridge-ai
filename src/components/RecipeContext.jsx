@@ -7,7 +7,7 @@ import {
   getStaticRecipeSteps, 
   matchesRecipeFilter,
   isVegetarianIngredient
-} from '../utils/recipeUtils';
+} from './recipeUtils';
 
 const RecipeContext = createContext();
 

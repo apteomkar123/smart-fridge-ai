@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Share2, Play, RefreshCw, Plus } from 'lucide-react';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
-import { parseRecipeIngredientMeasurements, cleanIngredientLocally } from '../utils/recipeUtils';
+import { parseRecipeIngredientMeasurements, cleanIngredientLocally } from './recipeUtils';
 
 export default function RecipeModal({ onStartCooking, addedItems, onAddIngredient }) {
   const { household } = useUser();
