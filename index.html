@@ -11,6 +11,7 @@
   
   <link rel="apple-touch-icon" href="/apple-touch-logo.png">
   <link rel="icon" type="image/png" href="/apple-touch-logo.png">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#6BAEE0" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" />
     
@@ -18,5 +19,12 @@
   <body class="bg-blue-50 text-slate-900">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
