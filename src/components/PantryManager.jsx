@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export default function PantryManager({ fridge, onAddManual, manualItem, setManualItem, onUpdateItem, onRemoveItem, receiptLoading, onFileUpload, barcodeInput, setBarcodeInput, onBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
+export default function PantryManager({ fridge, handleAddManualItem, manualItem, setManualItem, handleUpdateInlineItem, handleRemoveItem, receiptLoading, handleFileUpload, barcodeInput, setBarcodeInput, handleBarcodeLookup, barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode }) {
   const isExpiringSoon = (date) => {
     if (!date) return false;
     const today = new Date();
@@ -21,7 +21,7 @@ export default function PantryManager({ fridge, onAddManual, manualItem, setManu
         { facingMode: "environment" }, 
         config, 
         (decodedText) => {
-          onBarcodeLookup(decodedText);
+          handleBarcodeLookup(decodedText);
         },
         () => {} // Ignore parse errors
       ).catch((err) => {
@@ -47,7 +47,7 @@ export default function PantryManager({ fridge, onAddManual, manualItem, setManu
             <p className="text-[12px] text-slate-500">Scan receipts, lookup barcodes, or add pantry items manually.</p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); onAddManual(manualItem); setManualItem(''); }} className="flex gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); handleAddManualItem(manualItem); setManualItem(''); }} className="flex gap-2">
             <input type="text" value={manualItem} onChange={(e) => setManualItem(e.target.value)} placeholder="Add manually..." className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm" />
             <button type="submit" className="bg-[#6BAEE0] text-white p-4 rounded-2xl shadow-lg shadow-blue-100 active:scale-90 transition-all">
               <Plus size={20} />
@@ -58,12 +58,12 @@ export default function PantryManager({ fridge, onAddManual, manualItem, setManu
             <label htmlFor="receipt-upload" className="cursor-pointer bg-sky-50 text-[#1F6FB8] border border-sky-100 px-5 py-4 rounded-2xl text-xs font-bold text-slate-800 hover:bg-sky-100 transition-all shadow-sm text-center flex items-center justify-center gap-2">
               {receiptLoading ? 'Scanning receipt…' : 'Scan receipt'}
             </label>
-            <input id="receipt-upload" type="file" accept="image/*" capture="environment" onChange={(e) => onFileUpload(e.target.files[0])} className="hidden" />
+            <input id="receipt-upload" type="file" accept="image/*" capture="environment" onChange={(e) => handleFileUpload(e.target.files[0])} className="hidden" />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[2fr_auto]">
             <input type="text" value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} placeholder="Enter barcode / UPC" className="bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm" />
-            <button type="button" onClick={() => onBarcodeLookup(barcodeInput)} className="bg-[#6BAEE0] text-white px-5 py-4 rounded-2xl text-xs font-bold shadow-lg shadow-blue-100 hover:bg-[#5da0cf] transition-all">
+            <button type="button" onClick={() => handleBarcodeLookup(barcodeInput)} className="bg-[#6BAEE0] text-white px-5 py-4 rounded-2xl text-xs font-bold shadow-lg shadow-blue-100 hover:bg-[#5da0cf] transition-all">
               {barcodeLoading ? <Loader2 className="animate-spin" size={20} /> : <Scan size={20} />}
             </button>
           </div>
@@ -118,7 +118,7 @@ export default function PantryManager({ fridge, onAddManual, manualItem, setManu
             fridge.map((item) => (
               <div key={item.id} className="bg-white border border-blue-50 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm group hover:shadow-md transition-all">
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <input type="text" defaultValue={item.raw_name} onBlur={(e) => onUpdateItem(item.id, e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-800 border-b border-transparent hover:border-blue-100 focus:border-sky-400 focus:outline-none pb-1" />
+                  <input type="text" defaultValue={item.raw_name} onBlur={(e) => handleUpdateInlineItem(item.id, e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-800 border-b border-transparent hover:border-blue-100 focus:border-sky-400 focus:outline-none pb-1" />
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[9px] font-mono font-black text-slate-300 uppercase">
                       Sanitized: <span className="text-[#6BAEE0]">{item.item_name}</span>
@@ -126,7 +126,7 @@ export default function PantryManager({ fridge, onAddManual, manualItem, setManu
                     {isExpiringSoon(item.expiry_date) && <AlertCircle size={10} className="text-orange-400 animate-pulse" />}
                   </div>
                 </div>
-                <button onClick={() => onRemoveItem(item.id)} className="text-slate-200 hover:text-red-400 transition-colors p-2"><Trash2 size={16} /></button>
+                <button onClick={() => handleRemoveItem(item.id)} className="text-slate-200 hover:text-red-400 transition-colors p-2"><Trash2 size={16} /></button>
               </div>
             ))
           )}

@@ -202,199 +202,6 @@ function MainApp() {
     return localToken;
   };
 
-  const parseMealDbRecipe = (meal) => {
-    const ingredients = [];
-    for (let i = 1; i <= 20; i += 1) {
-      const ingredient = meal[`strIngredient${i}`];
-      const measure = meal[`strMeasure${i}`];
-      if (ingredient && ingredient.trim()) {
-        const cleanedIngredient = `${measure ? measure.trim() : ''} ${ingredient.trim()}`.trim();
-        ingredients.push(cleanedIngredient);
-      }
-    }
-    const steps = String(meal.strInstructions || '')
-      .split(/\r?\n+/)
-      .map((step) => step.trim())
-      .filter(Boolean);
-
-    return {
-      id: meal.idMeal,
-      name: meal.strMeal || `Recipe ${meal.idMeal}`,
-      meal_type: meal.strCategory || meal.strArea || 'General',
-      ingredients,
-      steps
-    };
-  };
-
-  const fetchOnlineRecipes = async () => {
-    const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
-    const results = await Promise.all(letters.map(async (letter) => {
-      try {
-        const response = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?f=${letter}`);
-        if (!response.ok) return [];
-        const data = await response.json();
-        return data.meals || [];
-      } catch (err) {
-        console.error('Online recipe fetch failed for', letter, err);
-        return [];
-      }
-    }));
-    const meals = results.flat();
-    const uniqueMeals = Array.from(new Map(meals.map((meal) => [meal.idMeal, meal])).values());
-    return uniqueMeals.map(parseMealDbRecipe);
-  };
-
-  const fetchAppData = async () => {
-    if (!user) return;
-    try {
-      let { data: inventory } = await supabase.from('fridge_inventory').select('*, expiry_date').eq('user_id', user.id);
-      const normalizedFridge = (inventory || []).map(row => {
-        const rawNameField = row.item_name || row.item || row.name || '';
-        return {
-          id: row.id,
-          raw_name: rawNameField,
-          item_name: cleanIngredientLocally(rawNameField),
-          expiry_date: row.expiry_date // Include expiry date
-        };
-      }).filter(item => item.raw_name);
-      setFridge(normalizedFridge);
-
-      const plainTokensArray = normalizedFridge.map(f => f.item_name).filter(Boolean);
-      calculateMacroMetrics(plainTokensArray);
-
-      const shopQuery = supabase.from('shopping_list').select('*').order('created_at', { ascending: true });
-      if (household?.id) shopQuery.eq('household_id', household.id);
-      else shopQuery.eq('user_id', user.id);
-      
-      let { data: shopItems } = await shopQuery;
-      setShoppingList(shopItems || []);
-
-      const likedQuery = supabase.from('saved_recipes').select('*');
-      likedQuery.eq('user_id', user.id); // Liked recipes usually stay personal
-      let { data: likedRecipes } = await likedQuery;
-      setSavedRecipes(likedRecipes || []);
-
-      let onlineRecipes = [];
-      try {
-        onlineRecipes = await fetchOnlineRecipes();
-      } catch (err) {
-        console.error('Failed to fetch online recipes', err);
-      }
-
-      if (onlineRecipes.length > 0) {
-        const normalizedRecipes = onlineRecipes.map((recipe) => {
-          const cleanedIngredients = (recipe.ingredients || []).map((i) => cleanIngredientLocally(i)).filter(Boolean);
-          const steps = Array.isArray(recipe.steps)
-            ? recipe.steps.map((step) => String(step || '').trim()).filter(Boolean)
-            : String(recipe.steps || '').split(/\r?\n+/).map((step) => String(step || '').trim()).filter(Boolean);
-          return {
-            ...recipe,
-            ingredients: recipe.ingredients || [],
-            cleanedIngredients,
-            steps
-          };
-        }).filter((recipe) => {
-          const joinedIngredients = (Array.isArray(recipe.cleanedIngredients) ? recipe.cleanedIngredients : []).join(' ').toLowerCase();
-          return isVegetarianIngredient(joinedIngredients);
-        });
-        setMasterRecipes(normalizedRecipes);
-        setRecipeCount(normalizedRecipes.length);
-      } else {
-        let { data: recipes } = await supabase.from('recipes').select('*').limit(10000);
-        const parseIngredientArray = (raw) => {
-          if (!raw) return [];
-          if (Array.isArray(raw)) return raw.map(i => String(i || '').trim()).filter(Boolean);
-          const text = String(raw).trim();
-          if (!text) return [];
-          try {
-            const parsed = JSON.parse(text);
-            if (Array.isArray(parsed)) return parsed.map(i => String(i || '').trim()).filter(Boolean);
-            if (typeof parsed === 'string') return [parsed.trim()];
-          } catch (e) {}
-          const splitItems = text.split(/[\r\n,;•–—]+/).map(i => String(i || '').trim()).filter(Boolean);
-          if (splitItems.length > 1) return splitItems;
-          const quotedItems = [...String(text).matchAll(/"([^"']+)"|'([^"']+)'/g)].map(m => m[1] || m[2]).filter(Boolean);
-          if (quotedItems.length) return quotedItems;
-          if (text.includes(' and ')) return text.split(/ and /i).map(i => String(i || '').trim()).filter(Boolean);
-          return [text];
-        };
-        const parseStepArray = (raw) => {
-          if (!raw) return [];
-          if (Array.isArray(raw)) return raw.map(i => String(i || '').trim()).filter(Boolean);
-          let text = String(raw).trim();
-          if (!text) return [];
-          try {
-            const parsed = JSON.parse(text);
-            if (Array.isArray(parsed)) return parsed.map(i => String(i || '').trim()).filter(Boolean);
-            if (typeof parsed === 'string') text = parsed.trim();
-          } catch (e) {}
-          if (text.includes('\n')) return text.split(/\r?\n+/).map(i => String(i || '').trim()).filter(Boolean);
-          const numbered = text.split(/\d+\.\s*/).map(i => String(i || '').trim()).filter(Boolean);
-          if (numbered.length > 1) return numbered;
-          const sentences = text.split(/(?<=\.)\s+(?=[A-Z])/).map(i => String(i || '').trim()).filter(Boolean);
-          return sentences.length > 1 ? sentences : [text];
-        };
-        const normalizedRecipes = (recipes || []).map(r => {
-          const parsedIngredients = parseIngredientArray(r.ingredients || r.ingredient_list || r.items || '');
-          const parsedSteps = parseStepArray(r.steps || r.instructions || r.method || '');
-          const cleanedIngredients = parsedIngredients.map(i => cleanIngredientLocally(i)).filter(Boolean);
-          return {
-            ...r,
-            name: r.name || r.recipe_name || r.title || 'Untitled Recipe Formulation',
-            meal_type: r.meal_type || r.category || r.type || 'General',
-            ingredients: parsedIngredients,
-            cleanedIngredients,
-            steps: parsedSteps
-          };
-        }).filter((recipe) => {
-          const joinedIngredients = (Array.isArray(recipe.cleanedIngredients) ? recipe.cleanedIngredients : []).join(' ').toLowerCase();
-          return isVegetarianIngredient(joinedIngredients);
-        });
-        setMasterRecipes(normalizedRecipes);
-        setRecipeCount(normalizedRecipes.length);
-      }
-    } catch (err) {
-      console.error(err.message);
-    }
-  };
-
-  useEffect(() => {
-    if (user) fetchAppData();
-  }, [user]);
-
-  const handleSaveRecipeToProfile = async (recipe) => {
-    if ((savedRecipes || []).some(r => r.recipe_id === String(recipe.id))) return alert("Recipe already liked!");
-    const { data, error } = await supabase.from('saved_recipes').insert([{
-      user_id: user.id,
-      recipe_id: String(recipe.id),
-      recipe_name: recipe.name,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      meal_type: recipe.meal_type || 'General'
-    }]).select();
-    if (!error && data) setSavedRecipes(prev => [...(prev || []), data[0]]);
-  };
-
-  const handleUpdateProfileName = async (newName) => {
-    if (!user || !newName.trim()) return;
-    const trimmed = newName.trim();
-    const { data, error } = await supabase.from('profiles').update({ name: trimmed }).eq('id', user.id).select().single();
-    if (error || !data) {
-      const { data: inserted, error: insertError } = await supabase.from('profiles').insert({ id: user.id, name: trimmed }).select().single();
-      if (!insertError && inserted) {
-        setUserName(inserted.name || trimmed);
-        return;
-      }
-    } else {
-      setUserName(data.name || trimmed);
-    }
-  };
-
-  const handleRemoveSavedRecipe = async (id) => {
-    setSavedRecipes(prev => (prev || []).filter(r => r.id !== id));
-    await supabase.from('saved_recipes').delete().eq('id', id);
-  };
-
   const handleAddToShoppingFromRecipe = (ing) => {
     const cleaned = cleanIngredientLocally(ing);
     handleAddShoppingItem(cleaned); // Pass cleaned ingredient directly
@@ -526,7 +333,7 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-blue-50/50 text-slate-800 font-sans antialiased pb-24 selection:bg-[#6BAEE0] selection:text-white">
       <div className="w-full flex justify-center">
-        <Header />
+        <Header triggerStoreTripPlanner={triggerStoreTripPlanner} />
       </div>
 
       <main className="w-full flex justify-center px-4 sm:px-6 py-8">
@@ -558,7 +365,6 @@ function MainApp() {
              {savedRecipes && savedRecipes.map(recipe => (
                 <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm">
                    <h3 onClick={() => setActiveModalRecipe(recipe)} className="font-bold cursor-pointer text-slate-700 hover:text-[#6BAEE0]">{recipe.recipe_name}</h3>
-                   <button onClick={() => handleRemoveSavedRecipe(recipe.id)} className="text-red-400 font-black">×</button>
                 </div>
              ))}
           </div>}
