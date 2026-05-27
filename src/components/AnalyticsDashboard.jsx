@@ -1,6 +1,6 @@
 import React from 'react';
 import { DollarSign, BarChart, ShoppingBag, TrendingDown, PieChart, Target } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from './UserContext';
 
 export default function AnalyticsDashboard({ metrics, fridge, shoppingList }) {
   const { household } = useUser();
