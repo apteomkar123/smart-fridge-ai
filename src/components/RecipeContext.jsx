@@ -116,7 +116,7 @@ export const RecipeProvider = ({ children, fridge }) => {
 
     setAiGenerating(true);
     try {
-      const prompt = `Create a unique vegetarian recipe name, ingredient list, and steps using: ${pantry.slice(0, 10).join(', ')}. Return raw JSON only.`;
+      const prompt = `Create a unique vegetarian recipe name, ingredient list, and steps using: ${pantry.slice(0, 10).join(', ')}. Return ONLY valid JSON with keys recipeName, ingredients, and steps.`;
       const res = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,19 +126,33 @@ export const RecipeProvider = ({ children, fridge }) => {
       if (!res.ok) throw new Error(`Server error ${res.status}`);
 
       const text = await res.text();
-      let parsed;
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let parsed = {};
       try {
-        parsed = JSON.parse(text);
+        parsed = JSON.parse(cleaned);
       } catch (e) {
-        throw new Error('AI returned an unreadable response. Please try again.');
+        parsed = {};
       }
 
-      if (!parsed.recipeName) throw new Error('AI response was missing recipe name. Please try again.');
+      const recipeName = parsed.recipeName || parsed.name || parsed.title || '';
+      if (!recipeName) {
+        const match = cleaned.match(/"recipeName"\s*:\s*"([^"]+)"/i) || cleaned.match(/recipe name\s*[:\-]\s*([^\n"]+)/i);
+        if (match) parsed.recipeName = match[1].trim();
+      }
 
-      const ingredients = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
-      const steps = Array.isArray(parsed.steps) && parsed.steps.length > 0
+      const ingredients = Array.isArray(parsed.ingredients)
+        ? parsed.ingredients
+        : typeof parsed.ingredients === 'string'
+          ? parsed.ingredients.split(/\r?\n|,|;/).map(i => i.trim()).filter(Boolean)
+          : [];
+
+      const steps = Array.isArray(parsed.steps)
         ? parsed.steps
-        : ['Follow the ingredient list to prepare this dish.'];
+        : typeof parsed.steps === 'string'
+          ? parsed.steps.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+          : [];
+
+      if (!parsed.recipeName) throw new Error('AI response was missing recipe name. Please try again.');
 
       setActiveModalRecipe({
         id: `ai-${Date.now()}`,
@@ -146,7 +160,7 @@ export const RecipeProvider = ({ children, fridge }) => {
         meal_type: 'Creative',
         ingredients,
         cleanedIngredients: ingredients.map(cleanIngredientLocally).filter(Boolean),
-        steps
+        steps: steps.length > 0 ? steps : ['Follow the ingredient list to prepare this dish.']
       });
       setMultiplier(1);
     } catch (err) {

@@ -4,16 +4,15 @@ It seems to me that AI features aren't working. Check on that.
 
 BUGS TO FIX. YOU TOLD ME YOU FIXED THESE PROBLEMS. THEN WHY IS IT STILL NOT WORKING? FIX THEM, AND MAKE SURE THEY'RE FIXED
 -------------
-Swapping ingredient STILL doesn't work from a recipe card
+Swapping ingredient STILL doesn't work from a recipe card. Now it says "Could not find a substitute. Please try again.", even though there very obviously should be a substituion for some of these.
 AI recipe generator gives server error 500
 I scanned a reciept, but the app did nothing with it
-The message that shows up when a barcode is scanned (Either the food name or "product not found") should fade away after 8 seconds, not stay there
 
 -------------------------------------------
 
 FEATURES TO ADD:
 -------------------
-Add a feature that allows you to mark individual items in your pantry as personal or household
+Add a feature that allows you to mark individual items that are already in your pantry as personal or household
 Add an option to delete households
 Household should not be "select one at a time", but instead you should have the option to add any of the your households
 

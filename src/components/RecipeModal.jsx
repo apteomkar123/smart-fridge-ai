@@ -49,13 +49,24 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
       });
       if (!response.ok) throw new Error(`Server error ${response.status}`);
       const text = await response.text();
-      let parsed;
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let parsed = {};
       try {
-        parsed = JSON.parse(text);
+        parsed = JSON.parse(cleaned);
       } catch (e) {
-        parsed = { recipeName: text.replace(/["{}]/g, '').trim() };
+        parsed = {};
       }
-      const subValue = (parsed.recipeName || '').trim();
+
+      const subValue = (
+        parsed.substitute ||
+        parsed.substituteName ||
+        parsed.recipeName ||
+        parsed.replacement ||
+        parsed.answer ||
+        (typeof parsed === 'string' ? parsed : '') ||
+        cleaned
+      ).toString().trim();
+
       if (subValue) {
         setSubstitutes(prev => ({ ...prev, [ingredient]: subValue }));
       } else {

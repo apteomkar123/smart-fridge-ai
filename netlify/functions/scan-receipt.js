@@ -2,12 +2,18 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
 const HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
 const callGemini = async (apiKey, parts, generationConfig = {}) => {
+  const bodyContents = parts.map((part) => {
+    if (typeof part === 'string') return { text: part };
+    if (part?.text) return { text: part.text };
+    return part;
+  });
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts }],
+      contents: bodyContents,
       generationConfig: { temperature: 0.2, ...generationConfig }
     })
   });
@@ -16,7 +22,8 @@ const callGemini = async (apiKey, parts, generationConfig = {}) => {
     throw new Error(`Gemini ${res.status}: ${errBody.slice(0, 300)}`);
   }
   const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0]?.content;
+  const text = candidate?.text || candidate?.parts?.map((p) => p.text).join('\n') || '';
   if (!text) throw new Error('Gemini returned an empty response');
   return text;
 };
@@ -53,14 +60,15 @@ export const handler = async (event) => {
       const isRecipe = !isSubstitution && (lower.includes('recipe') || lower.includes('cook') || lower.includes('meal') || lower.includes('generate'));
 
       const prompt = isRecipe
-        ? `${bodyData.customPrompt}. Generate a creative vegetarian recipe. Return ONLY valid JSON with no extra text: { "recipeName": "string", "ingredients": ["string"], "steps": ["string"] }.`
-        : `${bodyData.customPrompt}. Return ONLY valid JSON with no extra text: { "recipeName": "substitute_name_here" }.`;
+        ? `${bodyData.customPrompt}. Generate a creative vegetarian recipe. Return ONLY valid JSON with no extra text and nothing else. Use keys: recipeName, ingredients, steps. Example: { "recipeName": "Veggie Bowl", "ingredients": ["..."], "steps": ["..."] }.`
+        : `${bodyData.customPrompt}. Return ONLY valid JSON with no extra text and nothing else. Use one of these keys: substitute, substituteName, recipeName, replacement. Example: { "substitute": "tofu" }.`;
 
       const rawText = await callGemini(apiKey, [{ text: prompt }], { temperature: 0.7 });
+      const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
 
       return {
         statusCode: 200, headers: HEADERS,
-        body: rawText.replace(/```json/g, '').replace(/```/g, '').trim()
+        body: cleanedText
       };
     }
 
