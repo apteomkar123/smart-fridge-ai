@@ -1,7 +1,12 @@
 import React from 'react';
 import { LogOut, Sparkles, ShoppingBag } from 'lucide-react';
+import { useUser } from './UserContext';
 
-export default function Header({ user, userName, handleGenerateAiRecipe, triggerStoreTripPlanner, handleSignOut }) {
+import { useRecipes } from './RecipeContext';
+
+export default function Header({ triggerStoreTripPlanner }) {
+  const { user, userName, handleSignOut } = useUser();
+  const { handleGenerateAiRecipe } = useRecipes();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
 

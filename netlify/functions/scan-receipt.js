@@ -43,7 +43,7 @@ export const handler = async (event, context) => {
 
     // 2. CHANNELS GATE B: AI Recipe Generator Core Integration
     if (bodyData && bodyData.customPrompt) {
-      const prompt = `${bodyData.customPrompt} Formulate a creative vegetarian recipe using these items. You must respond with a strict raw JSON object string mapping exactly these properties: { "recipeName": "string name", "ingredients": ["clean item strings"], "steps": ["step 1 description string", "step 2 description string"] }. Do not wrap inside markdown code block formatting backticks.`;
+      const prompt = `${bodyData.customPrompt} Formulate a creative vegetarian recipe using these items. If an essential ingredient is missing but a common substitute exists within the pantry list provided, prioritize that substitute. Respond with a strict raw JSON object: { "recipeName": "string", "ingredients": ["item strings"], "steps": ["step strings"], "substitutions": {"original": "replacement"} }. Do not wrap inside markdown code block formatting backticks.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',

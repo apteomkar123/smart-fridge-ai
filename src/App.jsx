@@ -10,6 +10,14 @@ import {
   BarChart3, 
   Users 
 } from 'lucide-react';
+import { 
+  cleanIngredientLocally, 
+  normalizeIngredientTokens, 
+  getStaticRecipeSteps, 
+  matchesRecipeFilter, 
+  triggerHaptic,
+  isVegetarianIngredient
+} from './components/recipeUtils';
 
 // Components (To be created)
 import Header from './components/Header';
@@ -20,132 +28,53 @@ import RecipeModal from './components/RecipeModal';
 import CookingMode from './components/CookingMode';
 import HouseholdSettings from './components/HouseholdSettings';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import AuthManager from './components/AuthManager';
+import { useUser } from './components/UserContext';
+import { RecipeProvider, useRecipes } from './components/RecipeContext';
+import { useInventory } from './components/useInventory';
 
-// --- Utilities moved outside component to prevent re-creation and improve clarity ---
-
-const vegetarianBlocklist = [
-  'chicken', 'beef', 'pork', 'fish', 'shrimp', 'salmon', 'ham', 'bacon', 'anchovy', 'turkey', 'lamb', 'duck', 'mutton', 'veal', 'crab', 'lobster', 'sausage', 'pepperoni'
-];
-
-const isVegetarianIngredient = (value) => {
-  if (!value) return true;
-  const normalized = String(value).toLowerCase();
-  return !vegetarianBlocklist.some(token => normalized.includes(token));
-};
-
-const cleanIngredientLocally = (rawName) => {
-  if (!rawName) return '';
-  let name = String(rawName).toLowerCase().trim();
-  name = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  name = name.replace(/[\u2013\u2014•]/g, ' ');
-  name = name.replace(/\d+/g, ' ');
-  name = name.replace(/\b(?:organic|fresh|large|small|medium|extra|reduced fat|low fat|low-sodium|low sodium|unsalted|sliced|diced|chopped|shredded|minced|ground|boneless|skinless|prepared|peeled|packaged|package|pack|can|canned|jar|bottle|tube|stick|slice|pieces|piece|cup|cups|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp|grams|gram|g|kg|pounds|pound|lb|lbs|oz|ounces|fluid|fl oz|ml|ltr|liter|litre|pkg|ct|count)\b/g, ' ');
-  name = name.replace(/[^a-z0-9\s]/g, ' ');
-  name = name.replace(/\s+/g, ' ').trim();
-  return name;
-};
-
-const normalizeIngredientTokens = (value) => {
-  const clean = cleanIngredientLocally(value);
-  return Array.from(new Set(clean.split(/\s+/).filter(Boolean)));
-};
-
-const formatIngredientMeasurement = (ingredientString, multiplier) => {
-  const lower = String(ingredientString).toLowerCase();
-  const nameOnly = ingredientString.replace(/^[0-9\/\.\s\-½⅓¼¾⅛]+/, '').trim();
-  if (/\b(cup|cups|ml|l|liter|litre|milk|yogurt|broth|water)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
-  if (/\b(tbsp|tablespoon|tablespoons|oil|sauce|vinegar|soy)\b/.test(lower)) return `${1 * multiplier} tbsp ${nameOnly}`;
-  if (/\b(tsp|teaspoon|teaspoons|garlic|ginger|salt|pepper|spice|herb)\b/.test(lower)) return `${0.5 * multiplier} tsp ${nameOnly}`;
-  if (/\b(flour|rice|lentil|sugar|pasta|beans)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
-  if (/\b(onion|tomato|potato|carrot|apple)\b/.test(lower)) return `${1 * multiplier} medium ${nameOnly}`;
-  if (/\b(paneer|tofu|cheese|yogurt)\b/.test(lower)) {
-    const oz = Math.max(1, Math.round((100 * multiplier) / 28.35));
-    return `${oz} oz ${nameOnly}`;
-  }
-  return `${1 * multiplier} each ${nameOnly}`;
-};
-
-const getStaticRecipeSteps = (recipe) => {
-  if (!recipe) return ['Follow the ingredient list to create the dish.'];
-  const rawSteps = recipe.steps || recipe.instructions || recipe.step || [];
-  let steps = [];
-  if (Array.isArray(rawSteps)) {
-    steps = rawSteps.map(step => String(step || '').trim()).filter(Boolean);
-  } else {
-    const textSteps = String(rawSteps || '').trim();
-    if (textSteps.includes('\n')) steps = textSteps.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    else if (textSteps) steps = [textSteps];
-  }
-  if (steps && steps.length) return steps;
-  const ingList = (recipe.cleanedIngredients || []).slice(0, 8).map(i => i.replace(/^[0-9\/\.\s\-½⅓¼¾⅛]+/, '').trim());
-  const firstFew = ingList.length ? ingList.join(', ') : 'your ingredients';
-  return [
-    `Prep: gather ${firstFew}.`,
-    'Combine the ingredients in a suitable pan or bowl.',
-    'Cook or bake until ingredients are tender and flavors meld (approx. 10–25 minutes).',
-    'Taste and adjust seasoning, then serve warm.'
-  ];
-};
-
-const parseRecipeIngredientMeasurements = (ingredientString, multiplier) => {
-  if (!ingredientString) return '';
-  const numericTokenMatch = ingredientString.match(/^([0-9\/\.\s\-½⅓¼¾⅛]+)/);
-  if (numericTokenMatch) {
-    const rawNumberString = numericTokenMatch[1].trim();
-    let baseVal = parseFloat(rawNumberString);
-    if (isNaN(baseVal)) {
-      if (rawNumberString.includes('½')) baseVal = 0.5;
-      else if (rawNumberString.includes('¼')) baseVal = 0.25;
-      else if (rawNumberString.includes('¾')) baseVal = 0.75;
-      else baseVal = 1.0; 
-    }
-    return `${baseVal * multiplier} ${ingredientString.substring(numericTokenMatch[0].length).trim()}`;
-  }
-  return formatIngredientMeasurement(ingredientString, multiplier);
-};
-
-// Subtle Haptic Feedback utility (Web Standard)
-const triggerHaptic = (intensity = 10) => {
-  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-    window.navigator.vibrate(intensity);
-  }
-};
-
-export default function App() 
-{
-  // Session & Auth States
-  const [user, setUser] = useState(null);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
+function MainApp() {
+  const { user, household, userName, handleSignOut, loading: authLoading } = useUser();
   
-  // Password Recovery States
-  const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
-  const [isResettingPasswordMode, setIsResettingPasswordMode] = useState(false);
-  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const {
+    fridge,
+    shoppingList,
+    nutritionMetrics,
+    loading: inventoryLoading,
+    receiptLoading,
+    barcodeLoading,
+    barcodeResult,
+    isScanningBarcode,
+    barcodeInput,
+    setBarcodeInput,
+    storeName,
+    error: inventoryError,
+    setIsScanningBarcode,
+    handleAddManualItem,
+    handleRemoveItem,
+    handleAddShoppingItem,
+    handleToggleShoppingCompleted,
+    handleClearShoppingItem,
+    handleBarcodeLookup,
+    handleFileUpload,
+    handleUpdateInlineItem
+  } = useInventory(user, household);
 
-  // Core Data States
-  const [fridge, setFridge] = useState([]); 
-  const [masterRecipes, setMasterRecipes] = useState([]);
-  const [recipeCount, setRecipeCount] = useState(0);
-  const [shoppingList, setShoppingList] = useState([]);
-  const [savedRecipes, setSavedRecipes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const {
+    processedRecipes,
+    handleGenerateAiRecipe,
+    activeModalRecipe,
+    setActiveModalRecipe,
+    savedRecipes
+  } = useRecipes();
+
+  const [isResettingPasswordMode, setIsResettingPasswordMode] = useState(false);
   
   // Input Handling States
   const [manualItem, setManualItem] = useState('');
-  const [shoppingInput, setShoppingInput] = useState('');
-  const [storeName, setStoreName] = useState('General Grocery');
-  const [userName, setUserName] = useState('');
-  const [receiptLoading, setReceiptLoading] = useState(false);
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [barcodeLoading, setBarcodeLoading] = useState(false);
-  const [barcodeResult, setBarcodeResult] = useState('');
   
   // Advanced Matrix Tracking States
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [nutritionMetrics, setNutritionMetrics] = useState({ protein: 0, carbs: 0, fat: 0 });
 
   // Navigation UI Layout States
   const [recipeSearch, setRecipeSearch] = useState('');
@@ -153,12 +82,12 @@ export default function App()
   const [shoppingAlerts, setShoppingAlerts] = useState([]);
   const [isStoreAlertOpen, setIsStoreAlertOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeModalRecipe, setActiveModalRecipe] = useState(null);
   const [activeTab, setActiveTab] = useState('pantry');
 
   // New Feature States
   const [isCookingMode, setIsCookingMode] = useState(false);
-  const [household, setHousehold] = useState(null);
+  const [urlRecipeId, setUrlRecipeId] = useState(null);
+  const [urlHouseholdId, setUrlHouseholdId] = useState(null);
 
   // Added items tracking for modal
   const [addedItems, setAddedItems] = useState(new Set());
@@ -169,91 +98,27 @@ export default function App()
   const snapshotCardRef = useRef(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchHousehold(session.user.id);
-      }
-    });
+    // Parse URL parameters for shared recipes
+    const params = new URLSearchParams(window.location.search);
+    const recipeIdFromUrl = params.get('recipe');
+    const householdIdFromUrl = params.get('hh');
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchHousehold(session.user.id);
-      } else {
-        setUser(null);
-        setHousehold(null);
-      }
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsResettingPasswordMode(true);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    if (recipeIdFromUrl) setUrlRecipeId(recipeIdFromUrl);
+    if (householdIdFromUrl) setUrlHouseholdId(householdIdFromUrl);
   }, []);
 
-  const fetchHousehold = async (userId) => {
-    const { data: profile } = await supabase.from('profiles').select('household_id, name, full_name').eq('id', userId).single();
-    if (profile) {
-      setUserName(profile.name || profile.full_name || '');
-      if (profile.household_id) {
-        const { data: hh } = await supabase.from('households').select('*').eq('id', profile.household_id).single();
-        setHousehold(hh);
-        fetchAppData(profile.household_id);
+  // Effect to open recipe modal from URL
+  useEffect(() => {
+    if (urlRecipeId && processedRecipes.length > 0) {
+      const recipeToOpen = processedRecipes.find(r => String(r.id) === urlRecipeId);
+      if (recipeToOpen) {
+        setActiveModalRecipe(recipeToOpen);
+        setActiveTab('recipes');
       }
+      setUrlRecipeId(null);
+      setUrlHouseholdId(null);
     }
-  };
-
-  const recipeCategoryMatches = (recipe, patterns) => {
-    const text = `${recipe.meal_type || ''} ${recipe.name || ''} ${(recipe.cleanedIngredients || []).join(' ')}`.toLowerCase();
-    return patterns.some((pattern) => text.includes(pattern));
-  };
-
-  const isRecipeVegan = (recipe) => {
-    const nonVegan = ['egg', 'eggs', 'milk', 'butter', 'cheese', 'cream', 'yogurt', 'honey', 'gelatin', 'paneer', 'whey'];
-    return !(recipe.cleanedIngredients || []).some((ing) => nonVegan.some((token) => ing.includes(token)));
-  };
-
-  const isRecipeMeat = (recipe) => {
-    const meatTokens = ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'ham', 'veal', 'duck', 'venison', 'mutton'];
-    return (recipe.cleanedIngredients || []).some((ing) => meatTokens.some((token) => ing.includes(token)));
-  };
-
-  const isRecipeFish = (recipe) => {
-    const fishTokens = ['fish', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'anchovy', 'trout', 'cod', 'seafood'];
-    return (recipe.cleanedIngredients || []).some((ing) => fishTokens.some((token) => ing.includes(token)));
-  };
-
-  const isRecipeEgg = (recipe) => {
-    return (recipe.cleanedIngredients || []).some((ing) => /(egg|eggs)/.test(ing));
-  };
-
-  const matchesRecipeFilter = (recipe, filter) => {
-    switch (filter) {
-      case 'vegetarian':
-        return !isRecipeMeat(recipe) && !isRecipeFish(recipe);
-      case 'vegan':
-        return isRecipeVegan(recipe);
-      case 'breakfast':
-        return recipeCategoryMatches(recipe, ['breakfast', 'morning', 'brunch']);
-      case 'lunch':
-        return recipeCategoryMatches(recipe, ['lunch', 'sandwich', 'salad', 'bowl']);
-      case 'dinner':
-        return recipeCategoryMatches(recipe, ['dinner', 'supper', 'main', 'casserole', 'stew', 'pasta']);
-      case 'dessert':
-        return recipeCategoryMatches(recipe, ['dessert', 'cake', 'pie', 'pudding', 'sweet', 'custard', 'ice cream', 'brownie']);
-      case 'snack':
-        return recipeCategoryMatches(recipe, ['snack', 'finger', 'appetizer', 'dip', 'nibble', 'side']);
-      case 'meat':
-        return isRecipeMeat(recipe);
-      case 'fish':
-        return isRecipeFish(recipe);
-      case 'egg':
-        return isRecipeEgg(recipe);
-      default:
-        return true;
-    }
-  };
+  }, [urlRecipeId, processedRecipes]);
 
   const buildCreativeRecipePrompt = (pantryItems) => {
     const ingredientList = pantryItems.slice(0, 10).join(', ');
@@ -382,13 +247,14 @@ export default function App()
   const fetchAppData = async () => {
     if (!user) return;
     try {
-      let { data: inventory } = await supabase.from('fridge_inventory').select('*').eq('user_id', user.id);
+      let { data: inventory } = await supabase.from('fridge_inventory').select('*, expiry_date').eq('user_id', user.id);
       const normalizedFridge = (inventory || []).map(row => {
         const rawNameField = row.item_name || row.item || row.name || '';
         return {
           id: row.id,
           raw_name: rawNameField,
-          item_name: cleanIngredientLocally(rawNameField)
+          item_name: cleanIngredientLocally(rawNameField),
+          expiry_date: row.expiry_date // Include expiry date
         };
       }).filter(item => item.raw_name);
       setFridge(normalizedFridge);
@@ -496,23 +362,6 @@ export default function App()
     if (user) fetchAppData();
   }, [user]);
 
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword.trim() });
-        if (error) throw error;
-        alert("PROFILE CREATED SUCCESSFULLY!");
-        setIsSignUp(false);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword.trim() });
-        if (error) throw error;
-      }
-    } catch (err) { alert(err.message); }
-    finally { setAuthLoading(false); }
-  };
-
   const handleUpdateInlineItem = async (id, updatedRawValue) => {
     setFridge(prev => (prev || []).map(item => item.id === id ? { ...item, raw_name: updatedRawValue, item_name: cleanIngredientLocally(updatedRawValue) } : item));
     await supabase.from('fridge_inventory').update({ item_name: updatedRawValue }).eq('id', id); // Ensure DB column name matches
@@ -529,7 +378,6 @@ export default function App()
     const alreadyLocal = (shoppingList || []).some(i => String(i.item_name || '').toLowerCase() === resolvedTokenName.toLowerCase());
     if (alreadyLocal) {
       alert('Item already in list');
-      if (!textOverride) setShoppingInput('');
       return;
     }
 
@@ -538,11 +386,10 @@ export default function App()
       household_id: household?.id || null,
       item_name: resolvedTokenName,
       is_completed: false,
-      price: price
+      price: price // Include price
     }]).select();
 
     if (!error && data) setShoppingList(prev => [...(prev || []), data[0]]);
-    if (!textOverride) setShoppingInput('');
   };
 
   const handleToggleShoppingCompleted = async (id, status) => {
@@ -590,7 +437,7 @@ export default function App()
 
   const handleAddToShoppingFromRecipe = (ing) => {
     const cleaned = cleanIngredientLocally(ing);
-    handleAddShoppingItem(null, cleaned);
+    handleAddShoppingItem(cleaned); // Pass cleaned ingredient directly
     setAddedItems(prev => new Set(prev).add(ing));
   };
 
@@ -657,28 +504,6 @@ export default function App()
     }
   };
 
-  const handleGenerateAiRecipe = async () => {
-    const pantryItems = (fridge || []).map(f => cleanIngredientLocally(f.item_name)).filter(Boolean);
-    if (pantryItems.length === 0) return alert("Your pantry is empty. Add a few ingredients to get a recipe suggestion.");
-    setAiGenerating(true);
-    try {
-      const aiRecipe = await fetchCreativeRecipeFromAi(pantryItems);
-      // Fix: Prioritize showing the actual AI generated recipe
-      setActiveModalRecipe(aiRecipe);
-      setActiveTab('recipes');
-      setServingMultiplier(1);
-    } catch (err) {
-      console.error(err);
-      // Fix: Fallback to local creative generation instead of just a database recipe
-      const local = generateLocalCreativeRecipe(pantryItems);
-      setActiveModalRecipe(local);
-      setActiveTab('recipes');
-      setServingMultiplier(1);
-    } finally {
-      setAiGenerating(false);
-    }
-  };
-
   const triggerStoreTripPlanner = () => {
     const pantryTokens = (fridge || []).map(f => f.item_name).filter(Boolean);
     const alerts = (processedRecipes || [])
@@ -696,285 +521,81 @@ export default function App()
     setIsStoreAlertOpen(true);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setFridge([]); setMasterRecipes([]); setActiveModalRecipe(null);
-  };
+  // All recipe-related logic is now in RecipeContext/useRecipes
+  // const processedRecipes = useMemo(() => { ... });
 
-  const handleRemoveItem = async (id) => {
-    setFridge(prev => (prev || []).filter(item => item.id !== id));
-    await supabase.from('fridge_inventory').delete().eq('id', id);
-  };
+  // All household-related logic is now in UserContext
+  // const handleJoinHousehold = async (code) => { ... };
+  // const handleCreateHousehold = async (name) => { ... };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setReceiptLoading(true);
-    setLoading(true);
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 600; canvas.height = 800;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 600, 800);
-      sendImageToBackend(canvas.toDataURL('image/jpeg', 0.75));
-    };
-  };
+  // All profile name update logic is now in UserContext
+  // const handleUpdateProfileName = async (newName) => { ... };
 
-  const lookupBarcodeProduct = async (barcode) => {
-    if (!barcode || !barcode.trim()) return null;
-    try {
-      const code = barcode.trim();
-      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      if (data?.status === 1 && data.product) {
-        return String(data.product.product_name || data.product.generic_name || data.product.brands || '').trim() || null;
-      }
-    } catch (err) {
-      console.error('Barcode lookup failed', err);
-    }
-    return null;
-  };
+  // All sign out logic is now in UserContext
+  // const handleSignOut = async () => { ... };
 
-  const handleBarcodeLookup = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!barcodeInput.trim()) return;
-    setBarcodeLoading(true);
-    setBarcodeResult('');
-    try {
-      const productName = await lookupBarcodeProduct(barcodeInput);
-      if (!productName) {
-        setBarcodeResult('No product found for that barcode.');
-      } else {
-        const sanitizedName = cleanIngredientLocally(productName);
-        if (!sanitizedName) {
-          setBarcodeResult(`Found product "${productName}", but could not sanitize it for pantry entry.`);
-        } else {
-          await supabase.from('fridge_inventory').insert([{ 
-            item_name: sanitizedName,
-            user_id: user.id,
-            household_id: household?.id || null
-          }]);
-          setBarcodeResult(`Added "${productName}" to your pantry.`);
-          setBarcodeInput('');
-          await fetchAppData();
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      setBarcodeResult('Barcode lookup failed. Please try again.');
-    } finally {
-      setBarcodeLoading(false);
-    }
-  };
+  // All item removal logic is now in useInventory
+  // const handleRemoveItem = async (id) => { ... };
 
-  const sendImageToBackend = async (base64Data) => {
-    try {
-      const response = await fetch('/.netlify/functions/scan-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Data })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.storeName) setStoreName(data.storeName);
-        const rawItems = Array.isArray(data.added) ? data.added.map(item => item.trim()) : [];
-        for (let rawItem of rawItems) {
-          if (!rawItem.trim()) continue;
-          const sanitizedToken = await resolveSanitizedTokenOnline(rawItem.trim());
-          const backgroundParsedToken = sanitizedToken || cleanIngredientLocally(rawItem.trim());
-          if (backgroundParsedToken) {
-            await supabase.from('fridge_inventory').insert([{ item_name: backgroundParsedToken, user_id: user.id, household_id: household?.id || null }]);
-          }
-        }
-        await fetchAppData();
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setReceiptLoading(false);
-      setLoading(false);
-    }
-  };
+  // All manual item add logic is now in useInventory
+  // const handleAddManualItem = async (e) => { ... };
 
-  const handleAddManualItem = async (e) => {
-    e.preventDefault();
-    if (!manualItem.trim()) return;
-    const backgroundParsedToken = cleanIngredientLocally(manualItem);
-    await supabase.from('fridge_inventory').insert([{ 
-      item_name: backgroundParsedToken, 
-      user_id: user.id,
-      household_id: household?.id || null 
-    }]);
-    setManualItem('');
-    await fetchAppData();
-  };
+  // All barcode lookup logic is now in useInventory
+  // const handleBarcodeLookup = async (e, directValue = null) => { ... };
 
-  const handleJoinHousehold = async (code) => {
-    const { data: hh, error } = await supabase.from('households').select('*').eq('invite_code', code).single();
-    if (error || !hh) return alert("Invalid invite code");
-    await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id);
-    setHousehold(hh);
-    fetchAppData(hh.id);
-  };
+  // All file upload logic is now in useInventory
+  // const handleFileUpload = async (e) => { ... };
 
-  const handleCreateHousehold = async (name) => {
-    const { data: hh } = await supabase.from('households').insert([{ name }]).select().single();
-    if (hh) {
-      await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id);
-      setHousehold(hh);
-    }
-  };
+  // All macro calculation logic is now in useInventory
+  // const calculateMacroMetrics = (tokens) => { ... };
 
-  const calculateMacroMetrics = (tokens) => {
-    let p = 0, c = 0, f = 0;
-    (tokens || []).forEach(item => {
-      if (!item) return;
-      if (item.includes('paneer') || item.includes('tofu')) { p += 18; c += 3; f += 20; }
-      else if (item.includes('lentil') || item.includes('chickpea') || item.includes('bean')) { p += 9; c += 22; f += 1; }
-      else { p += 4; c += 12; f += 2; }
-    });
-    setNutritionMetrics({ protein: p, carbs: c, fat: f });
-  };
-
-  // 🛡️ SAFELY MEMOIZED SORT MATRIX DECK
-  const processedRecipes = useMemo(() => {
-    const pantryStrings = (fridge || []).map(f => cleanIngredientLocally(f.item_name || '')).filter(Boolean);
-    const pantryTokens = new Set(pantryStrings.flatMap(normalizeIngredientTokens));
-    const pantryPhrases = new Set(pantryStrings);
-
-    const stopwords = new Set(['salt','water','pepper','oil','sugar','butter','egg','eggs','flour','onion','garlic','milk','cream','vinegar','soy','wheat','corn','bread']);
-
-    const scoreIngredientMatch = (ingClean) => {
-      if (!ingClean) return 0;
-      const ingTokens = normalizeIngredientTokens(ingClean).filter((t) => !stopwords.has(t));
-      if (pantryPhrases.has(ingClean)) return 1;
-      if (ingTokens.some((token) => pantryTokens.has(token) && pantryTokens.has(token))) return 0.95;
-
-      let bestScore = 0;
-      pantryStrings.forEach((pantry) => {
-        const pantryClean = cleanIngredientLocally(pantry);
-        if (!pantryClean) return;
-        const pantryTokensFromPhrase = normalizeIngredientTokens(pantryClean).filter((t) => !stopwords.has(t));
-        if (pantryClean === ingClean || pantryClean.includes(ingClean) || ingClean.includes(pantryClean)) {
-          bestScore = 1;
-          return;
-        }
-        const overlap = ingTokens.filter((token) => pantryTokensFromPhrase.includes(token)).length;
-        if (overlap >= 2) bestScore = Math.max(bestScore, 0.9);
-        else if (overlap === 1) bestScore = Math.max(bestScore, 0.65);
-      });
-
-      return bestScore;
-    };
-
-    const scored = (masterRecipes || []).map(recipe => {
-      const cleanedIngredients = (recipe.cleanedIngredients || []).filter(Boolean);
-      const totalIngredients = cleanedIngredients.length || 1;
-
-      const ingredientMatches = cleanedIngredients.map((ing) => {
-        const matchScore = scoreIngredientMatch(cleanIngredientLocally(ing));
-        return {
-          raw: ing,
-          cleaned: cleanIngredientLocally(ing),
-          score: matchScore,
-          exact: matchScore >= 0.95
-        };
-      });
-
-      const ownedCount = ingredientMatches.filter((match) => match.score > 0).length;
-      const exactMatchCount = ingredientMatches.filter((match) => match.exact).length;
-      const totalScore = ingredientMatches.reduce((sum, match) => sum + match.score, 0);
-      const matchPercentage = Math.round((totalScore / totalIngredients) * 100);
-      const missingCount = totalIngredients - ownedCount;
-      const scoreVariance = totalScore * 100 - missingCount * 8;
-
-      const steps = getStaticRecipeSteps({ ...recipe, cleanedIngredients });
-
-      return {
-        ...recipe,
-        cleanedIngredients,
-        matchPercentage,
-        scoreVariance,
-        ownedCount,
-        exactMatchCount,
-        totalCount: totalIngredients,
-        missingCount,
-        totalScore,
-        steps
-      };
-    });
-
-    const filteredBySearch = scored.filter((recipe) => {
-      if (!recipeSearch) return true;
-      const search = recipeSearch.toLowerCase();
-      return (recipe.name && recipe.name.toLowerCase().includes(search)) || (recipe.cleanedIngredients || []).some((ing) => ing.toLowerCase().includes(search));
-    });
-
-    const filteredByCategory = filteredBySearch.filter((recipe) => matchesRecipeFilter(recipe, activeRecipeFilter));
-
-    return filteredByCategory.sort((a, b) => {
-      if (b.matchPercentage !== a.matchPercentage) return b.matchPercentage - a.matchPercentage;
-      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-      if (b.exactMatchCount !== a.exactMatchCount) return b.exactMatchCount - a.exactMatchCount;
-      if (b.ownedCount !== a.ownedCount) return b.ownedCount - a.ownedCount;
-      return a.totalCount - b.totalCount;
-    });
-  }, [fridge, masterRecipes, recipeSearch, activeRecipeFilter]);
+  // All expiring soon logic is now in useInventory or recipeUtils
+  // const isExpiringSoon = (date) => { ... };
 
   if (!user) {
     return (
       <div className="min-h-screen bg-blue-50 text-slate-900 font-sans font-black tracking-tight antialiased flex items-center justify-center p-6 select-none">
-        <div className="bg-white border border-blue-100 p-10 rounded-[3rem] w-full max-w-md shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-[#6BAEE0]"></div>
-          <h2 className="logo-text text-5xl mb-6 text-[#1F6FB8] text-center">Hungry</h2>
-          
-          {isForgotPasswordView ? (
-            <form onSubmit={async (e) => { e.preventDefault(); try { await supabase.auth.resetPasswordForEmail(authEmail); alert('Password reset link sent to your email!'); setIsForgotPasswordView(false); setAuthEmail(''); } catch (err) { alert(err.message); } }} className="space-y-4 mt-6 font-sans">
-              <p className="text-xs text-slate-400 mb-4">Enter your email to receive a password reset link.</p>
-              <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Email Address" />
-              <button type="submit" className="w-full bg-[#6BAEE0] hover:bg-[#5da0cf] text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-100">{authLoading ? "Sending..." : "Send Reset Link"}</button>
-              <button type="button" onClick={() => { setIsForgotPasswordView(false); setAuthEmail(''); }} className="w-full bg-white border border-blue-100 font-black py-3 rounded-xl text-xs uppercase tracking-widest text-slate-400 hover:text-sky-500 shadow-sm transition-all">Back to Sign In</button>
-            </form>
-          ) : isSignUp ? (
-            <form onSubmit={handleAuthSubmit} className="space-y-4 mt-6 font-sans">
-              <p className="text-xs text-slate-400 mb-2">Create a new account</p>
-              <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Email Address" />
-              <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Password" />
-              <button type="submit" className="w-full bg-[#6BAEE0] hover:bg-[#5da0cf] text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-100">{authLoading ? "Creating..." : "Create Account"}</button>
-              <button type="button" onClick={() => { setIsSignUp(false); setAuthEmail(''); setAuthPassword(''); }} className="w-full bg-white border border-blue-100 font-black py-3 rounded-xl text-xs uppercase tracking-widest text-slate-400 hover:text-sky-500 shadow-sm transition-all">Back to Sign In</button>
-            </form>
-          ) : (
-            <form onSubmit={handleAuthSubmit} className="space-y-4 mt-6 font-sans">
-              <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Email Address" />
-              <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Password" />
-              <button type="submit" className="w-full bg-[#6BAEE0] hover:bg-[#5da0cf] text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-100">{authLoading ? "Verifying..." : "Sign In"}</button>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => { setIsSignUp(true); setAuthEmail(''); setAuthPassword(''); }} className="flex-1 bg-white border border-blue-100 font-black py-3 rounded-xl text-xs uppercase tracking-widest text-slate-400 hover:text-sky-500 shadow-sm transition-all">Create Account</button>
-                <button type="button" onClick={() => { setIsForgotPasswordView(true); setAuthPassword(''); }} className="flex-1 bg-white border border-blue-100 font-black py-3 rounded-xl text-xs uppercase tracking-widest text-slate-400 hover:text-sky-500 shadow-sm transition-all">Forgot Password</button>
-              </div>
-            </form>
-          )}
-        </div>
+        <AuthManager />
       </div>
     );
   }
 
+  if (authLoading || inventoryLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (inventoryError) return <div className="min-h-screen flex items-center justify-center text-red-500">Error: {inventoryError}</div>;
+
   return (
     <div className="min-h-screen bg-blue-50/50 text-slate-800 font-sans antialiased pb-24 selection:bg-[#6BAEE0] selection:text-white">
-      <Header user={user} userName={userName} storeName={storeName} handleGenerateAiRecipe={handleGenerateAiRecipe} triggerStoreTripPlanner={triggerStoreTripPlanner} handleSignOut={handleSignOut} />
+      <div className="w-full flex justify-center">
+        <Header />
+      </div>
 
       <main className="w-full flex justify-center px-4 sm:px-6 py-8">
         <div className="w-full max-w-5xl">
-          {activeTab === 'pantry' && <PantryManager fridge={fridge} handleAddManualItem={handleAddManualItem} manualItem={manualItem} setManualItem={setManualItem} handleUpdateInlineItem={handleUpdateInlineItem} handleRemoveItem={handleRemoveItem} loading={loading} handleFileUpload={handleFileUpload} receiptLoading={receiptLoading} barcodeInput={barcodeInput} setBarcodeInput={setBarcodeInput} handleBarcodeLookup={handleBarcodeLookup} barcodeLoading={barcodeLoading} barcodeResult={barcodeResult} />}
-          {activeTab === 'recipes' && <RecipeExplorer recipes={processedRecipes} recipeSearch={recipeSearch} setRecipeSearch={setRecipeSearch} activeFilter={activeRecipeFilter} setFilter={setActiveRecipeFilter} onOpenRecipe={setActiveModalRecipe} onSaveRecipe={handleSaveRecipeToProfile} />}
-          {activeTab === 'shopping' && <ShoppingListManager list={shoppingList} onAdd={handleAddShoppingItem} shoppingInput={shoppingInput} setShoppingInput={setShoppingInput} onToggle={handleToggleShoppingCompleted} onClear={handleClearShoppingItem} />}
+          {activeTab === 'pantry' && (
+            <PantryManager 
+              fridge={fridge}
+              handleAddManualItem={handleAddManualItem}
+              manualItem={manualItem}
+              setManualItem={setManualItem}
+              handleUpdateInlineItem={handleUpdateInlineItem}
+              handleRemoveItem={handleRemoveItem}
+              receiptLoading={receiptLoading}
+              handleFileUpload={handleFileUpload}
+              barcodeInput={barcodeInput}
+              setBarcodeInput={setBarcodeInput}
+              handleBarcodeLookup={handleBarcodeLookup}
+              barcodeLoading={barcodeLoading}
+              barcodeResult={barcodeResult}
+              isScanningBarcode={isScanningBarcode}
+              setIsScanningBarcode={setIsScanningBarcode}
+            />
+          )}
+          {activeTab === 'recipes' && <RecipeExplorer />}
+          {activeTab === 'shopping' && <ShoppingListManager list={shoppingList} onAdd={(val) => handleAddShoppingItem(val)} onToggle={handleToggleShoppingCompleted} onClear={handleClearShoppingItem} />}
           {activeTab === 'analytics' && <AnalyticsDashboard metrics={nutritionMetrics} fridge={fridge} shoppingList={shoppingList} />}
-          {activeTab === 'household' && <HouseholdSettings household={household} user={user} profileName={userName} onUpdateName={handleUpdateProfileName} onCreate={handleCreateHousehold} onJoin={handleJoinHousehold} />}
+          {activeTab === 'household' && <HouseholdSettings />}
           {activeTab === 'saved' && <div className="space-y-6">
-             {savedRecipes.map(recipe => (
+             {savedRecipes && savedRecipes.map(recipe => (
                 <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm">
                    <h3 onClick={() => setActiveModalRecipe(recipe)} className="font-bold cursor-pointer text-slate-700 hover:text-[#6BAEE0]">{recipe.recipe_name}</h3>
                    <button onClick={() => handleRemoveSavedRecipe(recipe.id)} className="text-red-400 font-black">×</button>
@@ -996,12 +617,13 @@ export default function App()
       {activeModalRecipe && (
         <RecipeModal 
           recipe={activeModalRecipe} 
-          multiplier={servingMultiplier} 
-          setMultiplier={setServingMultiplier}
+          // multiplier and setMultiplier are now managed by useRecipes
+          // onStartCooking and addedItems are still passed as props
           onClose={() => setActiveModalRecipe(null)}
           onStartCooking={() => setIsCookingMode(true)}
           addedItems={addedItems}
-          onAddIngredient={handleAddToShoppingFromRecipe}
+          onAddIngredient={handleAddToShoppingFromRecipe} // Pass substitutions to RecipeModal if needed
+          household={household}
         />
       )}
 
@@ -1051,5 +673,15 @@ export default function App()
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  const { user, household } = useUser();
+  const { fridge } = useInventory(user, household);
+  return (
+    <RecipeProvider fridge={fridge}>
+      <MainApp />
+    </RecipeProvider>
   );
 }

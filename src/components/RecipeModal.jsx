@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
 import { X, Share2, Play, RefreshCw, Plus } from 'lucide-react';
+import { useUser } from './UserContext';
+import { useRecipes } from './RecipeContext';
+import { formatIngredientMeasurement } from './recipeUtils';
 
-export default function RecipeModal({ recipe, multiplier, setMultiplier, onClose, onStartCooking, addedItems, onAddIngredient }) {
+export default function RecipeModal({ onStartCooking, addedItems, onAddIngredient }) {
+  const { household } = useUser();
+  const { 
+    activeModalRecipe: recipe, 
+    multiplier, 
+    setMultiplier, 
+    setActiveModalRecipe: onClose 
+  } = useRecipes();
+
   const [substitutes, setSubstitutes] = useState({});
   const [loadingSub, setLoadingSub] = useState(null);
 
   const handleShare = async () => {
+    const householdParam = household?.id ? `&hh=${household.id}` : '';
+    const shareUrl = `${window.location.origin}?recipe=${recipe.id}${householdParam}`;
+
     const shareData = {
-      title: `Check out this recipe: ${recipe.name}`,
-      text: `I found this ${recipe.name} on Hungry!`,
-      url: window.location.origin + '?recipe=' + recipe.id,
+      title: `Hungry: ${recipe.name}`,
+      text: household?.name 
+        ? `Check out this ${recipe.name} recipe from our ${household.name} kitchen!` 
+        : `I found this amazing ${recipe.name} recipe on Hungry!`,
+      url: shareUrl,
     };
     try {
-      if (navigator.share) await navigator.share(shareData);
-      else alert("Link copied to clipboard!");
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Unique recipe link copied to clipboard!");
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -55,7 +75,7 @@ export default function RecipeModal({ recipe, multiplier, setMultiplier, onClose
                 <div key={idx} className="flex flex-col border-b border-blue-50 pb-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-700">{substitutes[ing] || ing}</span>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <button 
                         onClick={() => getSubstitution(ing)}
                         className="text-[10px] text-sky-400 hover:text-[#6BAEE0]"

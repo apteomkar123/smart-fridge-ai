@@ -1,7 +1,17 @@
 import React from 'react';
 import { Search, Filter, Star } from 'lucide-react';
+import { useRecipes } from './RecipeContext';
 
-export default function RecipeExplorer({ recipes, recipeSearch, setRecipeSearch, activeFilter, setFilter, onOpenRecipe, onSaveRecipe }) {
+export default function RecipeExplorer() {
+  const { 
+    processedRecipes: recipes, 
+    recipeSearch, 
+    setRecipeSearch, 
+    activeFilter, 
+    setFilter, 
+    setActiveModalRecipe: onOpenRecipe, 
+    onSaveRecipe 
+  } = useRecipes();
   const filters = ['all', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'vegetarian', 'vegan'];
 
   return (

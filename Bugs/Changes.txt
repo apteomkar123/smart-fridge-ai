@@ -1,3 +1,5 @@
-The name of the app at the top needs to be in the blue color, not white.
-Add the scan receipt feature back in.
-Add a scan barcode feature. The barcode should be search online to figure out what it is and added to the pantry.
+Do the eat me first logic exactly how you said
+Do the voice activated cooking mode exactly how you said
+Do the price comparison and store insights feature exactly how you said
+Add the intelligent substitution feature exactly how you said.
+The barcode lookup should also have a barcode scanner
