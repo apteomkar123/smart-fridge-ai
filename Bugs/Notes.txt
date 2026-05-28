@@ -105,6 +105,38 @@ Swapping ingredient doesn't work from a recipe card
 AI recipe generator gives server error 502
 Carry along the tags and filter over to the saved recipes tab
 Allow the user to create multiple households. Pantry items can either be shared in the household, or can be for the individual.
+Add a feature that allows you to mark individual items that are already in your pantry as personal or household
+Add an option to delete households
+Household should not be "select one at a time", but instead you should have the option to add any of the your households
+Swapping ingredient STILL doesn't work from a recipe card. Now it says "Could not find a substitute. Please try again.", even though there very obviously should be a substituion for some of these.
+AI recipe generator gives server error 500
+I scanned a reciept, but the app did nothing with it
+Add a feature for cuisine too, for example the user should be able to select Indian specifically, or other cuisines, etc.
+Make the pantry open up as a separate card. Organize the pantry according to proteins, dairy, vegetables, frozen food, fruits, general ingredients, beverages, snacks, etc.
+Be able to pull the cost of items using the barcode.
+When the pantry list gets too long, the menu at the bottom gets stuck in the middle of the page, the menu needs to stay stationary at the bottom.
+The barcode scanner should disappear the instant it scans something. Since it stays around for a while, stuff keeps getting scanned in. It should also only scan one item at a time, it shouldn't even be scanning multiple items in one opening.
+The recipes need better meta data that will allow them to be filtered. Filter all the recipes according to the filters currently in the page. One recipe can be included in multiple recipes.
+It does not seem like the spoonacular API is working properly, the number of ingredients and recipes recognized seems the same. I also want nutrional info for all the ingredients added to pantry, especially for those that are scanned in using a barcode.
+Add a feature that allows the user to remove certain ingredients from consideration for the AI recipe generator. For example, if the user has potato chips in the pantry, they may not want potato chips to be used in the recipe.
+The Use Spoonacular API for the category information too. That'll be a better source than TheMealDB since it's more expansive. 
+The message that accompanies the share link should not say the name of the household.
+Ingredients should be able to be dragged and dropped into another category.
+The AI recipe generator should first ask for which of the ingredients out of the pantry the user wants to use in their recipe when the button is tapped. It should sort ingredients by the expiry date (sooner something is going to expiry, the higher on the list it should be). Remove the current exclude feature that you just added from the pantry.
+When a ingredient is tapped, it should pull up a ingredient card, where the user can edit the name, the amount, view nutritional facts, and anything else you may find useful.
+Make the pantry stock more concise. It can even open up as a separate card. Right now the user has to scroll to far down to see everything.
+Read the full name to categorize the ingredients. Potato chips has been added to vegetables, when it's clearly a snack.
+The recipe suggestion doesn't seem to be working perfectly. I just added a ton of items to the pantry, but the recipes didn't get updated at all.
+Ingredients should not be taken as literal even when it comes from barcode. From the barcode information, understand what the item is, and add it in wording that it will be able to matchable for recipes. Use fuzzy matching.
+Add a filter for cuisine nationality for recipets as well
+Auto fill the expiry date for all ingredients according to information found online.
+Add nutritional info for both ingredients and recipes. Recipes should figure out nutritonal info based off the amount of ingredients needed.
+Inventory value should be calculated off of the price pulled from barcode. If the price of the ingredient is not available, allow the user to enter the price in the card for the ingredient.
+The nutritional info for ingredients should show up when the ingredient card is opened. 
+Ingredient names should be properly capitalized as proper nouns
+Vegetarian and Vegan filters don't work for recipes
+Change the icon for protien to something non meat
+
 
 
 TESTED

@@ -22,9 +22,11 @@ export const RecipeProvider = ({ children, fridge }) => {
   const [masterRecipes, setMasterRecipes] = useState([]);
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [recipeSearch, setRecipeSearch] = useState('');
-  const [activeFilter, setFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [cuisineFilter, setCuisineFilter] = useState('all');
   const [savedSearch, setSavedSearch] = useState('');
-  const [savedFilter, setSavedFilter] = useState('all');
+  const [savedCategoryFilter, setSavedCategoryFilter] = useState('all');
+  const [savedCuisineFilter, setSavedCuisineFilter] = useState('all');
 
   // Debounced search states to prevent heavy filtering on every keystroke
   const [debouncedRecipeSearch, setDebouncedRecipeSearch] = useState('');
@@ -211,9 +213,10 @@ export const RecipeProvider = ({ children, fridge }) => {
           const s = debouncedRecipeSearch.toLowerCase();
           return !s || r.name.toLowerCase().includes(s) || r.cleanedIngredients.some(i => i.includes(s));
         })
-        .filter(r => matchesRecipeFilter(r, activeFilter))
+        .filter(r => matchesRecipeFilter(r, categoryFilter))
+        .filter(r => cuisineFilter === 'all' || matchesRecipeFilter(r, cuisineFilter))
         .sort((a, b) => b.matchPercentage - a.matchPercentage);
-    }, [fridge, masterRecipes, debouncedRecipeSearch, activeFilter]);
+    }, [fridge, masterRecipes, debouncedRecipeSearch, categoryFilter, cuisineFilter]);
 
   const triggerStoreTripPlanner = useCallback(() => {
     const pantryTokens = (fridge || []).map(f => f.item_name).filter(Boolean);
@@ -265,15 +268,26 @@ export const RecipeProvider = ({ children, fridge }) => {
         return !s || name.toLowerCase().includes(s) || ings.some(i => i.toLowerCase().includes(s));
       })
       .filter(r => {
-        if (savedFilter === 'all') return true;
+        if (savedCategoryFilter === 'all') return true;
         const normalized = {
           meal_type: r.meal_type,
           name: r.recipe_name,
+          cuisine: '',
           cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : []
         };
-        return matchesRecipeFilter(normalized, savedFilter);
+        return matchesRecipeFilter(normalized, savedCategoryFilter);
+      })
+      .filter(r => {
+        if (savedCuisineFilter === 'all') return true;
+        const normalized = {
+          meal_type: r.meal_type,
+          name: r.recipe_name,
+          cuisine: '',
+          cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : []
+        };
+        return matchesRecipeFilter(normalized, savedCuisineFilter);
       });
-  }, [savedRecipes, debouncedSavedSearch, savedFilter]);
+  }, [savedRecipes, debouncedSavedSearch, savedCategoryFilter, savedCuisineFilter]);
 
   return (
     <RecipeContext.Provider value={{
@@ -282,12 +296,16 @@ export const RecipeProvider = ({ children, fridge }) => {
       filteredSavedRecipes,
       recipeSearch,
       setRecipeSearch,
-      activeFilter,
-      setFilter,
+      categoryFilter,
+      setCategoryFilter,
+      cuisineFilter,
+      setCuisineFilter,
       savedSearch,
       setSavedSearch,
-      savedFilter,
-      setSavedFilter,
+      savedCategoryFilter,
+      setSavedCategoryFilter,
+      savedCuisineFilter,
+      setSavedCuisineFilter,
       aiGenerating,
       isAiPickerOpen,
       setIsAiPickerOpen,

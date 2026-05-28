@@ -1,18 +1,13 @@
-It seems to me that AI features aren't working. Check on that.
-
------------------------------------------
-
-BUGS TO FIX. YOU TOLD ME YOU FIXED THESE PROBLEMS. THEN WHY IS IT STILL NOT WORKING? FIX THEM, AND MAKE SURE THEY'RE FIXED
+BUGS TO FIX. 
 -------------
-Swapping ingredient STILL doesn't work from a recipe card. Now it says "Could not find a substitute. Please try again.", even though there very obviously should be a substituion for some of these.
-AI recipe generator gives server error 500
-I scanned a reciept, but the app did nothing with it
+The vegetarian and vegan filtes still aren't working
+The category and cuisine filters should be separate for both the saved recipes and suggested recipes. The user should be able to select both lunch and indian, for example.
+
 
 -------------------------------------------
 
 FEATURES TO ADD:
 -------------------
-Add a feature that allows you to mark individual items that are already in your pantry as personal or household
-Add an option to delete households
-Household should not be "select one at a time", but instead you should have the option to add any of the your households
-
+If an ingredient is added to a household, the cost of the ingredient should be automatically split between the household members. Pull the Venmo API, and allow the money to be requested straight through Venmo.
+Add cuisine filters to the recipe suggestions as well, not just saved recipes.
+Add an AI agent at the nutritional overview section that'll give the user recommendations on what things to get to increase their protein, carbs, or fat in the overview.

@@ -48,9 +48,10 @@ function AppContent({ inventory }) {
     filteredSavedRecipes,
     savedSearch,
     setSavedSearch,
-    savedFilter,
-    setSavedFilter,
-    activeFilter,
+    savedCategoryFilter,
+    setSavedCategoryFilter,
+    savedCuisineFilter,
+    setSavedCuisineFilter,
     shoppingAlerts,
     isStoreAlertOpen,
     setIsStoreAlertOpen,
@@ -125,8 +126,8 @@ function AppContent({ inventory }) {
                     {['all', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'vegetarian', 'vegan'].map((f) => (
                       <button
                         key={f}
-                        onClick={() => setSavedFilter(f)}
-                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedFilter === f ? 'bg-[#6BAEE0] text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-400 border border-blue-50 hover:border-sky-200'}`}
+                        onClick={() => setSavedCategoryFilter(f)}
+                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedCategoryFilter === f ? 'bg-[#6BAEE0] text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-400 border border-blue-50 hover:border-sky-200'}`}
                       >
                         {f}
                       </button>
@@ -136,8 +137,8 @@ function AppContent({ inventory }) {
                     {['indian', 'chinese', 'mexican', 'japanese', 'korean', 'jamaican', 'latin', 'african', 'mediterranean'].map((f) => (
                       <button
                         key={f}
-                        onClick={() => setSavedFilter(f)}
-                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedFilter === f ? 'bg-slate-700 text-white shadow-lg' : 'bg-white text-slate-400 border border-blue-50 hover:border-slate-300'}`}
+                        onClick={() => setSavedCuisineFilter(savedCuisineFilter === f ? 'all' : f)}
+                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedCuisineFilter === f ? 'bg-slate-700 text-white shadow-lg' : 'bg-white text-slate-400 border border-blue-50 hover:border-slate-300'}`}
                       >
                         {f}
                       </button>
@@ -180,7 +181,7 @@ function AppContent({ inventory }) {
           <button onClick={() => { triggerHaptic(); setActiveTab('pantry'); }} className={`p-2 rounded-full transition-all ${activeTab === 'pantry' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Refrigerator size={24} /></button>
           <button onClick={() => { triggerHaptic(); setActiveTab('recipes'); }} className={`p-2 rounded-full transition-all ${activeTab === 'recipes' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ChefHat size={24} /></button>
           <button onClick={() => { triggerHaptic(); setActiveTab('shopping'); }} className={`p-2 rounded-full transition-all ${activeTab === 'shopping' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ShoppingCart size={24} /></button>
-          <button onClick={() => { triggerHaptic(); setSavedFilter(activeFilter); setActiveTab('saved'); }} className={`p-2 rounded-full transition-all ${activeTab === 'saved' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Star size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setActiveTab('saved'); }} className={`p-2 rounded-full transition-all ${activeTab === 'saved' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Star size={24} /></button>
           <button onClick={() => { triggerHaptic(); setActiveTab('household'); }} className={`p-2 rounded-full transition-all ${activeTab === 'household' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Users size={24} /></button>
           <button onClick={() => { triggerHaptic(); setActiveTab('analytics'); }} className={`p-2 rounded-full transition-all ${activeTab === 'analytics' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
         </nav>

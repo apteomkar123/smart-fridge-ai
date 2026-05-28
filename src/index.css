@@ -16,11 +16,13 @@
 
 /* Apply it to a specific class or heading */
 .logo-text {
-  font-family: 'Yellowtail', cursive;
-  font-size: 3rem; /* Adjust size as needed */
-  color: #1F6FB8; /* Use blue for the app name text */
-  letter-spacing: 0.05em;
-  text-transform: none; /* Keeps the cursive capitalization natural */
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #1F6FB8 0%, #6BAEE0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
 }
 
 @keyframes floatUp {

@@ -53,6 +53,7 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
   const [amount, setAmount] = useState(item.amount || '');
   const [price, setPrice] = useState(item.price > 0 ? String(Number(item.price).toFixed(2)) : '');
   const [category, setCategory] = useState(item.categoryOverride || categorizeItem(item.raw_name || ''));
+  const [splitCount, setSplitCount] = useState(2);
 
   // Actual nutrition (from barcode) takes priority; fall back to estimate
   const actualNutrition = item.nutrition?.kcal > 0 ? item.nutrition : null;
@@ -139,6 +140,46 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
                 <div><p className="text-sm font-black text-emerald-500">{displayNutrition.protein}g</p><p className="text-[9px] text-slate-400">protein</p></div>
                 <div><p className="text-sm font-black text-amber-500">{displayNutrition.carbs}g</p><p className="text-[9px] text-slate-400">carbs</p></div>
                 <div><p className="text-sm font-black text-rose-500">{displayNutrition.fat}g</p><p className="text-[9px] text-slate-400">fat</p></div>
+              </div>
+            </div>
+          )}
+
+          {item.household_id && parseFloat(price) > 0 && (
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Split via Venmo</p>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs text-slate-500 flex-1">Split between</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSplitCount(c => Math.max(2, c - 1))}
+                    className="w-7 h-7 bg-white border border-blue-100 rounded-xl text-sm font-bold text-slate-600 flex items-center justify-center hover:border-sky-300 transition-colors"
+                  >−</button>
+                  <span className="w-5 text-center text-sm font-black text-slate-700">{splitCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSplitCount(c => c + 1)}
+                    className="w-7 h-7 bg-white border border-blue-100 rounded-xl text-sm font-bold text-slate-600 flex items-center justify-center hover:border-sky-300 transition-colors"
+                  >+</button>
+                </div>
+                <span className="text-xs text-slate-500">people</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Per person</p>
+                  <p className="text-xl font-black text-[#6BAEE0]">${(parseFloat(price) / splitCount).toFixed(2)}</p>
+                </div>
+                <a
+                  href={`venmo://paycharge?txn=pay&amount=${(parseFloat(price) / splitCount).toFixed(2)}&note=${encodeURIComponent(`Grocery split: ${name}`)}`}
+                  onClick={() => {
+                    setTimeout(() => {
+                      window.open(`https://account.venmo.com/payment-link?txn=pay&amount=${(parseFloat(price) / splitCount).toFixed(2)}&note=${encodeURIComponent(`Grocery split: ${name}`)}`, '_blank');
+                    }, 600);
+                  }}
+                  className="bg-[#3D95CE] text-white px-5 py-2.5 rounded-2xl text-xs font-black shadow-md shadow-blue-200 active:scale-95 transition-all"
+                >
+                  Request via Venmo
+                </a>
               </div>
             </div>
           )}

@@ -1,9 +1,36 @@
-import React from 'react';
-import { DollarSign, BarChart, ShoppingBag, TrendingDown, PieChart, Target } from 'lucide-react';
+import React, { useState } from 'react';
+import { DollarSign, BarChart, ShoppingBag, TrendingDown, PieChart, Target, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { useUser } from './UserContext';
 
 export default function AnalyticsDashboard({ metrics, fridge, shoppingList }) {
   const { household } = useUser();
+  const [aiTips, setAiTips] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const getAiRecommendations = async () => {
+    setAiLoading(true);
+    setAiTips(null);
+    try {
+      const totalMacrosCalc = (metrics.protein || 0) + (metrics.carbs || 0) + (metrics.fat || 0) || 1;
+      const pct = (v) => Math.round((v / totalMacrosCalc) * 100);
+      const prompt = `A user's current pantry macro distribution: Protein ${metrics.protein || 0}g (${pct(metrics.protein)}%), Carbs ${metrics.carbs || 0}g (${pct(metrics.carbs)}%), Fat ${metrics.fat || 0}g (${pct(metrics.fat)}%). Give exactly 3 specific, actionable food recommendations to improve their nutritional balance. Return ONLY valid JSON: {"tips":[{"title":"food name","description":"why and how it helps, under 40 words"}]}`;
+
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt })
+      });
+
+      const text = await res.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      setAiTips(Array.isArray(parsed.tips) ? parsed.tips : []);
+    } catch {
+      setAiTips([{ title: 'Could not load recommendations', description: 'Please try again.' }]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
   // Spending & Asset Calculations
   const pantryValue = fridge.reduce((sum, item) => sum + (item.price || 0), 0);
   const missingSpend = shoppingList.filter(i => !i.is_completed).reduce((sum, i) => sum + (i.price || 0), 0);
@@ -163,6 +190,51 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList }) {
         {uniqueStores.length > 0 && (
           <div className="mt-4 text-center text-xs text-slate-500">
             <p>Tracked stores: {uniqueStores.join(', ')}</p>
+          </div>
+        )}
+      </section>
+
+      <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+        <div className="flex items-center justify-between mb-5 px-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="text-[#6BAEE0]" size={18} />
+            <h2 className="text-[14px] font-bold text-slate-400">AI Nutrition Coach</h2>
+          </div>
+          {aiTips && (
+            <button onClick={getAiRecommendations} className="text-slate-300 hover:text-[#6BAEE0] transition-colors p-1">
+              <RefreshCw size={14} />
+            </button>
+          )}
+        </div>
+
+        {!aiTips && !aiLoading && (
+          <button
+            onClick={getAiRecommendations}
+            className="w-full bg-sky-50 border border-sky-100 text-[#6BAEE0] py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-sky-100 transition-all active:scale-[0.98]"
+          >
+            <Sparkles size={15} />
+            Get Personalized Recommendations
+          </button>
+        )}
+
+        {aiLoading && (
+          <div className="flex items-center justify-center gap-3 py-6 text-slate-400">
+            <Loader2 size={18} className="animate-spin text-[#6BAEE0]" />
+            <span className="text-xs font-bold">Analyzing your nutrition...</span>
+          </div>
+        )}
+
+        {aiTips && (
+          <div className="space-y-3">
+            {aiTips.map((tip, i) => (
+              <div key={i} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+                <div className="w-6 h-6 bg-[#6BAEE0] text-white rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">{i + 1}</div>
+                <div>
+                  <p className="text-xs font-black text-slate-700 mb-1">{tip.title}</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">{tip.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>

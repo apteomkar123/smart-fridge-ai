@@ -101,11 +101,18 @@ export const isRecipeVegan = (recipe) => {
 };
 
 export const isRecipeMeat = (recipe) => {
-  return (recipe.cleanedIngredients || []).some((ing) => MEAT_PATTERN.test(ing));
+  return (recipe.cleanedIngredients || []).some((ing) => {
+    // Broth/stock/powder are not whole-protein ingredients — many veggie recipes use chicken broth
+    if (/\b(broth|stock|powder|extract|flavor|flavour)\b/.test(ing)) return false;
+    return MEAT_PATTERN.test(ing);
+  });
 };
 
 export const isRecipeFish = (recipe) => {
-  return (recipe.cleanedIngredients || []).some((ing) => FISH_PATTERN.test(ing));
+  return (recipe.cleanedIngredients || []).some((ing) => {
+    if (/\b(broth|stock|powder|extract|flavor|flavour)\b/.test(ing)) return false;
+    return FISH_PATTERN.test(ing);
+  });
 };
 
 export const isRecipeEgg = (recipe) => {
@@ -120,8 +127,12 @@ const cuisineMatch = (recipe, ...areas) => {
 
 export const matchesRecipeFilter = (recipe, filter) => {
   switch (filter) {
-    case 'vegetarian': return !isRecipeMeat(recipe) && !isRecipeFish(recipe);
-    case 'vegan': return isRecipeVegan(recipe);
+    case 'vegetarian':
+      if (/\bvegetarian\b/i.test(recipe.meal_type || '')) return true;
+      return !isRecipeMeat(recipe) && !isRecipeFish(recipe);
+    case 'vegan':
+      if (/\bvegan\b/i.test(recipe.meal_type || '')) return true;
+      return isRecipeVegan(recipe) && !isRecipeMeat(recipe) && !isRecipeFish(recipe);
     case 'breakfast': return recipeCategoryMatches(recipe, ['breakfast', 'morning', 'brunch', 'pancake', 'waffle', 'oat', 'cereal', 'muffin', 'toast', 'smoothie bowl']);
     case 'lunch': return recipeCategoryMatches(recipe, ['lunch', 'sandwich', 'salad', 'bowl', 'soup', 'wrap', 'light meal', 'starter', 'side']);
     case 'dinner': return recipeCategoryMatches(recipe, ['dinner', 'supper', 'main', 'casserole', 'stew', 'pasta', 'beef', 'chicken', 'lamb', 'pork', 'seafood', 'biryani', 'curry', 'roast', 'baked', 'goat', 'miscellaneous']);
