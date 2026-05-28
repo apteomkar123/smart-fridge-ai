@@ -83,9 +83,9 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         : `increasing ${macroKey} intake`;
 
       const pct = (v) => Math.round((v / totalMacros) * 100);
-      // Include a random seed so the AI varies suggestions on each request
-      const seed = Math.floor(Math.random() * 9999);
-      const prompt = `[Seed:${seed}] User's pantry macro distribution: Protein ${metrics.protein || 0}g (${pct(metrics.protein)}%), Carbs ${metrics.carbs || 0}g (${pct(metrics.carbs)}%), Fat ${metrics.fat || 0}g (${pct(metrics.fat)}%). User wants help with ${focus}. Suggest 3 DIFFERENT specific ingredients to add to their shopping list and 2 DIFFERENT recipe ideas (do NOT repeat previous suggestions). Return ONLY valid JSON: {"ingredients":[{"name":"...","amount":"...","reason":"under 25 words"}],"recipes":[{"name":"...","reason":"under 25 words"}]}`;
+      // Large random seed + timestamp forces the AI to produce different results every call
+      const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const prompt = `[Session:${seed}] A user's current pantry macros: Protein ${metrics.protein || 0}g (${pct(metrics.protein)}%), Carbs ${metrics.carbs || 0}g (${pct(metrics.carbs)}%), Fat ${metrics.fat || 0}g (${pct(metrics.fat)}%). Goal: ${focus}. Pick 3 FRESH, CREATIVE, UNEXPECTED ingredients AND 2 FRESH, CREATIVE recipes NOT commonly suggested. Avoid generic staples. Return ONLY valid JSON: {"ingredients":[{"name":"...","amount":"...","reason":"under 25 words"}],"recipes":[{"name":"...","reason":"under 25 words"}]}`;
 
       const res = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',
@@ -114,40 +114,48 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
 
   const handleOpenRecipe = async (recipeName) => {
     if (openingRecipe === recipeName) return;
-    // Try exact match in processed recipes first
-    const match = findRecipeByName ? findRecipeByName(recipeName) : processedRecipes.find(r => r.name.toLowerCase() === recipeName.toLowerCase());
+    const match = findRecipeByName ? findRecipeByName(recipeName) : null;
     if (match) { setActiveModalRecipe(match); return; }
-    // Generate full recipe via AI if not in DB
-    if (generateRecipeByName) {
-      setOpeningRecipe(recipeName);
-      try {
-        const generated = await generateRecipeByName(recipeName);
-        setActiveModalRecipe(generated);
-      } catch {}
+    setOpeningRecipe(recipeName);
+    try {
+      const generated = await generateRecipeByName(recipeName);
+      if (generated) setActiveModalRecipe(generated);
+    } catch (e) {
+      console.error('Could not open recipe:', e);
+    } finally {
       setOpeningRecipe(null);
     }
   };
 
   const handleToggleStar = async (recipeName) => {
-    const alreadySaved = savedRecipes?.find(sr => sr.recipe_name?.toLowerCase() === recipeName.toLowerCase());
+    // Check if already saved by name in savedRecipes context
+    const alreadySaved = (savedRecipes || []).find(
+      sr => sr.recipe_name?.toLowerCase() === recipeName.toLowerCase()
+    );
     if (alreadySaved) {
+      // Unstar: remove from DB and local tracking
       onRemoveSavedRecipe(alreadySaved.id);
       setStarredRecipes(prev => { const s = new Set(prev); s.delete(recipeName); return s; });
       return;
     }
-    const match = findRecipeByName ? findRecipeByName(recipeName) : processedRecipes.find(r => r.name.toLowerCase() === recipeName.toLowerCase());
+    // If locally tracked as starred but not yet in savedRecipes (DB hasn't refreshed)
+    if (starredRecipes.has(recipeName)) {
+      setStarredRecipes(prev => { const s = new Set(prev); s.delete(recipeName); return s; });
+      return;
+    }
+    // Star: find or generate recipe then save
+    const match = findRecipeByName ? findRecipeByName(recipeName) : null;
     if (match) {
       onSaveRecipe(match);
       setStarredRecipes(prev => new Set([...prev, recipeName]));
       return;
     }
-    // Generate and save
-    if (generateRecipeByName) {
-      try {
-        const generated = await generateRecipeByName(recipeName);
-        onSaveRecipe(generated);
-        setStarredRecipes(prev => new Set([...prev, recipeName]));
-      } catch {}
+    setStarredRecipes(prev => new Set([...prev, recipeName])); // optimistic
+    try {
+      const generated = await generateRecipeByName(recipeName);
+      if (generated) onSaveRecipe(generated);
+    } catch {
+      setStarredRecipes(prev => { const s = new Set(prev); s.delete(recipeName); return s; }); // rollback
     }
   };
 
@@ -533,24 +541,12 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex-1 bg-blue-50 rounded-2xl border border-blue-100 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">My Budget</p>
+        <div className="mb-4">
+          <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">My Monthly Budget</p>
             {personalBudget > 0
               ? <p className="text-2xl font-black text-[#6BAEE0]">${personalBudget.toFixed(2)}<span className="text-sm font-bold text-slate-400">/mo</span></p>
-              : <p className="text-sm font-bold text-slate-300 italic">Not set</p>}
-          </div>
-          <div className="flex-1 bg-blue-50 rounded-2xl border border-blue-100 p-4 relative">
-            <button
-              onClick={() => { setIsEditingHouseholdBudget(v => !v); setHouseholdBudgetInput(String(Number(household?.budget_limit || 0).toFixed(2))); }}
-              className="absolute top-2 right-2 p-1 text-slate-300 hover:text-[#6BAEE0] transition-colors"
-            >
-              <Edit2 size={12} />
-            </button>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Household Budget</p>
-            {(household?.budget_limit > 0)
-              ? <p className="text-2xl font-black text-slate-700">${Number(household.budget_limit).toFixed(2)}<span className="text-sm font-bold text-slate-400">/mo</span></p>
-              : <p className="text-sm font-bold text-slate-300 italic">Not set</p>}
+              : <p className="text-sm font-bold text-slate-300 italic">Not set — tap edit to add</p>}
           </div>
         </div>
 
@@ -577,21 +573,9 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
           </div>
         )}
 
-        {isEditingHouseholdBudget && (
+        {false && (
           <div className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest self-center shrink-0">Household:</p>
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">$</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={householdBudgetInput}
-                onChange={(e) => setHouseholdBudgetInput(e.target.value)}
-                placeholder="0.00"
-                className="w-full bg-white border border-blue-100 pl-7 pr-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:border-sky-400 focus:outline-none"
-              />
-            </div>
+            {/* Household budget moved to Household tab */}
             <button
               onClick={() => { handleUpdateBudgetLimit(householdBudgetInput); setIsEditingHouseholdBudget(false); }}
               className="bg-[#6BAEE0] text-white px-5 py-3 rounded-2xl text-xs font-black shadow-md shadow-blue-100 hover:bg-[#5da0cf] transition-all"

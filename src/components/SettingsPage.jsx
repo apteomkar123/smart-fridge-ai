@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Users } from 'lucide-react';
 import { useUser } from './UserContext';
+import HouseholdSettings from './HouseholdSettings';
 
 const DIETARY_OPTIONS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Kosher', 'Dairy-Free', 'Nut-Free', 'Low-Carb', 'High-Protein'];
 const NUTRITION_GOALS = ['Balanced', 'High Protein', 'Low Carb', 'Low Fat', 'Build Muscle', 'Lose Weight'];
@@ -163,6 +164,13 @@ export default function SettingsPage() {
           {settingsSaved ? 'Saved!' : 'Save Settings'}
         </button>
       </section>
+
+      {/* ── Household Settings ── */}
+      <div className="flex items-center gap-2 px-2 mt-4">
+        <Users className="text-[#6BAEE0]" size={18} />
+        <h2 className="text-[14px] font-bold text-slate-400">Household Settings</h2>
+      </div>
+      <HouseholdSettings />
     </div>
   );
 }

@@ -266,5 +266,19 @@ FEATURES:
 TESTED
 ------
 
-IMPLEMENTED (session 2026-05-28 v3 - syntax fix):
-- Removed stray )} in App.jsx shopping alerts block -- build now 0 errors
+
+IMPLEMENTED (session 2026-05-28 v4):
+BUGS:
+- Search keyword stays visible in search box when auto-applied as a filter chip
+- Hamburger button removed; left-edge swipe gesture opens nav (touch starts within 30px of left, swipe right >50px)
+- Dietary substitution now replaces the ENTIRE ingredient string with sub + quantity prefix (no more "mushroom breasts")
+- Ingredient comma splitting: smart modifier detection (boneless, skinless, chopped etc.) prevents false splits; valid food lists still split
+- Spending tab: only shows personal budget; household budget moved to Household tab
+- AI Nutrition coach: timestamp+random seed forces different results; star optimistic update + proper unstar logic; recipes generate via AI if not in DB
+
+FEATURES:
+- Household tab rebuilt: shared shopping list (Supabase real-time), shared recipe list, household budget editor
+- Household Settings embedded inside Settings page (no longer a standalone nav item replaced by household tab)
+- Personal Shopper: full-screen shopping mode, store selector (TJs/Walmart/etc.), items grouped by category with store-specific aisle names
+- Add Recipe modal: Public/Private toggle + Save To personal or household selector
+- Friends page: share 'Add me on Hungry' link, search users by name, friend list, public cooking feed from Chef History

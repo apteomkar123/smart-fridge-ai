@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import { X, Plus, Minus, Link, Loader2, Check } from 'lucide-react';
+import { X, Plus, Minus, Link, Loader2, Check, Globe, Lock, Users, User } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
+import { useUser } from './UserContext';
 import { cleanIngredientLocally, toTitleCase } from './recipeUtils';
 
 export default function AddRecipeModal({ onClose }) {
   const { onSaveRecipe } = useRecipes();
+  const { households } = useUser();
   const [mode, setMode] = useState('manual'); // 'manual' | 'url'
   const [url, setUrl] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
   const [saved, setSaved] = useState(false);
+
+  // Visibility + destination
+  const [isPublic, setIsPublic] = useState(true);
+  const [destination, setDestination] = useState('personal'); // 'personal' | household id
 
   // Manual form state
   const [name, setName] = useState('');
@@ -30,6 +36,7 @@ export default function AddRecipeModal({ onClose }) {
     if (!name.trim()) return;
     const filteredIngs = ingredients.filter(i => i.trim());
     const filteredSteps = steps.filter(s => s.trim());
+    const householdId = destination !== 'personal' ? destination : null;
     const recipe = {
       id: `manual-${Date.now()}`,
       name: toTitleCase(name.trim()),
@@ -39,8 +46,10 @@ export default function AddRecipeModal({ onClose }) {
       cleanedIngredients: filteredIngs.map(cleanIngredientLocally).filter(Boolean),
       steps: filteredSteps,
       _userCreated: true,
+      _isPublic: isPublic,
+      _householdId: householdId,
     };
-    onSaveRecipe(recipe);
+    onSaveRecipe(recipe, householdId);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 1200);
   };
@@ -181,6 +190,37 @@ export default function AddRecipeModal({ onClose }) {
                 </button>
               </div>
             </div>
+
+            {/* Visibility */}
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setIsPublic(true)}
+                className={`flex items-center justify-center gap-2 py-3 rounded-2xl border text-xs font-black transition-all ${isPublic ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white text-slate-400 border-blue-100'}`}>
+                <Globe size={13} /> Public
+              </button>
+              <button type="button" onClick={() => setIsPublic(false)}
+                className={`flex items-center justify-center gap-2 py-3 rounded-2xl border text-xs font-black transition-all ${!isPublic ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-white text-slate-400 border-blue-100'}`}>
+                <Lock size={13} /> Private
+              </button>
+            </div>
+
+            {/* Destination */}
+            {households.length > 0 && (
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Save To</label>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  <button type="button" onClick={() => setDestination('personal')}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all ${destination === 'personal' ? 'bg-sky-50 text-[#6BAEE0] border-sky-200' : 'bg-white text-slate-400 border-blue-100'}`}>
+                    <User size={12} /> Personal
+                  </button>
+                  {households.map(h => (
+                    <button key={h.id} type="button" onClick={() => setDestination(h.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all ${destination === h.id ? 'bg-sky-50 text-[#6BAEE0] border-sky-200' : 'bg-white text-slate-400 border-blue-100'}`}>
+                      <Users size={12} /> {h.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               onClick={handleSaveManual}

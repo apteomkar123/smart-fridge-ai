@@ -105,18 +105,24 @@ export const locallyAdaptRecipe = (recipe, targetDiet) => {
   const cuisine = recipe.cuisine || recipe.meal_type || '';
   const substitutionLog = [];
 
+  // Extract the leading quantity/measurement from an ingredient string
+  const _extractQty = (s) => {
+    const m = s.match(/^([\d\/\.\s\-½⅓¼¾⅛]+(?:cup|cups|tbsp|tsp|oz|g|kg|lb|lbs|ml|l|piece|pieces|slice|slices|bunch|clove|cloves|can|jar|head|sprig|sprigs|\s)*)/i);
+    return m ? m[0].trimEnd() : '';
+  };
+
   const adaptIngredient = (ing) => {
-    let result = ing;
     for (const [pattern, getSub] of rules) {
+      if (!pattern.test(ing)) continue;
       const sub = getSub(cuisine);
-      const newIng = result.replace(pattern, sub);
-      if (newIng !== result) {
-        substitutionLog.push({ from: ing, to: newIng });
-        result = newIng;
-        break; // one substitution per ingredient
-      }
+      // If the pattern matches a whole-protein word, replace the ENTIRE ingredient
+      // (preserving only the leading quantity) to avoid "boneless skinless mushroom breasts"
+      const qty = _extractQty(ing);
+      const result = qty ? `${qty} ${sub}` : toTitleCase(sub);
+      substitutionLog.push({ from: ing, to: result });
+      return result;
     }
-    return result;
+    return ing;
   };
 
   const updatedIngredients = (recipe.ingredients || []).map(adaptIngredient);

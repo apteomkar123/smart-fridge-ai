@@ -29,20 +29,13 @@ export default function RecipeExplorer() {
   // instead of passing it through as a text search
   const handleSearchChange = (value) => {
     const lower = value.toLowerCase().trim();
+    // Apply filter chip AND keep the text visible in the search box
     if (mealTypeOptions.includes(lower)) {
       setCategoryFilters(prev => prev.includes(lower) ? prev : [...prev, lower]);
-      setRecipeSearch('');
-      return;
-    }
-    if (dietOptions.includes(lower)) {
+    } else if (dietOptions.includes(lower)) {
       setDietFilters(prev => prev.includes(lower) ? prev : [...prev, lower]);
-      setRecipeSearch('');
-      return;
-    }
-    if (cuisineOptions.includes(lower)) {
+    } else if (cuisineOptions.includes(lower)) {
       setCuisineFilters(prev => prev.includes(lower) ? prev : [...prev, lower]);
-      setRecipeSearch('');
-      return;
     }
     setRecipeSearch(value);
   };

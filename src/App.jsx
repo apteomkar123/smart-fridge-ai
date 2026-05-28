@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, Menu, X } from 'lucide-react';
+import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
@@ -9,6 +9,9 @@ import RecipeModal from './components/RecipeModal';
 import CookingMode from './components/CookingMode';
 import AiIngredientPickerModal from './components/AiIngredientPickerModal';
 import HouseholdSettings from './components/HouseholdSettings';
+import HouseholdTab from './components/HouseholdTab';
+import PersonalShopper from './components/PersonalShopper';
+import FriendsPage from './components/FriendsPage';
 import SettingsPage from './components/SettingsPage';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import MealPrepModal from './components/MealPrepModal';
@@ -74,8 +77,22 @@ function AppContent({ inventory }) {
   const [activeTab, setActiveTab] = useState('pantry');
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
+  const [isShopperOpen, setIsShopperOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const mainRef = useRef(null);
+  const touchStartX = useRef(null);
+
+  // Open nav on left-edge swipe right (starts within 30px of left edge)
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches[0];
+    touchStartX.current = touch.clientX < 30 ? touch.clientX : null;
+  }, []);
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    if (deltaX > 50) setNavOpen(true);
+    touchStartX.current = null;
+  }, []);
   const [shopCategoryFilters, setShopCategoryFilters] = useState([]);
   const [shopDietFilters, setShopDietFilters] = useState([]);
   const [shopCuisineFilters, setShopCuisineFilters] = useState([]);
@@ -93,6 +110,7 @@ function AppContent({ inventory }) {
     { tab: 'chefHistory', icon: <Clock size={22} />,         label: 'Chef History' },
     { tab: 'analytics',   icon: <BarChart3 size={22} />,     label: 'Analytics' },
     { tab: 'household',   icon: <Users size={22} />,         label: 'Household' },
+    { tab: 'friends',     icon: <UserRound size={22} />,     label: 'Friends' },
     { tab: 'settings',    icon: <Settings size={22} />,      label: 'Settings' },
   ];
 
@@ -135,16 +153,12 @@ function AppContent({ inventory }) {
         </div>
       </nav>
 
-      {/* ── Main area ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full">
-        {/* Hamburger trigger — top-left pill */}
-        <button
-          onClick={() => setNavOpen(true)}
-          className="fixed top-4 left-4 z-[45] bg-white/80 backdrop-blur-xl border border-white/50 shadow-lg p-3 rounded-2xl text-slate-500 hover:text-[#6BAEE0] transition-all"
-        >
-          <Menu size={20} />
-        </button>
-
+      {/* ── Main area — swipe from left edge to open nav ─────────────────── */}
+      <div
+        className="flex-1 flex flex-col overflow-hidden w-full"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
       {/* Scrollable area — Header sticky inside here */}
       <main ref={mainRef} className="flex-1 overflow-y-auto w-full">
         <div className="w-full flex justify-center">
@@ -178,12 +192,22 @@ function AppContent({ inventory }) {
             )}
             {activeTab === 'recipes' && <RecipeExplorer />}
             {activeTab === 'shopping' && (
-              <ShoppingListManager
-                list={shoppingList}
-                onAdd={handleAddShoppingItem}
-                onToggle={handleToggleShoppingCompleted}
-                onClear={handleClearShoppingItem}
-              />
+              <>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setIsShopperOpen(true)}
+                    className="flex items-center gap-2 bg-[#6BAEE0] text-white px-5 py-2.5 rounded-2xl text-xs font-black shadow-lg shadow-blue-100 active:scale-95 transition-all"
+                  >
+                    <ShoppingCart size={14} /> Go Shopping
+                  </button>
+                </div>
+                <ShoppingListManager
+                  list={shoppingList}
+                  onAdd={handleAddShoppingItem}
+                  onToggle={handleToggleShoppingCompleted}
+                  onClear={handleClearShoppingItem}
+                />
+              </>
             )}
             {activeTab === 'chefHistory' && <ChefHistory />}
             {activeTab === 'analytics' && (
@@ -194,7 +218,8 @@ function AppContent({ inventory }) {
                 onAddShoppingItem={handleAddShoppingItem}
               />
             )}
-            {activeTab === 'household' && <HouseholdSettings />}
+            {activeTab === 'household' && <HouseholdTab onAddShoppingItem={handleAddShoppingItem} />}
+            {activeTab === 'friends' && <FriendsPage />}
             {activeTab === 'settings' && <SettingsPage />}
             {activeTab === 'saved' && (
               <div className="space-y-6">
@@ -309,6 +334,12 @@ function AppContent({ inventory }) {
 
       <AiIngredientPickerModal />
       <MealPrepModal />
+      {isShopperOpen && (
+        <PersonalShopper
+          shoppingList={shoppingList}
+          onClose={() => setIsShopperOpen(false)}
+        />
+      )}
       {isAddRecipeOpen && <AddRecipeModal onClose={() => setIsAddRecipeOpen(false)} />}
 
       {activeModalRecipe && (

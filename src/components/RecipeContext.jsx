@@ -13,24 +13,34 @@ import { STATIC_RECIPES } from './staticRecipes';
 
 const RecipeContext = createContext();
 
-const MEALDB_CACHE_KEY = 'hungry_mealdb_v6'; // bumped: broader ingredient split patterns
+const MEALDB_CACHE_KEY = 'hungry_mealdb_v7'; // bumped: smarter comma-split with modifier detection
+
+// Words that appear BEFORE a comma as adjective/modifier — don't split here
+const _INGREDIENT_MODIFIERS = /^(boneless|skinless|fresh|dried|frozen|canned|large|small|medium|extra|lean|ground|minced|diced|chopped|sliced|shredded|peeled|halved|quartered|roughly|finely|coarsely|thinly|thickly|packed|heaping|level|softened|beaten|rinsed|drained|trimmed|deveined|pitted|seeded|lightly|plain|reduced|low|full|whole|room\s+temperature|fat-free|sugar-free|gluten-free)$/i;
 
 // Split ingredients that accidentally contain multiple items in one string.
-// Handles newlines, semicolons, " + " separators, and comma/colon before a measurement.
 const _normalizeIngredients = (ings) =>
   (ings || []).flatMap(ing => {
     const s = String(ing || '').trim();
     if (!s) return [];
-    // 1. Split on newlines
+    // 1. Newlines always separate items
     const lines = s.split(/\n+/).map(l => l.trim()).filter(Boolean);
     if (lines.length > 1) return lines;
-    // 2. Split on semicolons (almost always a list separator)
+    // 2. Semicolons almost always separate list items
     if (/;\s*\w/.test(s)) return s.split(/;\s*/).map(p => p.trim()).filter(Boolean);
-    // 3. Split on " + " with spaces (explicit list join)
+    // 3. " + " always separates items
     if (/ \+ /.test(s)) return s.split(/ \+ /).map(p => p.trim()).filter(Boolean);
-    // 4. Split on comma or colon immediately before a digit/fraction — new measurement
-    const parts = s.split(/[,:\s]*(?=[\d½⅓¼¾⅛]\s*(?:cup|tbsp|tsp|oz|g|kg|lb|lbs|ml|l|piece|slice|bunch|head|clove|can|jar|\w))/i);
-    if (parts.length > 1) return parts.map(p => p.trim()).filter(Boolean);
+    // 4. Comma splitting: split only when the word BEFORE the comma is NOT a modifier
+    const commaParts = s.split(/,\s*/);
+    if (commaParts.length > 1) {
+      // Check if any split point follows a modifier (don't split those)
+      const safeToSplit = commaParts.every((part, i) => {
+        if (i === 0) return true;
+        const wordBeforeComma = commaParts[i - 1].trim().split(/\s+/).pop() || '';
+        return !_INGREDIENT_MODIFIERS.test(wordBeforeComma);
+      });
+      if (safeToSplit) return commaParts.map(p => p.trim()).filter(Boolean);
+    }
     return [s];
   });
 const MEALDB_CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -316,11 +326,12 @@ export const RecipeProvider = ({ children, fridge }) => {
     setIsStoreAlertOpen(true);
   }, [fridge, processedRecipes]);
 
-  const onSaveRecipe = async (recipe) => {
+  const onSaveRecipe = async (recipe, householdId = null) => {
     if (!user) return;
-    if (savedRecipes.some(r => r.recipe_id === String(recipe.id))) return;
+    if (!householdId && savedRecipes.some(r => r.recipe_id === String(recipe.id))) return;
     const { data, error: err } = await supabase.from('saved_recipes').insert([{
       user_id: user.id,
+      household_id: householdId || null,
       recipe_id: String(recipe.id),
       recipe_name: recipe.name,
       ingredients: recipe.ingredients,
