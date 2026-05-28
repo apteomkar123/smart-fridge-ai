@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Share2, Play, RefreshCw, Plus } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
-import { parseRecipeIngredientMeasurements, cleanIngredientLocally } from './recipeUtils';
+import { parseRecipeIngredientMeasurements, cleanIngredientLocally, estimateNutrition } from './recipeUtils';
 
 export default function RecipeModal({ onStartCooking, addedItems, onAddIngredient }) {
   const {
@@ -13,6 +13,32 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
 
   const [substitutes, setSubstitutes] = useState({});
   const [loadingSub, setLoadingSub] = useState(null);
+
+  // Estimate total nutrition for the recipe (per serving, ~4 servings assumed)
+  const recipeNutrition = useMemo(() => {
+    const ings = recipe.cleanedIngredients || [];
+    if (ings.length === 0) return null;
+    let totalKcal = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, matched = 0;
+    ings.forEach(ing => {
+      const n = estimateNutrition(ing);
+      if (n) {
+        totalKcal += n.kcal;
+        totalProtein += n.protein;
+        totalCarbs += n.carbs;
+        totalFat += n.fat;
+        matched++;
+      }
+    });
+    if (matched === 0) return null;
+    const servings = 4 * multiplier;
+    return {
+      kcal: Math.round(totalKcal / servings),
+      protein: Math.round((totalProtein / servings) * 10) / 10,
+      carbs: Math.round((totalCarbs / servings) * 10) / 10,
+      fat: Math.round((totalFat / servings) * 10) / 10,
+      coverage: Math.round((matched / ings.length) * 100)
+    };
+  }, [recipe.cleanedIngredients, multiplier]);
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}?recipe=${recipe.id}`;
@@ -130,6 +156,21 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
             </div>
           </section>
         </div>
+
+        {recipeNutrition && (
+          <div className="mt-6 bg-sky-50 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Est. Nutrition per Serving</p>
+              <span className="text-[9px] font-bold text-sky-400 bg-sky-100 px-2 py-0.5 rounded-full">~{recipeNutrition.coverage}% coverage</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div><p className="text-base font-black text-[#6BAEE0]">{recipeNutrition.kcal}</p><p className="text-[9px] text-slate-400">kcal</p></div>
+              <div><p className="text-base font-black text-emerald-500">{recipeNutrition.protein}g</p><p className="text-[9px] text-slate-400">protein</p></div>
+              <div><p className="text-base font-black text-amber-500">{recipeNutrition.carbs}g</p><p className="text-[9px] text-slate-400">carbs</p></div>
+              <div><p className="text-base font-black text-rose-500">{recipeNutrition.fat}g</p><p className="text-[9px] text-slate-400">fat</p></div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 pt-6 border-t border-blue-50 flex justify-between items-center">
           <div className="flex gap-1 bg-blue-50/50 p-1 rounded-2xl border border-blue-100">

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X, Users, User, GripVertical, ChevronRight } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { estimateNutrition } from './recipeUtils';
 
 const CATEGORIES = ['Proteins', 'Dairy & Eggs', 'Fruits', 'Vegetables', 'Beverages', 'Snacks', 'Frozen', 'General'];
 
 const CATEGORY_ICONS = {
-  'Proteins': '🥩',
+  'Proteins': '🫘',
   'Dairy & Eggs': '🥛',
   'Fruits': '🍎',
   'Vegetables': '🥦',
@@ -50,7 +51,14 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
   const [name, setName] = useState(item.raw_name || '');
   const [expiry, setExpiry] = useState(item.expiry_date ? item.expiry_date.split('T')[0] : '');
   const [amount, setAmount] = useState(item.amount || '');
+  const [price, setPrice] = useState(item.price > 0 ? String(Number(item.price).toFixed(2)) : '');
   const [category, setCategory] = useState(item.categoryOverride || categorizeItem(item.raw_name || ''));
+
+  // Actual nutrition (from barcode) takes priority; fall back to estimate
+  const actualNutrition = item.nutrition?.kcal > 0 ? item.nutrition : null;
+  const estimated = !actualNutrition ? estimateNutrition(name) : null;
+  const displayNutrition = actualNutrition || estimated;
+  const isEstimated = !actualNutrition && !!estimated;
 
   const handleSave = () => {
     const autoCategory = categorizeItem(name);
@@ -58,6 +66,7 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
       raw_name: name,
       expiry_date: expiry || null,
       amount,
+      price: parseFloat(price) || 0,
       categoryOverride: category !== autoCategory ? category : null,
     });
     onClose();
@@ -65,7 +74,7 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
 
   return (
     <div className="fixed inset-0 bg-blue-900/20 backdrop-blur-xl flex items-end justify-center z-[70]">
-      <div className="bg-white/95 backdrop-blur-2xl p-6 rounded-t-[3rem] w-full max-w-lg shadow-2xl border-t border-white/50">
+      <div className="bg-white/95 backdrop-blur-2xl p-6 rounded-t-[3rem] w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl border-t border-white/50">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-black text-slate-800 tracking-tighter">Ingredient Details</h3>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
@@ -80,13 +89,23 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
             />
           </div>
 
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</label>
-            <input
-              type="text" value={amount} onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 2 cups, 500g, 3 pieces…"
-              className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none placeholder:text-slate-300"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</label>
+              <input
+                type="text" value={amount} onChange={(e) => setAmount(e.target.value)}
+                placeholder="e.g. 2 cups, 500g…"
+                className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none placeholder:text-slate-300"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price ($)</label>
+              <input
+                type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none placeholder:text-slate-300"
+              />
+            </div>
           </div>
 
           <div>
@@ -109,22 +128,18 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
             </select>
           </div>
 
-          {item.nutrition?.kcal > 0 && (
+          {displayNutrition && (
             <div className="bg-sky-50 rounded-2xl p-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nutrition per 100g</p>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div><p className="text-sm font-black text-[#6BAEE0]">{item.nutrition.kcal}</p><p className="text-[9px] text-slate-400">kcal</p></div>
-                <div><p className="text-sm font-black text-emerald-500">{item.nutrition.protein}g</p><p className="text-[9px] text-slate-400">protein</p></div>
-                <div><p className="text-sm font-black text-amber-500">{item.nutrition.carbs}g</p><p className="text-[9px] text-slate-400">carbs</p></div>
-                <div><p className="text-sm font-black text-rose-500">{item.nutrition.fat}g</p><p className="text-[9px] text-slate-400">fat</p></div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nutrition per 100g</p>
+                {isEstimated && <span className="text-[9px] font-bold text-sky-400 bg-sky-100 px-2 py-0.5 rounded-full">estimated</span>}
               </div>
-            </div>
-          )}
-
-          {item.price > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</span>
-              <span className="text-sm font-black text-emerald-500">${Number(item.price).toFixed(2)}</span>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div><p className="text-sm font-black text-[#6BAEE0]">{displayNutrition.kcal}</p><p className="text-[9px] text-slate-400">kcal</p></div>
+                <div><p className="text-sm font-black text-emerald-500">{displayNutrition.protein}g</p><p className="text-[9px] text-slate-400">protein</p></div>
+                <div><p className="text-sm font-black text-amber-500">{displayNutrition.carbs}g</p><p className="text-[9px] text-slate-400">carbs</p></div>
+                <div><p className="text-sm font-black text-rose-500">{displayNutrition.fat}g</p><p className="text-[9px] text-slate-400">fat</p></div>
+              </div>
             </div>
           )}
         </div>
@@ -362,6 +377,8 @@ export default function PantryManager({
 
   const sheetItems = activeSheet ? (groupedFridge[activeSheet] || []) : [];
 
+  const totalValue = fridge.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* ── Input Section ─────────────────────────────────────────────────── */}
@@ -467,7 +484,14 @@ export default function PantryManager({
       {/* ── Pantry Stock — Compact Category Grid ──────────────────────────── */}
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
         <div className="flex justify-between items-center mb-5 px-1">
-          <h2 className="text-[14px] font-bold text-slate-400">Pantry Stock</h2>
+          <div>
+            <h2 className="text-[14px] font-bold text-slate-400">Pantry Stock</h2>
+            {totalValue > 0 && (
+              <p className="text-[10px] font-black text-emerald-500 mt-0.5">
+                Est. value: ${totalValue.toFixed(2)}
+              </p>
+            )}
+          </div>
           <span className="bg-blue-50 text-[#6BAEE0] border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black">
             {fridge.length} items
           </span>

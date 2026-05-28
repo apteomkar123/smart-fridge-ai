@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { cleanIngredientLocally, triggerHaptic } from './recipeUtils';
+import { cleanIngredientLocally, triggerHaptic, getEstimatedExpiry } from './recipeUtils';
 import { put, getAll, remove, OBJECT_STORES } from '../dbUtils';
 
 export const useInventory = (user, household) => {
@@ -180,6 +180,8 @@ export const useInventory = (user, household) => {
     const sanitized = await resolveSanitizedTokenOnline(itemName);
     if (!sanitized) return;
 
+    const estimatedExpiry = extraData.expiry_date || getEstimatedExpiry(itemName);
+
     const tempId = `temp-${Date.now()}`;
     setFridge(prev => [...prev, {
       id: tempId,
@@ -187,7 +189,8 @@ export const useInventory = (user, household) => {
       item_name: sanitized,
       household_id: targetHouseholdId,
       nutrition: extraData.nutrition || null,
-      price: extraData.price || 0
+      price: extraData.price || 0,
+      expiry_date: estimatedExpiry
     }]);
     triggerHaptic(50);
 
@@ -195,7 +198,8 @@ export const useInventory = (user, household) => {
       item_name: sanitized,
       user_id: user.id,
       household_id: targetHouseholdId,
-      price: extraData.price || 0
+      price: extraData.price || 0,
+      expiry_date: estimatedExpiry
     };
 
     const savedData = await performMutation('fridge_inventory', 'INSERT', newItem);
@@ -371,12 +375,14 @@ export const useInventory = (user, household) => {
       }
       if (updates.expiry_date !== undefined) next.expiry_date = updates.expiry_date;
       if (updates.household_id !== undefined) next.household_id = updates.household_id;
+      if (updates.price !== undefined) next.price = updates.price;
       return next;
     }));
     const dbUpdates = {};
     if (updates.raw_name !== undefined) dbUpdates.item_name = cleanIngredientLocally(updates.raw_name);
     if (updates.expiry_date !== undefined) dbUpdates.expiry_date = updates.expiry_date;
     if (updates.household_id !== undefined) dbUpdates.household_id = updates.household_id;
+    if (updates.price !== undefined) dbUpdates.price = updates.price;
     if (Object.keys(dbUpdates).length > 0) {
       await performMutation('fridge_inventory', 'UPDATE', dbUpdates, id);
     }

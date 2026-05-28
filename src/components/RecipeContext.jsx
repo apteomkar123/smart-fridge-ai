@@ -241,7 +241,7 @@ export const RecipeProvider = ({ children, fridge }) => {
       recipe_name: recipe.name,
       ingredients: recipe.ingredients,
       steps: recipe.steps,
-      meal_type: recipe.meal_type || 'General'
+      meal_type: [recipe.meal_type, recipe.cuisine].filter(Boolean).join(' ').trim() || 'General'
     }]).select();
     if (!err && data) setSavedRecipes(prev => [...prev, data[0]]);
   };

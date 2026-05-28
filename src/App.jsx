@@ -132,6 +132,17 @@ function AppContent({ inventory }) {
                       </button>
                     ))}
                   </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide mt-2">
+                    {['indian', 'chinese', 'mexican', 'japanese', 'korean', 'jamaican', 'latin', 'african', 'mediterranean'].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setSavedFilter(f)}
+                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedFilter === f ? 'bg-slate-700 text-white shadow-lg' : 'bg-white text-slate-400 border border-blue-50 hover:border-slate-300'}`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="grid gap-4">
