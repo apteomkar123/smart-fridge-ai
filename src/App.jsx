@@ -7,6 +7,7 @@ import RecipeExplorer from './components/RecipeExplorer';
 import ShoppingListManager from './components/ShoppingListManager';
 import RecipeModal from './components/RecipeModal';
 import CookingMode from './components/CookingMode';
+import AiIngredientPickerModal from './components/AiIngredientPickerModal';
 import HouseholdSettings from './components/HouseholdSettings';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import AuthManager from './components/AuthManager';
@@ -36,7 +37,7 @@ function AppContent({ inventory }) {
     handleClearShoppingItem,
     handleBarcodeLookup,
     handleFileUpload,
-    handleUpdateInlineItem
+    handleUpdateItem
   } = inventory;
 
   const {
@@ -75,7 +76,7 @@ function AppContent({ inventory }) {
                 activeHousehold={activeHousehold}
                 households={households}
                 handleAddManualItem={handleAddManualItem}
-                handleUpdateInlineItem={handleUpdateInlineItem}
+                handleUpdateItem={handleUpdateItem}
                 handleRemoveItem={handleRemoveItem}
                 handleToggleItemHousehold={handleToggleItemHousehold}
                 receiptLoading={receiptLoading}
@@ -173,6 +174,8 @@ function AppContent({ inventory }) {
           <button onClick={() => { triggerHaptic(); setActiveTab('analytics'); }} className={`p-2 rounded-full transition-all ${activeTab === 'analytics' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
         </nav>
       </div>
+
+      <AiIngredientPickerModal />
 
       {activeModalRecipe && (
         <RecipeModal

@@ -4,6 +4,7 @@ import { useUser } from './UserContext';
 import {
   cleanIngredientLocally,
   normalizeIngredientTokens,
+  fuzzyTokenMatch,
   getStaticRecipeSteps,
   matchesRecipeFilter
 } from './recipeUtils';
@@ -30,7 +31,7 @@ export const RecipeProvider = ({ children, fridge }) => {
   const [debouncedSavedSearch, setDebouncedSavedSearch] = useState('');
 
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiExclusions, setAiExclusions] = useState(new Set());
+  const [isAiPickerOpen, setIsAiPickerOpen] = useState(false);
   const [activeModalRecipe, setActiveModalRecipe] = useState(null);
   const [multiplier, setMultiplier] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -130,19 +131,9 @@ export const RecipeProvider = ({ children, fridge }) => {
     }
   }, [masterRecipes]);
 
-  const toggleAiExclusion = useCallback((itemName) => {
-    setAiExclusions(prev => {
-      const next = new Set(prev);
-      if (next.has(itemName)) next.delete(itemName);
-      else next.add(itemName);
-      return next;
-    });
-  }, []);
-
-  const handleGenerateAiRecipe = async () => {
-    const pantry = (fridge || [])
-      .filter(f => !aiExclusions.has(f.item_name))
-      .map(f => cleanIngredientLocally(f.item_name))
+  const handleGenerateAiRecipe = async (selectedIngredients) => {
+    const pantry = (selectedIngredients || [])
+      .map(i => cleanIngredientLocally(i))
       .filter(Boolean);
     if (pantry.length === 0) return alert("Add items to your pantry first so AI knows what you have.");
 
@@ -210,7 +201,7 @@ export const RecipeProvider = ({ children, fridge }) => {
       const pantryTokens = new Set((fridge || []).flatMap(f => normalizeIngredientTokens(f.item_name)));
       const scored = masterRecipes.map(recipe => {
         const cleaned = recipe.cleanedIngredients || [];
-        const matchCount = cleaned.filter(ing => normalizeIngredientTokens(ing).some(t => pantryTokens.has(t))).length;
+        const matchCount = cleaned.filter(ing => normalizeIngredientTokens(ing).some(t => fuzzyTokenMatch(t, pantryTokens))).length;
         const matchPercentage = Math.round((matchCount / (cleaned.length || 1)) * 100);
         return { ...recipe, matchPercentage };
       });
@@ -298,8 +289,8 @@ export const RecipeProvider = ({ children, fridge }) => {
       savedFilter,
       setSavedFilter,
       aiGenerating,
-      aiExclusions,
-      toggleAiExclusion,
+      isAiPickerOpen,
+      setIsAiPickerOpen,
       handleGenerateAiRecipe,
       onSaveRecipe,
       onRemoveSavedRecipe,
@@ -312,7 +303,8 @@ export const RecipeProvider = ({ children, fridge }) => {
       shoppingAlerts,
       isStoreAlertOpen,
       setIsStoreAlertOpen,
-      triggerStoreTripPlanner
+      triggerStoreTripPlanner,
+      fridge
     }}>
       {children}
     </RecipeContext.Provider>

@@ -361,6 +361,27 @@ export const useInventory = (user, household) => {
     await performMutation('fridge_inventory', 'UPDATE', { item_name: sanitized }, id);
   }, [performMutation]);
 
+  const handleUpdateItem = useCallback(async (id, updates) => {
+    setFridge(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const next = { ...item };
+      if (updates.raw_name !== undefined) {
+        next.raw_name = updates.raw_name;
+        next.item_name = cleanIngredientLocally(updates.raw_name);
+      }
+      if (updates.expiry_date !== undefined) next.expiry_date = updates.expiry_date;
+      if (updates.household_id !== undefined) next.household_id = updates.household_id;
+      return next;
+    }));
+    const dbUpdates = {};
+    if (updates.raw_name !== undefined) dbUpdates.item_name = cleanIngredientLocally(updates.raw_name);
+    if (updates.expiry_date !== undefined) dbUpdates.expiry_date = updates.expiry_date;
+    if (updates.household_id !== undefined) dbUpdates.household_id = updates.household_id;
+    if (Object.keys(dbUpdates).length > 0) {
+      await performMutation('fridge_inventory', 'UPDATE', dbUpdates, id);
+    }
+  }, [performMutation]);
+
   return {
     fridge,
     shoppingList,
@@ -384,6 +405,7 @@ export const useInventory = (user, household) => {
     handleClearShoppingItem,
     handleBarcodeLookup,
     handleFileUpload,
-    handleUpdateInlineItem
+    handleUpdateInlineItem,
+    handleUpdateItem
   };
 };

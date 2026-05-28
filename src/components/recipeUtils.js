@@ -135,6 +135,20 @@ export const matchesRecipeFilter = (recipe, filter) => {
 };
 
 /**
+ * Fuzzy token match: handles singular/plural (egg↔eggs, tomato↔tomatoes, berry↔berries)
+ */
+export const fuzzyTokenMatch = (token, tokenSet) => {
+  if (tokenSet.has(token)) return true;
+  if (token.endsWith('ies') && token.length > 5 && tokenSet.has(token.slice(0, -3) + 'y')) return true;
+  if (token.endsWith('ves') && token.length > 5 && tokenSet.has(token.slice(0, -3) + 'f')) return true;
+  if (token.endsWith('es') && token.length > 4 && tokenSet.has(token.slice(0, -2))) return true;
+  if (token.endsWith('s') && token.length > 3 && tokenSet.has(token.slice(0, -1))) return true;
+  if (tokenSet.has(token + 's')) return true;
+  if (tokenSet.has(token + 'es')) return true;
+  return false;
+};
+
+/**
  * Subtle Haptic Feedback utility (Web Standard)
  */
 export const triggerHaptic = (intensity = 10) => {

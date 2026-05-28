@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X, Users, User, ChevronDown, Ban } from 'lucide-react';
+import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X, Users, User, GripVertical, ChevronRight } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { useRecipes } from './RecipeContext';
 
 const CATEGORIES = ['Proteins', 'Dairy & Eggs', 'Fruits', 'Vegetables', 'Beverages', 'Snacks', 'Frozen', 'General'];
 
-const categorizeItem = (itemName) => {
-  const n = (itemName || '').toLowerCase();
-  if (/\b(chicken|beef|pork|lamb|turkey|fish|salmon|tuna|shrimp|crab|lobster|bacon|sausage|ham|mutton|duck|seafood|steak|mince|pepperoni|anchovy|venison|veal|salami|meat|prawn)\b/.test(n)) return 'Proteins';
-  if (/\b(milk|cheese|butter|yogurt|cream|egg|paneer|ghee|curd|whey|kefir|mozzarella|cheddar|parmesan|brie|ricotta|cottage|sour cream|dairy)\b/.test(n)) return 'Dairy & Eggs';
-  if (/\b(apple|banana|orange|mango|grape|strawberry|blueberry|raspberry|blackberry|lemon|lime|pear|peach|plum|cherry|watermelon|melon|pineapple|kiwi|avocado|fig|date|papaya|guava|coconut|pomegranate|passion fruit)\b/.test(n)) return 'Fruits';
-  if (/\b(carrot|potato|tomato|onion|garlic|spinach|broccoli|cauliflower|lettuce|cabbage|cucumber|pepper|celery|kale|zucchini|eggplant|mushroom|corn|pea|bean|lentil|asparagus|beetroot|radish|leek|okra|squash|yam|ginger|turmeric|chili|capsicum|chard|arugula|herb|cilantro|parsley|basil|mint)\b/.test(n)) return 'Vegetables';
-  if (/\b(water|juice|soda|tea|coffee|beer|wine|spirit|whiskey|vodka|rum|gin|drink|beverage|smoothie|shake|cola|lemonade|kombucha|sparkling)\b/.test(n)) return 'Beverages';
-  if (/\b(chip|crisp|cracker|cookie|biscuit|candy|chocolate|popcorn|pretzel|almond|cashew|walnut|peanut|pistachio|trail mix|granola|protein bar|rice cake|snack|nut)\b/.test(n)) return 'Snacks';
-  if (/\b(frozen|ice cream|gelato|popsicle|sorbet)\b/.test(n)) return 'Frozen';
-  return 'General';
+const CATEGORY_ICONS = {
+  'Proteins': '🥩',
+  'Dairy & Eggs': '🥛',
+  'Fruits': '🍎',
+  'Vegetables': '🥦',
+  'Beverages': '☕',
+  'Snacks': '🍿',
+  'Frozen': '🧊',
+  'General': '📦',
 };
 
 const CATEGORY_COLORS = {
@@ -28,31 +26,258 @@ const CATEGORY_COLORS = {
   'General': 'bg-slate-50 text-slate-400 border-slate-100',
 };
 
+// NOTE: Snacks intentionally checked BEFORE Vegetables — "potato chips" must be Snacks not Vegetables
+const categorizeItem = (itemName) => {
+  const n = (itemName || '').toLowerCase();
+  if (/\b(chicken|beef|pork|lamb|turkey|fish|salmon|tuna|shrimp|crab|lobster|bacon|sausage|ham|mutton|duck|seafood|steak|mince|pepperoni|anchovy|venison|veal|salami|meat|prawn)\b/.test(n)) return 'Proteins';
+  if (/\b(milk|cheese|butter|yogurt|cream|egg|paneer|ghee|curd|whey|kefir|mozzarella|cheddar|parmesan|brie|ricotta|cottage|sour cream|dairy)\b/.test(n)) return 'Dairy & Eggs';
+  if (/\b(apple|banana|orange|mango|grape|strawberry|blueberry|raspberry|blackberry|lemon|lime|pear|peach|plum|cherry|watermelon|melon|pineapple|kiwi|avocado|fig|date|papaya|guava|coconut|pomegranate|passion fruit)\b/.test(n)) return 'Fruits';
+  if (/\b(water|juice|soda|tea|coffee|beer|wine|spirit|whiskey|vodka|rum|gin|drink|beverage|smoothie|shake|cola|lemonade|kombucha|sparkling)\b/.test(n)) return 'Beverages';
+  if (/\b(chip|crisp|cracker|cookie|biscuit|candy|chocolate|popcorn|pretzel|almond|cashew|walnut|peanut|pistachio|trail mix|granola|protein bar|rice cake|snack|nut)\b/.test(n)) return 'Snacks';
+  if (/\b(carrot|potato|tomato|onion|garlic|spinach|broccoli|cauliflower|lettuce|cabbage|cucumber|pepper|celery|kale|zucchini|eggplant|mushroom|corn|pea|bean|lentil|asparagus|beetroot|radish|leek|okra|squash|yam|ginger|turmeric|chili|capsicum|chard|arugula|herb|cilantro|parsley|basil|mint)\b/.test(n)) return 'Vegetables';
+  if (/\b(frozen|ice cream|gelato|popsicle|sorbet)\b/.test(n)) return 'Frozen';
+  return 'General';
+};
+
+const isExpiringSoon = (date) => {
+  if (!date) return false;
+  const diff = (new Date(date) - new Date()) / (1000 * 60 * 60 * 24);
+  return diff <= 7 && diff > 0;
+};
+
+// ─── Ingredient Card Modal ────────────────────────────────────────────────────
+function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
+  const [name, setName] = useState(item.raw_name || '');
+  const [expiry, setExpiry] = useState(item.expiry_date ? item.expiry_date.split('T')[0] : '');
+  const [amount, setAmount] = useState(item.amount || '');
+  const [category, setCategory] = useState(item.categoryOverride || categorizeItem(item.raw_name || ''));
+
+  const handleSave = () => {
+    const autoCategory = categorizeItem(name);
+    onSave(item.id, {
+      raw_name: name,
+      expiry_date: expiry || null,
+      amount,
+      categoryOverride: category !== autoCategory ? category : null,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-blue-900/20 backdrop-blur-xl flex items-end justify-center z-[70]">
+      <div className="bg-white/95 backdrop-blur-2xl p-6 rounded-t-[3rem] w-full max-w-lg shadow-2xl border-t border-white/50">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-black text-slate-800 tracking-tighter">Ingredient Details</h3>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Name</label>
+            <input
+              type="text" value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</label>
+            <input
+              type="text" value={amount} onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 2 cups, 500g, 3 pieces…"
+              className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none placeholder:text-slate-300"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expiry Date</label>
+            <input
+              type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)}
+              className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+            <select
+              value={category} onChange={(e) => setCategory(e.target.value)}
+              className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none"
+            >
+              {CATEGORIES.map(c => (
+                <option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>
+              ))}
+            </select>
+          </div>
+
+          {item.nutrition?.kcal > 0 && (
+            <div className="bg-sky-50 rounded-2xl p-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nutrition per 100g</p>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div><p className="text-sm font-black text-[#6BAEE0]">{item.nutrition.kcal}</p><p className="text-[9px] text-slate-400">kcal</p></div>
+                <div><p className="text-sm font-black text-emerald-500">{item.nutrition.protein}g</p><p className="text-[9px] text-slate-400">protein</p></div>
+                <div><p className="text-sm font-black text-amber-500">{item.nutrition.carbs}g</p><p className="text-[9px] text-slate-400">carbs</p></div>
+                <div><p className="text-sm font-black text-rose-500">{item.nutrition.fat}g</p><p className="text-[9px] text-slate-400">fat</p></div>
+              </div>
+            </div>
+          )}
+
+          {item.price > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</span>
+              <span className="text-sm font-black text-emerald-500">${Number(item.price).toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={() => { onDelete(item.id); onClose(); }}
+            className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-100 transition-colors"
+          >
+            <Trash2 size={18} />
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-[#6BAEE0] text-white py-3 rounded-2xl font-bold active:scale-95 transition-all shadow-lg shadow-blue-100"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Category Bottom Sheet ────────────────────────────────────────────────────
+function CategorySheet({ category, items, onClose, onItemTap, onRemove, households, getHouseholdLabel, cycleItemHousehold, setCategoryOverrides }) {
+  const [dragOverCat, setDragOverCat] = useState(null);
+  const colorCls = CATEGORY_COLORS[category];
+  const otherCats = CATEGORIES.filter(c => c !== category);
+
+  const handleDrop = (e, targetCat) => {
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData('itemId');
+    if (!itemId) return;
+    setCategoryOverrides(prev => {
+      const next = { ...prev, [itemId]: targetCat };
+      localStorage.setItem('hungry_cat_overrides', JSON.stringify(next));
+      return next;
+    });
+    setDragOverCat(null);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-blue-900/20 backdrop-blur-xl flex items-end justify-center z-[60]">
+      <div className="bg-white/95 backdrop-blur-2xl rounded-t-[3rem] w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl border-t border-white/50">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-blue-50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{CATEGORY_ICONS[category]}</span>
+            <div>
+              <h3 className="text-base font-black text-slate-800">{category}</h3>
+              <p className="text-[10px] text-slate-400 font-medium">{items.length} item{items.length !== 1 ? 's' : ''} · drag to move between categories</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
+        </div>
+
+        {/* Drop targets for other categories */}
+        <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
+          {otherCats.map(c => (
+            <div
+              key={c}
+              onDragOver={(e) => { e.preventDefault(); setDragOverCat(c); }}
+              onDragLeave={() => setDragOverCat(null)}
+              onDrop={(e) => handleDrop(e, c)}
+              className={`shrink-0 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${
+                dragOverCat === c ? CATEGORY_COLORS[c] + ' scale-110 shadow-md' : 'bg-slate-50 text-slate-300 border-slate-100'
+              }`}
+            >
+              {CATEGORY_ICONS[c]} {c}
+            </div>
+          ))}
+        </div>
+
+        {/* Item list */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-1.5 pt-1">
+          {items.map(item => {
+            const expiring = isExpiringSoon(item.expiry_date);
+            return (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData('itemId', item.id)}
+                className="flex items-center gap-3 px-4 py-3 bg-white border border-blue-50 rounded-2xl hover:border-sky-100 transition-all cursor-grab active:cursor-grabbing"
+              >
+                <GripVertical size={14} className="text-slate-200 shrink-0" />
+
+                <button className="flex-1 text-left min-w-0" onClick={() => onItemTap(item)}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-700">{item.raw_name}</span>
+                    {expiring && <AlertCircle size={10} className="text-orange-400 animate-pulse shrink-0" />}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {item.amount && <span className="text-[9px] font-mono text-slate-400">{item.amount}</span>}
+                    {item.expiry_date && (
+                      <span className={`text-[9px] font-mono font-black ${expiring ? 'text-orange-400' : 'text-slate-300'}`}>
+                        Exp {new Date(item.expiry_date).toLocaleDateString()}
+                      </span>
+                    )}
+                    {item.nutrition?.kcal > 0 && (
+                      <span className="text-[9px] font-mono text-sky-400">{item.nutrition.kcal} kcal</span>
+                    )}
+                    {item.price > 0 && (
+                      <span className="text-[9px] font-mono text-emerald-500">${Number(item.price).toFixed(2)}</span>
+                    )}
+                  </div>
+                </button>
+
+                {households.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => cycleItemHousehold(item)}
+                    className={`shrink-0 flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full uppercase border transition-all ${
+                      item.household_id ? 'text-[#6BAEE0] bg-sky-50 border-sky-100' : 'text-slate-300 bg-slate-50 border-slate-100'
+                    }`}
+                  >
+                    {item.household_id ? <Users size={9} /> : <User size={9} />}
+                  </button>
+                )}
+
+                <button onClick={() => onRemove(item.id)} className="text-slate-200 hover:text-red-400 transition-colors shrink-0 p-1">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function PantryManager({
   fridge, activeHousehold, households = [],
-  handleAddManualItem, handleUpdateInlineItem, handleRemoveItem, handleToggleItemHousehold,
+  handleAddManualItem, handleUpdateItem, handleRemoveItem, handleToggleItemHousehold,
   receiptLoading, receiptMessage, handleFileUpload,
   barcodeInput, setBarcodeInput, handleBarcodeLookup,
   barcodeLoading, barcodeResult, isScanningBarcode, setIsScanningBarcode
 }) {
-  const { aiExclusions, toggleAiExclusion } = useRecipes();
   const [manualItem, setManualItem] = useState('');
   const [selectedHouseholdId, setSelectedHouseholdId] = useState(null);
-  const [expandedCategories, setExpandedCategories] = useState({});
+  const [activeSheet, setActiveSheet] = useState(null);
+  const [activeIngredient, setActiveIngredient] = useState(null);
+  const [categoryOverrides, setCategoryOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('hungry_cat_overrides') || '{}'); } catch { return {}; }
+  });
+  const [amounts, setAmounts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('hungry_amounts') || '{}'); } catch { return {}; }
+  });
   const hasScannedRef = useRef(false);
 
-  const isExpiringSoon = (date) => {
-    if (!date) return false;
-    const diff = (new Date(date) - new Date()) / (1000 * 60 * 60 * 24);
-    return diff <= 7 && diff > 0;
-  };
-
-  const toggleCategory = (cat) => {
-    setExpandedCategories(prev => ({ ...prev, [cat]: prev[cat] === false ? true : false }));
-  };
-  const isCategoryExpanded = (cat) => expandedCategories[cat] !== false;
-
-  // Barcode camera scanner — stops immediately on first scan
+  // Barcode camera scanner — ref-locked to prevent double-scan
   useEffect(() => {
     let scanner;
     if (isScanningBarcode) {
@@ -75,9 +300,7 @@ export default function PantryManager({
       });
     }
     return () => {
-      if (scanner && scanner.isScanning) {
-        scanner.stop().catch(() => {});
-      }
+      if (scanner && scanner.isScanning) scanner.stop().catch(() => {});
     };
   }, [isScanningBarcode, handleBarcodeLookup, setIsScanningBarcode]);
 
@@ -100,15 +323,48 @@ export default function PantryManager({
     return households.find(h => h.id === householdId)?.name || 'Shared';
   };
 
-  // Group fridge items by category
+  const getEffectiveCategory = (item) =>
+    categoryOverrides[item.id] || categorizeItem(item.raw_name || item.item_name || '');
+
+  const handleSaveIngredient = (id, updates) => {
+    // Handle category override
+    if ('categoryOverride' in updates) {
+      const newOverrides = { ...categoryOverrides };
+      if (updates.categoryOverride === null) delete newOverrides[id];
+      else newOverrides[id] = updates.categoryOverride;
+      localStorage.setItem('hungry_cat_overrides', JSON.stringify(newOverrides));
+      setCategoryOverrides(newOverrides);
+    }
+    // Handle amount (local only)
+    if (updates.amount !== undefined) {
+      const newAmounts = { ...amounts, [id]: updates.amount };
+      localStorage.setItem('hungry_amounts', JSON.stringify(newAmounts));
+      setAmounts(newAmounts);
+    }
+    // Persist name / expiry / household to DB
+    const { categoryOverride, amount, ...dbUpdates } = updates;
+    if (Object.keys(dbUpdates).length > 0) {
+      handleUpdateItem(id, dbUpdates);
+    }
+  };
+
+  // Enrich fridge items with local-only fields
+  const enrichedFridge = fridge.map(item => ({
+    ...item,
+    amount: amounts[item.id] || '',
+    categoryOverride: categoryOverrides[item.id] || null,
+  }));
+
   const groupedFridge = CATEGORIES.reduce((acc, cat) => {
-    acc[cat] = fridge.filter(item => categorizeItem(item.item_name) === cat);
+    acc[cat] = enrichedFridge.filter(item => getEffectiveCategory(item) === cat);
     return acc;
   }, {});
 
+  const sheetItems = activeSheet ? (groupedFridge[activeSheet] || []) : [];
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Input Section */}
+      {/* ── Input Section ─────────────────────────────────────────────────── */}
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
         <div className="space-y-4">
           <div>
@@ -154,7 +410,7 @@ export default function PantryManager({
           </form>
 
           <label htmlFor="receipt-upload" className="cursor-pointer block bg-sky-50 text-[#1F6FB8] border border-sky-100 px-5 py-4 rounded-2xl text-xs font-bold hover:bg-sky-100 transition-all shadow-sm text-center">
-            {receiptLoading ? 'Scanning receipt...' : 'Scan Receipt'}
+            {receiptLoading ? 'Scanning receipt…' : 'Scan Receipt'}
           </label>
           <input id="receipt-upload" type="file" accept="image/*" capture="environment" onChange={(e) => { e.target.value = ''; handleFileUpload(e.target.files[0]); }} className="hidden" />
           {receiptMessage && <p className="text-[12px] text-slate-500">{receiptMessage}</p>}
@@ -181,13 +437,11 @@ export default function PantryManager({
             <Camera size={16} /> Scan with Camera
           </button>
 
-          {barcodeResult && (
-            <p className="text-[12px] text-slate-500">{barcodeResult}</p>
-          )}
+          {barcodeResult && <p className="text-[12px] text-slate-500">{barcodeResult}</p>}
         </div>
       </section>
 
-      {/* Barcode camera overlay */}
+      {/* ── Barcode Camera Overlay ─────────────────────────────────────────── */}
       {isScanningBarcode && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
           <div className="bg-white/10 backdrop-blur-2xl rounded-[3rem] w-full max-w-md overflow-hidden relative shadow-2xl border border-white/20">
@@ -210,99 +464,74 @@ export default function PantryManager({
         </div>
       )}
 
-      {/* Pantry Stock — organized by category */}
+      {/* ── Pantry Stock — Compact Category Grid ──────────────────────────── */}
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-        <div className="flex justify-between items-center mb-6 px-2">
-          <div>
-            <h2 className="text-[14px] font-bold text-slate-400">Pantry Stock</h2>
-            {aiExclusions.size > 0 && (
-              <p className="text-[10px] text-orange-400 font-bold mt-0.5">{aiExclusions.size} item{aiExclusions.size !== 1 ? 's' : ''} excluded from AI recipes</p>
-            )}
-          </div>
-          <span className="bg-blue-50 text-[#6BAEE0] border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black">{fridge.length} items</span>
+        <div className="flex justify-between items-center mb-5 px-1">
+          <h2 className="text-[14px] font-bold text-slate-400">Pantry Stock</h2>
+          <span className="bg-blue-50 text-[#6BAEE0] border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black">
+            {fridge.length} items
+          </span>
         </div>
 
         {fridge.length === 0 ? (
-          <p className="text-xs text-slate-400 font-medium italic text-center py-10">Your pantry is empty</p>
+          <p className="text-xs text-slate-400 font-medium italic text-center py-8">Your pantry is empty — add items above</p>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {CATEGORIES.map(cat => {
               const items = groupedFridge[cat];
-              if (items.length === 0) return null;
-              const isOpen = isCategoryExpanded(cat);
+              if (!items || items.length === 0) return null;
               const colorCls = CATEGORY_COLORS[cat];
+              const expiringCount = items.filter(i => isExpiringSoon(i.expiry_date)).length;
 
               return (
-                <div key={cat} className="rounded-2xl border border-blue-50 overflow-hidden">
-                  <button
-                    onClick={() => toggleCategory(cat)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-white/60 hover:bg-blue-50/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${colorCls}`}>{cat}</span>
-                      <span className="text-[10px] font-bold text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <ChevronDown size={14} className={`text-slate-300 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {isOpen && (
-                    <div className="divide-y divide-blue-50/60">
-                      {items.map((item) => (
-                        <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 group hover:bg-blue-50/20 transition-colors ${aiExclusions.has(item.item_name) ? 'bg-orange-50/40 opacity-60' : 'bg-white'}`}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <input
-                                type="text"
-                                defaultValue={item.raw_name}
-                                onBlur={(e) => handleUpdateInlineItem(item.id, e.target.value)}
-                                className="flex-1 bg-transparent text-xs font-bold text-slate-800 border-b border-transparent hover:border-blue-100 focus:border-sky-400 focus:outline-none pb-0.5 min-w-0"
-                              />
-                              {households.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => cycleItemHousehold(item)}
-                                  className={`shrink-0 flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border transition-all ${item.household_id ? 'text-[#6BAEE0] bg-sky-50 border-sky-100 hover:bg-sky-100' : 'text-slate-400 bg-slate-50 border-slate-100 hover:border-sky-200 hover:text-[#6BAEE0]'}`}
-                                >
-                                  {item.household_id ? <><Users size={9} /> {getHouseholdLabel(item.household_id)}</> : <><User size={9} /> Personal</>}
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                              <span className="text-[9px] font-mono font-black text-slate-300 uppercase">
-                                {item.item_name}
-                                {item.expiry_date && <span className="ml-1">· Exp {new Date(item.expiry_date).toLocaleDateString()}</span>}
-                              </span>
-                              {isExpiringSoon(item.expiry_date) && <AlertCircle size={10} className="text-orange-400 animate-pulse" />}
-                              {item.nutrition && item.nutrition.kcal > 0 && (
-                                <span className="text-[9px] font-mono font-black text-sky-400 bg-sky-50 px-1.5 py-0.5 rounded-md">
-                                  {item.nutrition.kcal} kcal · P {item.nutrition.protein}g · C {item.nutrition.carbs}g · F {item.nutrition.fat}g
-                                </span>
-                              )}
-                              {item.price > 0 && (
-                                <span className="text-[9px] font-mono font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                  ${Number(item.price).toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => toggleAiExclusion(item.item_name)}
-                            title={aiExclusions.has(item.item_name) ? 'Include in AI recipes' : 'Exclude from AI recipes'}
-                            className={`p-1 shrink-0 transition-colors ${aiExclusions.has(item.item_name) ? 'text-orange-400' : 'text-slate-200 hover:text-orange-300'}`}
-                          >
-                            <Ban size={14} />
-                          </button>
-                          <button onClick={() => handleRemoveItem(item.id)} className="text-slate-200 hover:text-red-400 transition-colors p-1 shrink-0"><Trash2 size={15} /></button>
-                        </div>
-                      ))}
+                <button
+                  key={cat}
+                  onClick={() => setActiveSheet(cat)}
+                  className={`relative p-4 rounded-2xl border text-left transition-all hover:scale-[1.03] active:scale-[0.97] ${colorCls}`}
+                >
+                  {expiringCount > 0 && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-orange-400 text-white rounded-full text-[8px] font-black flex items-center justify-center shadow">
+                      {expiringCount}
                     </div>
                   )}
-                </div>
+                  <div className="text-2xl mb-2 leading-none">{CATEGORY_ICONS[cat]}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest leading-tight mb-0.5">{cat}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold opacity-60">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                    <ChevronRight size={12} className="opacity-40" />
+                  </div>
+                </button>
               );
             })}
           </div>
         )}
       </section>
+
+      {/* ── Category Bottom Sheet ──────────────────────────────────────────── */}
+      {activeSheet && (
+        <CategorySheet
+          category={activeSheet}
+          items={sheetItems}
+          onClose={() => setActiveSheet(null)}
+          onItemTap={(item) => setActiveIngredient(item)}
+          onRemove={(id) => handleRemoveItem(id)}
+          households={households}
+          getHouseholdLabel={getHouseholdLabel}
+          cycleItemHousehold={cycleItemHousehold}
+          setCategoryOverrides={setCategoryOverrides}
+        />
+      )}
+
+      {/* ── Ingredient Card Modal ──────────────────────────────────────────── */}
+      {activeIngredient && (
+        <IngredientCardModal
+          item={activeIngredient}
+          onClose={() => setActiveIngredient(null)}
+          onSave={handleSaveIngredient}
+          onDelete={(id) => { handleRemoveItem(id); setActiveIngredient(null); setActiveSheet(null); }}
+          households={households}
+        />
+      )}
     </div>
   );
 }

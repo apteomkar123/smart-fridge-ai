@@ -5,7 +5,7 @@ import { useRecipes } from './RecipeContext';
 
 export default function Header() {
   const { user, userName, handleSignOut } = useUser();
-  const { handleGenerateAiRecipe, triggerStoreTripPlanner, aiGenerating } = useRecipes();
+  const { setIsAiPickerOpen, triggerStoreTripPlanner, aiGenerating } = useRecipes();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   const displayName = userName || user?.email?.split('@')[0] || 'Chef';
@@ -18,7 +18,7 @@ export default function Header() {
       </div>
       <div className="flex items-center gap-3">
         <button
-          onClick={handleGenerateAiRecipe}
+          onClick={() => setIsAiPickerOpen(true)}
           disabled={aiGenerating}
           title="Generate AI Recipe"
           className="bg-sky-50 text-[#6BAEE0] p-2.5 rounded-xl hover:bg-sky-100 transition-colors disabled:opacity-60"
