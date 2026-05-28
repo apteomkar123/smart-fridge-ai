@@ -61,113 +61,118 @@ function AppContent({ inventory }) {
   const addedItems = new Set(shoppingList.map(i => cleanIngredientLocally(i.item_name)));
 
   return (
-    <div className="min-h-screen bg-blue-50/50 text-slate-800 font-sans antialiased pb-24 selection:bg-[#6BAEE0] selection:text-white">
-      <div className="w-full flex justify-center">
-        <Header />
-      </div>
-
-      <main className="w-full flex justify-center px-4 sm:px-6 py-8">
-        <div className="w-full max-w-5xl">
-          {activeTab === 'pantry' && (
-            <PantryManager
-              fridge={fridge}
-              activeHousehold={activeHousehold}
-              households={households}
-              handleAddManualItem={handleAddManualItem}
-              handleUpdateInlineItem={handleUpdateInlineItem}
-              handleRemoveItem={handleRemoveItem}
-              handleToggleItemHousehold={handleToggleItemHousehold}
-              receiptLoading={receiptLoading}
-              receiptMessage={receiptMessage}
-              handleFileUpload={handleFileUpload}
-              barcodeInput={barcodeInput}
-              setBarcodeInput={setBarcodeInput}
-              handleBarcodeLookup={handleBarcodeLookup}
-              barcodeLoading={barcodeLoading}
-              barcodeResult={barcodeResult}
-              isScanningBarcode={isScanningBarcode}
-              setIsScanningBarcode={setIsScanningBarcode}
-            />
-          )}
-          {activeTab === 'recipes' && <RecipeExplorer />}
-          {activeTab === 'shopping' && (
-            <ShoppingListManager
-              list={shoppingList}
-              onAdd={handleAddShoppingItem}
-              onToggle={handleToggleShoppingCompleted}
-              onClear={handleClearShoppingItem}
-            />
-          )}
-          {activeTab === 'analytics' && (
-            <AnalyticsDashboard
-              metrics={nutritionMetrics}
-              fridge={fridge}
-              shoppingList={shoppingList}
-            />
-          )}
-          {activeTab === 'household' && <HouseholdSettings />}
-          {activeTab === 'saved' && (
-            <div className="space-y-6">
-              <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-                <div className="relative mb-6">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="text"
-                    placeholder="Search saved recipes..."
-                    value={savedSearch}
-                    onChange={(e) => setSavedSearch(e.target.value)}
-                    className="w-full bg-blue-50/50 border border-blue-100 pl-12 pr-6 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all"
-                  />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {['all', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'vegetarian', 'vegan'].map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setSavedFilter(f)}
-                      className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedFilter === f ? 'bg-[#6BAEE0] text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-400 border border-blue-50 hover:border-sky-200'}`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                {filteredSavedRecipes.length === 0 ? (
-                  <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
-                ) : (
-                  filteredSavedRecipes.map(recipe => (
-                    <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm hover:shadow-md transition-all group">
-                      <div
-                        className="flex-1 cursor-pointer"
-                        onClick={() => setActiveModalRecipe({
-                          ...recipe,
-                          id: recipe.recipe_id,
-                          name: recipe.recipe_name,
-                          cleanedIngredients: recipe.ingredients ? recipe.ingredients.map(cleanIngredientLocally) : []
-                        })}
+    <div className="h-[100dvh] flex flex-col bg-blue-50/50 text-slate-800 font-sans antialiased selection:bg-[#6BAEE0] selection:text-white overflow-hidden">
+      {/* Scrollable area — Header sticky inside here */}
+      <main className="flex-1 overflow-y-auto w-full">
+        <div className="w-full flex justify-center">
+          <Header />
+        </div>
+        <div className="w-full flex justify-center px-4 sm:px-6 py-8">
+          <div className="w-full max-w-5xl pb-4">
+            {activeTab === 'pantry' && (
+              <PantryManager
+                fridge={fridge}
+                activeHousehold={activeHousehold}
+                households={households}
+                handleAddManualItem={handleAddManualItem}
+                handleUpdateInlineItem={handleUpdateInlineItem}
+                handleRemoveItem={handleRemoveItem}
+                handleToggleItemHousehold={handleToggleItemHousehold}
+                receiptLoading={receiptLoading}
+                receiptMessage={receiptMessage}
+                handleFileUpload={handleFileUpload}
+                barcodeInput={barcodeInput}
+                setBarcodeInput={setBarcodeInput}
+                handleBarcodeLookup={handleBarcodeLookup}
+                barcodeLoading={barcodeLoading}
+                barcodeResult={barcodeResult}
+                isScanningBarcode={isScanningBarcode}
+                setIsScanningBarcode={setIsScanningBarcode}
+              />
+            )}
+            {activeTab === 'recipes' && <RecipeExplorer />}
+            {activeTab === 'shopping' && (
+              <ShoppingListManager
+                list={shoppingList}
+                onAdd={handleAddShoppingItem}
+                onToggle={handleToggleShoppingCompleted}
+                onClear={handleClearShoppingItem}
+              />
+            )}
+            {activeTab === 'analytics' && (
+              <AnalyticsDashboard
+                metrics={nutritionMetrics}
+                fridge={fridge}
+                shoppingList={shoppingList}
+              />
+            )}
+            {activeTab === 'household' && <HouseholdSettings />}
+            {activeTab === 'saved' && (
+              <div className="space-y-6">
+                <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+                  <div className="relative mb-6">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search saved recipes..."
+                      value={savedSearch}
+                      onChange={(e) => setSavedSearch(e.target.value)}
+                      className="w-full bg-blue-50/50 border border-blue-100 pl-12 pr-6 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all"
+                    />
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {['all', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'vegetarian', 'vegan'].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setSavedFilter(f)}
+                        className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${savedFilter === f ? 'bg-[#6BAEE0] text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-400 border border-blue-50 hover:border-sky-200'}`}
                       >
-                        <span className="text-[8px] font-mono font-black text-slate-400 uppercase bg-blue-50/50 px-2 py-1 rounded-md">{recipe.meal_type}</span>
-                        <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors">{recipe.recipe_name}</h3>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {filteredSavedRecipes.length === 0 ? (
+                    <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
+                  ) : (
+                    filteredSavedRecipes.map(recipe => (
+                      <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm hover:shadow-md transition-all group">
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => setActiveModalRecipe({
+                            ...recipe,
+                            id: recipe.recipe_id,
+                            name: recipe.recipe_name,
+                            cleanedIngredients: recipe.ingredients ? recipe.ingredients.map(cleanIngredientLocally) : []
+                          })}
+                        >
+                          <span className="text-[8px] font-mono font-black text-slate-400 uppercase bg-blue-50/50 px-2 py-1 rounded-md">{recipe.meal_type}</span>
+                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors">{recipe.recipe_name}</h3>
+                        </div>
+                        <button onClick={() => onRemoveSavedRecipe(recipe.id)} className="text-red-300 hover:text-red-500 transition-colors p-2"><Trash2 size={20} /></button>
                       </div>
-                      <button onClick={() => onRemoveSavedRecipe(recipe.id)} className="text-red-300 hover:text-red-500 transition-colors p-2"><Trash2 size={20} /></button>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
 
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-2xl border border-white/50 rounded-full h-16 shadow-2xl flex items-center justify-around px-6 z-40 transition-all hover:scale-[1.02]">
-        <button onClick={() => { triggerHaptic(); setActiveTab('pantry'); }} className={`p-2 rounded-full transition-all ${activeTab === 'pantry' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Refrigerator size={24} /></button>
-        <button onClick={() => { triggerHaptic(); setActiveTab('recipes'); }} className={`p-2 rounded-full transition-all ${activeTab === 'recipes' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ChefHat size={24} /></button>
-        <button onClick={() => { triggerHaptic(); setActiveTab('shopping'); }} className={`p-2 rounded-full transition-all ${activeTab === 'shopping' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ShoppingCart size={24} /></button>
-        <button onClick={() => { triggerHaptic(); setSavedFilter(activeFilter); setActiveTab('saved'); }} className={`p-2 rounded-full transition-all ${activeTab === 'saved' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Star size={24} /></button>
-        <button onClick={() => { triggerHaptic(); setActiveTab('household'); }} className={`p-2 rounded-full transition-all ${activeTab === 'household' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Users size={24} /></button>
-        <button onClick={() => { triggerHaptic(); setActiveTab('analytics'); }} className={`p-2 rounded-full transition-all ${activeTab === 'analytics' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
-      </nav>
+      {/* Bottom nav — always at bottom, never scrolls */}
+      <div className="shrink-0 w-full flex justify-center px-4 pb-6 pt-3 bg-blue-50/60 backdrop-blur-sm">
+        <nav className="w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white/50 rounded-full h-16 shadow-2xl flex items-center justify-around px-6 transition-all hover:scale-[1.02]">
+          <button onClick={() => { triggerHaptic(); setActiveTab('pantry'); }} className={`p-2 rounded-full transition-all ${activeTab === 'pantry' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Refrigerator size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setActiveTab('recipes'); }} className={`p-2 rounded-full transition-all ${activeTab === 'recipes' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ChefHat size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setActiveTab('shopping'); }} className={`p-2 rounded-full transition-all ${activeTab === 'shopping' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><ShoppingCart size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setSavedFilter(activeFilter); setActiveTab('saved'); }} className={`p-2 rounded-full transition-all ${activeTab === 'saved' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Star size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setActiveTab('household'); }} className={`p-2 rounded-full transition-all ${activeTab === 'household' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><Users size={24} /></button>
+          <button onClick={() => { triggerHaptic(); setActiveTab('analytics'); }} className={`p-2 rounded-full transition-all ${activeTab === 'analytics' ? 'bg-sky-50 text-[#6BAEE0]' : 'text-slate-400'}`}><BarChart3 size={24} /></button>
+        </nav>
+      </div>
 
       {activeModalRecipe && (
         <RecipeModal
@@ -180,9 +185,7 @@ function AppContent({ inventory }) {
       {isCookingMode && activeModalRecipe && (
         <CookingMode
           steps={getStaticRecipeSteps(activeModalRecipe)}
-          onClose={() => {
-            setIsCookingMode(false);
-          }}
+          onClose={() => setIsCookingMode(false)}
         />
       )}
 

@@ -103,18 +103,33 @@ export const isRecipeEgg = (recipe) => {
   return (recipe.cleanedIngredients || []).some((ing) => /(egg|eggs)/.test(ing));
 };
 
+const cuisineMatch = (recipe, ...areas) => {
+  const c = (recipe.cuisine || '').toLowerCase();
+  return areas.includes(c);
+};
+
 export const matchesRecipeFilter = (recipe, filter) => {
   switch (filter) {
     case 'vegetarian': return !isRecipeMeat(recipe) && !isRecipeFish(recipe);
     case 'vegan': return isRecipeVegan(recipe);
-    case 'breakfast': return recipeCategoryMatches(recipe, ['breakfast', 'morning', 'brunch']);
-    case 'lunch': return recipeCategoryMatches(recipe, ['lunch', 'sandwich', 'salad', 'bowl']);
-    case 'dinner': return recipeCategoryMatches(recipe, ['dinner', 'supper', 'main', 'casserole', 'stew', 'pasta']);
-    case 'dessert': return recipeCategoryMatches(recipe, ['dessert', 'cake', 'pie', 'pudding', 'sweet', 'custard', 'ice cream', 'brownie']);
-    case 'snack': return recipeCategoryMatches(recipe, ['snack', 'finger', 'appetizer', 'dip', 'nibble', 'side']);
+    case 'breakfast': return recipeCategoryMatches(recipe, ['breakfast', 'morning', 'brunch', 'pancake', 'waffle', 'oat', 'cereal', 'muffin', 'toast', 'smoothie bowl']);
+    case 'lunch': return recipeCategoryMatches(recipe, ['lunch', 'sandwich', 'salad', 'bowl', 'soup', 'wrap', 'light meal', 'starter', 'side']);
+    case 'dinner': return recipeCategoryMatches(recipe, ['dinner', 'supper', 'main', 'casserole', 'stew', 'pasta', 'beef', 'chicken', 'lamb', 'pork', 'seafood', 'biryani', 'curry', 'roast', 'baked', 'goat', 'miscellaneous']);
+    case 'dessert': return recipeCategoryMatches(recipe, ['dessert', 'cake', 'pie', 'pudding', 'sweet', 'custard', 'ice cream', 'brownie', 'cookie', 'biscuit', 'tart', 'pastry', 'crepe', 'cheesecake']);
+    case 'snack': return recipeCategoryMatches(recipe, ['snack', 'finger', 'appetizer', 'dip', 'nibble', 'side', 'starter', 'bread', 'fritter', 'antipasto']);
     case 'meat': return isRecipeMeat(recipe);
     case 'fish': return isRecipeFish(recipe);
     case 'egg': return isRecipeEgg(recipe);
+    // Cuisine filters
+    case 'indian': return cuisineMatch(recipe, 'indian');
+    case 'chinese': return cuisineMatch(recipe, 'chinese');
+    case 'mexican': return cuisineMatch(recipe, 'mexican');
+    case 'japanese': return cuisineMatch(recipe, 'japanese');
+    case 'korean': return cuisineMatch(recipe, 'korean') || recipeCategoryMatches(recipe, ['kimchi', 'bibimbap', 'japchae', 'bulgogi', 'tteok']);
+    case 'jamaican': return cuisineMatch(recipe, 'jamaican');
+    case 'latin': return cuisineMatch(recipe, 'mexican', 'spanish', 'portuguese', 'american');
+    case 'african': return cuisineMatch(recipe, 'kenyan', 'moroccan', 'egyptian', 'tunisian');
+    case 'mediterranean': return cuisineMatch(recipe, 'greek', 'italian', 'turkish', 'spanish', 'french', 'portuguese', 'moroccan');
     default: return true;
   }
 };

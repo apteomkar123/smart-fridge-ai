@@ -149,7 +149,8 @@ export const useInventory = (user, household) => {
         item_name: cleanIngredientLocally(row.item_name),
         expiry_date: row.expiry_date,
         price: row.price || 0,
-        household_id: row.household_id || null
+        household_id: row.household_id || null,
+        nutrition: null
       })).filter(item => item.raw_name);
       setFridge(normalizedFridge);
       calculateMacroMetrics(normalizedFridge.map(f => f.item_name));
@@ -173,20 +174,28 @@ export const useInventory = (user, household) => {
     fetchAppData();
   }, [fetchAppData]);
 
-  const handleAddManualItem = useCallback(async (itemName, targetHouseholdId = null) => {
+  const handleAddManualItem = useCallback(async (itemName, targetHouseholdId = null, extraData = {}) => {
     if (!itemName || !itemName.trim() || !user) return;
 
     const sanitized = await resolveSanitizedTokenOnline(itemName);
     if (!sanitized) return;
 
     const tempId = `temp-${Date.now()}`;
-    setFridge(prev => [...prev, { id: tempId, raw_name: itemName, item_name: sanitized, household_id: targetHouseholdId }]);
+    setFridge(prev => [...prev, {
+      id: tempId,
+      raw_name: itemName,
+      item_name: sanitized,
+      household_id: targetHouseholdId,
+      nutrition: extraData.nutrition || null,
+      price: extraData.price || 0
+    }]);
     triggerHaptic(50);
 
     const newItem = {
       item_name: sanitized,
       user_id: user.id,
-      household_id: targetHouseholdId
+      household_id: targetHouseholdId,
+      price: extraData.price || 0
     };
 
     const savedData = await performMutation('fridge_inventory', 'INSERT', newItem);
@@ -244,6 +253,7 @@ export const useInventory = (user, household) => {
   }, [performMutation]);
 
   const handleBarcodeLookup = useCallback(async (barcode) => {
+    if (!barcode) return;
     setBarcodeLoading(true);
     setBarcodeResult('');
     try {
@@ -252,14 +262,36 @@ export const useInventory = (user, household) => {
       const data = await response.json();
       if (data?.status === 1 && data.product) {
         const name = data.product.product_name || data.product.brands || '';
+
+        // Extract nutrition per 100g
+        const nm = data.product.nutriments || {};
+        const kcal = Math.round(nm['energy-kcal_100g'] || (nm['energy_100g'] || 0) / 4.184);
+        const nutrition = kcal > 0 ? {
+          kcal,
+          protein: Math.round((nm['proteins_100g'] || 0) * 10) / 10,
+          carbs: Math.round((nm['carbohydrates_100g'] || 0) * 10) / 10,
+          fat: Math.round((nm['fat_100g'] || 0) * 10) / 10,
+        } : null;
+
+        // Try Open Prices API for price
+        let price = 0;
+        try {
+          const priceRes = await fetch(`https://prices.openfoodfacts.org/api/v1/prices?product_code=${barcode}&order_by=-date&size=1`);
+          if (priceRes.ok) {
+            const priceData = await priceRes.json();
+            if (priceData.items && priceData.items.length > 0) price = priceData.items[0].price || 0;
+          }
+        } catch (_) {}
+
         if (name) {
-          await handleAddManualItem(name);
-          setBarcodeResult(`Added: ${name}`);
+          await handleAddManualItem(name, null, { nutrition, price });
+          const nutritionText = nutrition ? ` · ${nutrition.kcal} kcal/100g` : '';
+          const priceText = price > 0 ? ` · $${Number(price).toFixed(2)}` : '';
+          setBarcodeResult(`Added: ${name}${nutritionText}${priceText}`);
           setTimeout(() => setBarcodeResult(''), 8000);
           try { await new Audio('/sounds/success.mp3').play(); } catch (e) {}
           triggerHaptic(100);
           setBarcodeInput('');
-          setIsScanningBarcode(false);
         } else {
           setBarcodeResult('Product found but has no name');
           setTimeout(() => setBarcodeResult(''), 8000);
@@ -289,7 +321,8 @@ export const useInventory = (user, household) => {
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         const base64Data = canvas.toDataURL('image/jpeg', 0.75);
 
-        await put(OBJECT_STORES.RECEIPT_IMAGES, { id: `receipt-${Date.now()}`, imageData: base64Data, timestamp: Date.now() });
+        // Cache the image for offline reference — fire and forget, never block the scan
+        put(OBJECT_STORES.RECEIPT_IMAGES, { id: `receipt-${Date.now()}`, imageData: base64Data, timestamp: Date.now() }).catch(() => {});
 
         const response = await fetch('/.netlify/functions/scan-receipt', {
           method: 'POST',
