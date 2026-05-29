@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChefHat, Camera, Star, Trash2, Check, Lock, Globe, ChevronDown, Clock, User } from 'lucide-react';
+import { X, ChefHat, Camera, Star, Trash2, Check, Lock, Globe, ChevronDown, Clock, User, Wand2, Loader2 } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
 
-function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete, onOpenRecipe, onTogglePrivacy }) {
+function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete, onOpenRecipe, onTogglePrivacy, onRemix }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(entry.notes || '');
+  const [remixing, setRemixing] = useState(false);
   const fileRef = useRef(null);
 
   const saveNotes = () => {
@@ -189,6 +190,14 @@ function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePh
         >
           <Star size={15} /> View Full Recipe
         </button>
+        <button
+          onClick={() => { setRemixing(true); onRemix(entry).finally(() => setRemixing(false)); }}
+          disabled={remixing}
+          className="w-full bg-violet-50 hover:bg-violet-100 border border-violet-200 active:scale-[0.98] text-violet-600 font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+        >
+          {remixing ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
+          {remixing ? 'Generating remix…' : 'Remix Leftovers'}
+        </button>
         <div className="flex gap-2">
           <button
             onClick={() => fileRef.current?.click()}
@@ -235,6 +244,34 @@ export default function ChefHistory() {
   const handleDelete = (id) => persist(history.filter(e => e.id !== id));
   const handleTogglePrivacy = (id) => persist(history.map(e => e.id === id ? { ...e, isPrivate: !e.isPrivate } : e));
 
+  const handleRemix = async (entry) => {
+    const ings = (entry.ingredients || []).slice(0, 8).join(', ');
+    try {
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customPrompt: `Create a creative new recipe that remixes leftover ingredients from a "${entry.recipeName}" dish. Leftover ingredients available: ${ings}. Make it a DIFFERENT dish that creatively repurposes these leftovers. Return ONLY valid JSON: {"name":"...","meal_type":"...","cuisine":"...","ingredients":["..."],"steps":["..."]}`,
+          directMode: true,
+        }),
+      });
+      const text = await res.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const data = JSON.parse(cleaned);
+      setActiveModalRecipe({
+        id: `remix-${Date.now()}`,
+        name: data.name || `${entry.recipeName} Remix`,
+        meal_type: data.meal_type || entry.meal_type || 'Main',
+        cuisine: data.cuisine || '',
+        ingredients: data.ingredients || [],
+        cleanedIngredients: data.ingredients || [],
+        steps: data.steps || [],
+      });
+    } catch {
+      alert('Could not generate a remix. Please try again.');
+    }
+  };
+
   const handleOpenRecipe = (entry) => {
     const found = masterRecipes.find(r => String(r.id) === String(entry.recipeId));
     setActiveModalRecipe(found || {
@@ -276,6 +313,7 @@ export default function ChefHistory() {
             onDelete={handleDelete}
             onOpenRecipe={handleOpenRecipe}
             onTogglePrivacy={handleTogglePrivacy}
+            onRemix={handleRemix}
           />
         ))}
       </div>

@@ -4,8 +4,17 @@ import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
 import SearchWithHistory from './SearchWithHistory';
 
+const MOODS = [
+  { key: 'tired',       label: '😴 Tired',        keywords: ['soup', 'pasta', 'oatmeal', 'rice', 'noodle', 'comfort', 'warm', 'broth', 'porridge'] },
+  { key: 'postworkout', label: '💪 Post-Workout',  keywords: ['chicken', 'egg', 'salmon', 'lentil', 'bean', 'protein', 'quinoa', 'greek', 'tofu', 'steak'] },
+  { key: 'celebratory', label: '🎉 Celebratory',   keywords: ['roast', 'lobster', 'pasta', 'cake', 'tart', 'risotto', 'steak', 'prawn', 'fancy', 'feast'] },
+  { key: 'stressed',    label: '🧘 Stressed',       keywords: ['salad', 'smoothie', 'avocado', 'green', 'light', 'fresh', 'detox', 'fruit', 'veggie', 'bowl'] },
+  { key: 'adventurous', label: '🌍 Adventurous',   keywords: ['indian', 'thai', 'korean', 'ethiopian', 'moroccan', 'peruvian', 'vietnamese', 'jamaican', 'fusion', 'spicy'] },
+];
+
 export default function RecipeExplorer() {
   const [shareMenuId, setShareMenuId] = useState(null);
+  const [selectedMood, setSelectedMood] = useState(null);
   const shareMenuRef = useRef(null);
   const { households } = useUser();
 
@@ -67,6 +76,18 @@ export default function RecipeExplorer() {
     [savedRecipes]
   );
 
+  // Apply mood boost: recipes matching mood keywords float to top
+  const moodFilteredRecipes = useMemo(() => {
+    if (!selectedMood) return recipes;
+    const mood = MOODS.find(m => m.key === selectedMood);
+    if (!mood) return recipes;
+    const score = (r) => {
+      const text = `${r.name} ${r.cuisine || ''} ${(r.cleanedIngredients || []).join(' ')}`.toLowerCase();
+      return mood.keywords.filter(k => text.includes(k)).length;
+    };
+    return [...recipes].sort((a, b) => score(b) - score(a));
+  }, [recipes, selectedMood]);
+
   const closeShareMenu = () => setShareMenuId(null);
 
   return (
@@ -104,15 +125,31 @@ export default function RecipeExplorer() {
             </button>
           ))}
         </div>
+
+        {/* Mood Food selector */}
+        <div className="mt-3 pt-3 border-t border-blue-50">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">How are you feeling?</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {MOODS.map(m => (
+              <button
+                key={m.key}
+                onClick={() => setSelectedMood(prev => prev === m.key ? null : m.key)}
+                className={`px-4 py-2 rounded-full text-[10px] font-black whitespace-nowrap transition-all ${selectedMood === m.key ? 'bg-[#6BAEE0] text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-500 border border-blue-50 hover:border-sky-200'}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Recipe Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {recipes.length === 0 && (categoryFilters.length > 0 || activeDietFilters.length > 0 || activeCuisineFilters.length > 0) ? (
+        {moodFilteredRecipes.length === 0 && (categoryFilters.length > 0 || activeDietFilters.length > 0 || activeCuisineFilters.length > 0) ? (
           <div className="col-span-full bg-white/80 border border-blue-100 p-8 rounded-[2rem] text-center text-slate-500">
             No recipes found for this filter.
           </div>
-        ) : recipes.slice(0, 48).map((recipe) => (
+        ) : moodFilteredRecipes.slice(0, 48).map((recipe) => (
           <div key={recipe.id} className="bg-white/80 backdrop-blur-md border border-white/40 p-5 rounded-[2rem] shadow-lg shadow-blue-900/5 group hover:scale-[1.02] transition-all cursor-pointer" onClick={() => onOpenRecipe(recipe)}>
             <div className="flex justify-between items-start gap-4">
               <div className="flex-1">

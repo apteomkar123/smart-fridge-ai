@@ -107,7 +107,7 @@ export const locallyAdaptRecipe = (recipe, targetDiet) => {
 
   // Extract the leading quantity/measurement from an ingredient string
   const _extractQty = (s) => {
-    const m = s.match(/^([\d\/\.\s\-½⅓¼¾⅛]+(?:cup|cups|tbsp|tsp|oz|g|kg|lb|lbs|ml|l|piece|pieces|slice|slices|bunch|clove|cloves|can|jar|head|sprig|sprigs|\s)*)/i);
+    const m = s.match(/^([\d\/\.\s\-½⅓¼¾⅛]+(?:cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|g|kg|lb|lbs|mls?|l|piece|pieces|slice|slices|bunch|cloves?|can|jar|head|sprigs?|\s)*)/i);
     return m ? m[0].trimEnd() : '';
   };
 
@@ -163,9 +163,9 @@ export const cleanIngredientLocally = (rawName) => {
   name = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   name = name.replace(/[\u2013\u2014•]/g, ' ');
   name = name.replace(/\d+/g, ' ');
-  name = name.replace(/\b(?:organic|fresh|large|small|medium|extra|reduced fat|low fat|low-sodium|low sodium|unsalted|sliced|diced|chopped|shredded|minced|ground|boneless|skinless|prepared|peeled|packaged|package|pack|can|canned|jar|bottle|tube|stick|slice|pieces|piece|cup|cups|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp|grams|gram|g|kg|pounds|pound|lb|lbs|oz|ounces|fluid|fl oz|ml|ltr|liter|litre|pkg|ct|count)\b/g, ' ');
+  name = name.replace(/\b(?:organic|fresh|large|small|medium|extra|reduced fat|low fat|low-sodium|low sodium|unsalted|sliced|diced|chopped|shredded|minced|ground|boneless|skinless|prepared|peeled|packaged|package|pack|can|canned|jar|bottle|tube|stick|slice|pieces|piece|cups?|tablespoons?|tbsps?|teaspoons?|tsps?|grams?|g|kg|pounds?|lb|lbs|oz|ounces?|fluid|fl oz|mls?|ltrs?|liters?|litres?|pkg|ct|count)\b/g, ' ');
   // Strip any leading unit words that may remain after digit removal (e.g. "tbsp olive oil")
-  name = name.replace(/^(?:tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons|cup|cups|oz|g|kg|lb|lbs|ml|fl)\s+/, '');
+  name = name.replace(/^(?:tbsps?|tsps?|tablespoons?|teaspoons?|cups?|oz|ounces?|g|kg|lb|lbs|mls?|fl)\s+/, '');
   name = name.replace(/[^a-z0-9\s]/g, ' ');
   name = name.replace(/\s+/g, ' ').trim();
   return name;
@@ -179,9 +179,9 @@ export const normalizeIngredientTokens = (value) => {
 export const formatIngredientMeasurement = (ingredientString, multiplier) => {
   const lower = String(ingredientString).toLowerCase();
   const nameOnly = ingredientString.replace(/^[0-9\/\.\s\-½⅓¼¾⅛]+/, '').trim();
-  if (/\b(cup|cups|ml|l|liter|litre|milk|yogurt|broth|water)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
-  if (/\b(tbsp|tablespoon|tablespoons|oil|sauce|vinegar|soy)\b/.test(lower)) return `${1 * multiplier} tbsp ${nameOnly}`;
-  if (/\b(tsp|teaspoon|teaspoons|garlic|ginger|salt|pepper|spice|herb)\b/.test(lower)) return `${0.5 * multiplier} tsp ${nameOnly}`;
+  if (/\b(cups?|mls?|l|liter|litres?|milk|yogurt|broth|water)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
+  if (/\b(tbsps?|tablespoons?|oil|sauce|vinegar|soy)\b/.test(lower)) return `${1 * multiplier} tbsp ${nameOnly}`;
+  if (/\b(tsps?|teaspoons?|garlic|ginger|salt|pepper|spice|herb)\b/.test(lower)) return `${0.5 * multiplier} tsp ${nameOnly}`;
   if (/\b(flour|rice|lentil|sugar|pasta|beans)\b/.test(lower)) return `${1 * multiplier} cup ${nameOnly}`;
   if (/\b(onion|tomato|potato|carrot|apple)\b/.test(lower)) return `${1 * multiplier} medium ${nameOnly}`;
   if (/\b(paneer|tofu|cheese|yogurt)\b/.test(lower)) {

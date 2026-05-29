@@ -330,3 +330,16 @@ BUGS:
 FEATURES:
 - Recipe modal header (title, star, share, X) is now sticky — locks at top as user scrolls through ingredients and steps
 - Nav "Hungry" text now uses same Pacifico logo-text font as the app header
+
+IMPLEMENTED (session 2026-05-29 session 5):
+BUGS:
+- Personal shopper improved with 13+ stores and more specific aisle location data; full grocery store API integration (Kroger, Target) requires API keys to be configured
+- Plural units (cups, mls, tbsps, tsps, ounces, grams) now recognized throughout ingredient parsing in recipeUtils.js
+
+FEATURES:
+- Leftover Remix Engine: "Remix Leftovers" AI button on each expanded Chef History card generates a new recipe from the leftover ingredients
+- Mood Food: "How are you feeling?" mood selector (Tired, Post-Workout, Celebratory, Stressed, Adventurous) in Recipe Explorer boosts matching recipes to the top
+- Settle Up: Household tab shows per-member cost split from shared shopping list with Venmo deep-link and Splitwise link
+- Taste Profile Heatmap: New "Taste" analytics tab with cuisine bar chart, mastery badges, meal-type breakdown, and cook count stats
+- Virtual Sous Chef: Cooking Mode now accepts ingredient list prop; voice commands "I don't have [X]" and "substitute for [X]" trigger real-time AI substitution suggestions; "Ingredients" command shows ingredient panel
+- Features deferred (require external APIs or native iOS): Smart Price-Drop Watch (requires Kroger/Target API), Interactive Potluck Households (requires schema migration), Community Pantry Swap (requires geolocation + Supabase)

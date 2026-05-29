@@ -426,6 +426,7 @@ function AppContent({ inventory }) {
       {isCookingMode && activeModalRecipe && (
         <CookingMode
           steps={getStaticRecipeSteps(activeModalRecipe)}
+          ingredients={activeModalRecipe.ingredients || []}
           onClose={() => setIsCookingMode(false)}
         />
       )}

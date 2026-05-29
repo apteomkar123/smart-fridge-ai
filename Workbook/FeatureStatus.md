@@ -25,6 +25,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Recipes
 - Recipe modal header (title, star, share, X) is sticky — stays locked at top as user scrolls through ingredients and steps
+- **Mood Food** — "How are you feeling?" mood selector (Tired / Post-Workout / Celebratory / Stressed / Adventurous) boosts matching recipes to the top of the explorer
 - Recipe explorer powered by MealDB + Spoonacular + static recipes, sorted by pantry match %
 - Search by name, ingredient, or filter keyword
 - Filter by meal type, diet, and cuisine
@@ -44,6 +45,10 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Cooking Mode — full-screen step-by-step view
 - Mark as Cooked (updates pantry)
 
+### Personal Shopper
+- Store-specific aisle locations for 13+ stores (Trader Joe's, Whole Foods, Walmart, Target, Kroger, Wegmans, Publix, Sprouts, HEB, Costco, Aldi, Harris Teeter, Food Lion, Sam's Club)
+- Full Kroger/Target grocery store API integration requires API keys (planned)
+
 ### Shopping List
 - Add items manually
 - Items auto-grouped by aisle (Produce, Dairy, Meat, Bakery, etc.)
@@ -54,6 +59,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Personal Shopper mode — distraction-free shopping view
 
 ### Chef History
+- **Leftover Remix Engine** — "Remix Leftovers" button on each expanded history card; AI generates a new recipe repurposing the leftover ingredients from that cook
 - Automatically logged when a recipe is marked as Cooked
 - Collapsed card shows photo thumbnail, recipe name, date, meal type, notes preview
 - Tap card to expand into a full chef history detail view — does NOT open the recipe modal
@@ -66,6 +72,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Recipe description saved alongside history entry when available
 
 ### Analytics
+- **Taste Profile Heatmap** — new "Taste" tab in Analytics showing cuisines explored (bar chart + mastery badge), meal type breakdown, and gamification messages (World Traveler, Master Chef, etc.)
 - Nutrition overview — protein / carbs / fat breakdown with distribution bars
 - AI Nutrition Coach — pick a macro goal, get ingredient and recipe suggestions
 - Eco Score — tracks expiring/expired items and waste risk
@@ -76,6 +83,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Save / restore meal plans (persisted to localStorage + Supabase backup)
 
 ### Household
+- **Settle Up** — shows per-member cost split from household shopping list; Venmo deep-link and Splitwise link per member
 - Create a household with a generated invite code
 - Join a household via invite code
 - Switch between multiple households
@@ -103,6 +111,12 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Default shopping list destination (personal or a specific household)
 - Default saved recipes destination (personal or a specific household)
 - Sign out
+
+### Cooking Mode (Virtual Sous Chef)
+- Voice navigation: "Next", "Back", "Repeat", "Stop", "Ingredients"
+- **Voice substitution**: say "I don't have [ingredient]" or "substitute for [X]" → AI fetches a real-time substitution suggestion
+- Ingredient panel toggle (tap list icon or say "Ingredients") shows full ingredient list during cooking
+- Mic pulses red when active; screen stay-awake via Wake Lock API
 
 ### Infrastructure
 - Progressive Web App (PWA) — installable on home screen, offline support via service worker
@@ -139,4 +153,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29 (session 4)*
+*Last updated: 2026-05-29 (session 5)*

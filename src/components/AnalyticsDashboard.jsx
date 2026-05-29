@@ -188,6 +188,12 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         >
           <DollarSign size={13} /> Spending
         </button>
+        <button
+          onClick={() => setDashTab('taste')}
+          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${dashTab === 'taste' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          🌍 Taste
+        </button>
       </div>
 
       {dashTab === 'nutrition' && <>
@@ -591,6 +597,95 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         )}
       </section>
       </>}
+
+      {dashTab === 'taste' && (() => {
+        // Build cuisine + meal-type stats from chef history
+        const history = (() => { try { return JSON.parse(localStorage.getItem('hungry_chef_history') || '[]'); } catch { return []; } })();
+        const cuisineCounts = {};
+        const mealTypeCounts = {};
+        history.forEach(e => {
+          const c = (e.cuisine || '').trim();
+          const m = (e.meal_type || '').trim();
+          if (c) cuisineCounts[c] = (cuisineCounts[c] || 0) + 1;
+          if (m) mealTypeCounts[m] = (mealTypeCounts[m] || 0) + 1;
+        });
+        const topCuisines = Object.entries(cuisineCounts).sort((a, b) => b[1] - a[1]);
+        const topMealTypes = Object.entries(mealTypeCounts).sort((a, b) => b[1] - a[1]);
+        const maxCuisine = topCuisines[0]?.[1] || 1;
+        const CUISINE_EMOJIS = { Indian: '🇮🇳', Chinese: '🇨🇳', Mexican: '🇲🇽', Japanese: '🇯🇵', Korean: '🇰🇷', Italian: '🇮🇹', French: '🇫🇷', American: '🇺🇸', Thai: '🇹🇭', Mediterranean: '🫒', African: '🌍', Caribbean: '🌴', Vietnamese: '🇻🇳', Greek: '🇬🇷', Spanish: '🇪🇸' };
+        const masteryMsg = (count) => count >= 10 ? '🏆 Master Chef' : count >= 5 ? '⭐ Expert' : count >= 3 ? '👨‍🍳 Explorer' : '🌱 Beginner';
+        return (
+          <div className="space-y-5">
+            <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+              <h3 className="text-[14px] font-bold text-slate-400 mb-5 flex items-center gap-2">🌍 Taste Profile</h3>
+              {history.length === 0 ? (
+                <p className="text-xs text-slate-300 italic text-center py-4">Cook some recipes to build your taste profile!</p>
+              ) : (
+                <div className="space-y-5">
+                  {topCuisines.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Cuisines Explored</p>
+                      <div className="space-y-3">
+                        {topCuisines.map(([cuisine, count]) => (
+                          <div key={cuisine}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-bold text-slate-600">{CUISINE_EMOJIS[cuisine] || '🍽️'} {cuisine}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-black text-slate-400">{masteryMsg(count)}</span>
+                                <span className="text-[10px] font-black text-[#6BAEE0]">{count}x</span>
+                              </div>
+                            </div>
+                            <div className="h-2 bg-blue-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#6BAEE0] rounded-full transition-all duration-700" style={{ width: `${Math.round((count / maxCuisine) * 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {topMealTypes.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Meal Types</p>
+                      <div className="flex flex-wrap gap-2">
+                        {topMealTypes.map(([type, count]) => (
+                          <span key={type} className="bg-sky-50 border border-sky-100 text-[#6BAEE0] px-3 py-1.5 rounded-full text-[10px] font-black">
+                            {type} <span className="opacity-60">×{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+                    <p className="text-xs font-black text-amber-700">
+                      {topCuisines.length === 0
+                        ? '🌱 Start cooking to unlock your taste profile!'
+                        : topCuisines.length >= 5
+                          ? `🌍 World Traveler! You've explored ${topCuisines.length} cuisines. Keep going!`
+                          : topCuisines[0][1] >= 5
+                            ? `🏆 ${topCuisines[0][0]} master! Try a new cuisine to expand your palate.`
+                            : `👨‍🍳 You've explored ${topCuisines.length} cuisine${topCuisines.length > 1 ? 's' : ''}. Cook more to unlock mastery badges!`}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-blue-50 rounded-2xl p-3">
+                      <p className="text-xl font-black text-[#6BAEE0]">{history.length}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">Dishes Cooked</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-2xl p-3">
+                      <p className="text-xl font-black text-emerald-500">{topCuisines.length}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">Cuisines</p>
+                    </div>
+                    <div className="bg-violet-50 rounded-2xl p-3">
+                      <p className="text-xl font-black text-violet-500">{topMealTypes.length}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">Meal Types</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        );
+      })()}
 
     </div>
   );

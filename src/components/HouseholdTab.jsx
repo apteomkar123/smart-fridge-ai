@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck } from 'lucide-react';
+import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
@@ -250,6 +250,55 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
           </div>
         )}
       </section>
+
+      {/* Settle Up */}
+      {members.length > 1 && hhShoppingItems.length > 0 && (
+        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+          <h2 className="text-[14px] font-bold text-slate-400 mb-4 flex items-center gap-2"><CreditCard size={15} /> Settle Up</h2>
+          {(() => {
+            const totalSpend = hhShoppingItems.reduce((s, i) => s + (i.price || 0), 0);
+            const perPerson = members.length > 0 ? totalSpend / members.length : 0;
+            const note = encodeURIComponent(`Hungry App: Grocery Split — ${selectedHH?.name || 'Household'}`);
+            const amount = perPerson.toFixed(2);
+            const venmoUrl = `https://venmo.com/?txn=charge&amount=${amount}&note=${note}`;
+            const splitwiseUrl = `https://secure.splitwise.com/`;
+            return (
+              <div className="space-y-3">
+                <div className="bg-sky-50 border border-sky-100 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Cost Breakdown</p>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-slate-500">Total list spend</span>
+                    <span className="text-sm font-black text-slate-700">${totalSpend.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">Per person ({members.length} members)</span>
+                    <span className="text-sm font-black text-[#6BAEE0]">${perPerson.toFixed(2)}</span>
+                  </div>
+                </div>
+                {members.filter(m => m.id !== user?.id).map(m => (
+                  <div key={m.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6BAEE0] to-[#4d96d1] flex items-center justify-center text-white font-black text-sm shrink-0">
+                      {(m.display_name || '?')[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-700 truncate">{m.display_name || 'Member'}</p>
+                      <p className="text-[10px] text-slate-400">owes ${perPerson.toFixed(2)}</p>
+                    </div>
+                    <a href={venmoUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] font-black text-white bg-[#3D95CE] px-2.5 py-1.5 rounded-xl hover:opacity-90 transition-all shrink-0">
+                      <ExternalLink size={11} /> Venmo
+                    </a>
+                  </div>
+                ))}
+                <a href={splitwiseUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full text-[11px] font-black text-slate-400 hover:text-[#6BAEE0] border border-slate-100 hover:border-sky-200 rounded-2xl py-2.5 transition-all">
+                  <ExternalLink size={12} /> Open Splitwise
+                </a>
+              </div>
+            );
+          })()}
+        </section>
+      )}
     </div>
   );
 }

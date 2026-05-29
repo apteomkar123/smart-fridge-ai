@@ -1,27 +1,34 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Mic, MicOff, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
+import { X, Mic, MicOff, ChevronLeft, ChevronRight, Volume2, List, RefreshCw, Loader2 } from 'lucide-react';
 
-export default function CookingMode({ steps, onClose }) {
+export default function CookingMode({ steps, ingredients, onClose }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
+  const [showIngredients, setShowIngredients] = useState(false);
+  const [substituteMsg, setSubstituteMsg] = useState(null);
+  const [fetchingSub, setFetchingSub] = useState(false);
 
   const recognitionRef = useRef(null);
   const utteranceRef = useRef(null);
   const wakeLockRef = useRef(null);
-  const isListeningRef = useRef(false); // ref to avoid stale closure in recognition.onend
+  const isListeningRef = useRef(false);
   const isMounted = useRef(true);
-  const currentStepRef = useRef(0); // ref so voice callbacks always read current step
+  const currentStepRef = useRef(0);
 
-  // Keep refs in sync with state
   useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
   useEffect(() => { currentStepRef.current = currentStepIndex; }, [currentStepIndex]);
 
-  const readStep = useCallback((index) => {
-    if (!utteranceRef.current || !steps[index]) return;
+  const speak = useCallback((text) => {
+    if (!utteranceRef.current) return;
     window.speechSynthesis.cancel();
-    utteranceRef.current.text = `Step ${index + 1}: ${steps[index]}`;
+    utteranceRef.current.text = text;
     window.speechSynthesis.speak(utteranceRef.current);
-  }, [steps]);
+  }, []);
+
+  const readStep = useCallback((index) => {
+    if (!steps[index]) return;
+    speak(`Step ${index + 1}: ${steps[index]}`);
+  }, [steps, speak]);
 
   const goToStep = useCallback((index) => {
     const next = Math.max(0, Math.min(index, steps.length - 1));
@@ -36,13 +43,34 @@ export default function CookingMode({ steps, onClose }) {
         wakeLockRef.current = lock;
       }).catch(() => {});
     }
-    return () => {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
-      }
-    };
+    return () => { wakeLockRef.current?.release().catch(() => {}); };
   }, []);
+
+  // Fetch substitution suggestion from AI
+  const fetchSubstitute = useCallback(async (ingredientMentioned) => {
+    setFetchingSub(true);
+    setSubstituteMsg(null);
+    try {
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customPrompt: `The user is cooking and says they don't have "${ingredientMentioned}". Suggest a quick, practical substitution from common pantry items. Keep your answer under 20 words.`,
+          directMode: true,
+        }),
+      });
+      const text = await res.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let msg = cleaned;
+      try { msg = JSON.parse(cleaned)?.answer || cleaned; } catch {}
+      setSubstituteMsg(msg);
+      speak(`Substitution for ${ingredientMentioned}: ${msg}`);
+    } catch {
+      setSubstituteMsg('Could not find a substitution. Try using a similar ingredient.');
+    } finally {
+      setFetchingSub(false);
+    }
+  }, [speak]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -58,20 +86,36 @@ export default function CookingMode({ steps, onClose }) {
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript.toLowerCase();
+
         if (transcript.includes('next')) {
           goToStep(currentStepRef.current + 1);
         } else if (transcript.includes('back') || transcript.includes('previous')) {
           goToStep(currentStepRef.current - 1);
-        } else if (transcript.includes('repeat') || transcript.includes('read')) {
+        } else if (transcript.includes('repeat') || transcript.includes('read') || transcript.includes('again')) {
           readStep(currentStepRef.current);
-        } else if (transcript.includes('stop') || transcript.includes('exit')) {
+        } else if (transcript.includes('stop') || transcript.includes('exit') || transcript.includes('close')) {
           onClose();
+        } else if (transcript.includes('ingredients') || transcript.includes('what do i need')) {
+          setShowIngredients(true);
+          speak('Showing your ingredient list.');
+        } else if (transcript.includes("don't have") || transcript.includes("do not have") || transcript.includes("out of") || transcript.includes("no ")) {
+          // Extract ingredient name after "don't have" / "out of"
+          const patterns = [/(?:don't have|do not have|out of|no )\s+(?:any\s+)?(.+)/];
+          for (const p of patterns) {
+            const m = transcript.match(p);
+            if (m && m[1]) {
+              fetchSubstitute(m[1].trim());
+              break;
+            }
+          }
+        } else if (transcript.includes('substitute') || transcript.includes('replace') || transcript.includes('swap')) {
+          // "substitute for garlic" / "replace the butter"
+          const m = transcript.match(/(?:substitute|replace|swap)(?:\s+(?:for|the))?\s+(.+)/);
+          if (m?.[1]) fetchSubstitute(m[1].trim());
         }
       };
 
       recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        // Don't stop listening on transient errors (no-speech, etc.)
         if (event.error === 'aborted') return;
         if (!isMounted.current) return;
         setIsListening(false);
@@ -79,7 +123,6 @@ export default function CookingMode({ steps, onClose }) {
       };
 
       recognition.onend = () => {
-        // Restart automatically if mic is still supposed to be on
         if (isListeningRef.current && isMounted.current) {
           try { recognition.start(); } catch (e) {}
         }
@@ -90,14 +133,10 @@ export default function CookingMode({ steps, onClose }) {
 
     return () => {
       isMounted.current = false;
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
+      try { recognitionRef.current?.stop(); } catch (e) {}
       window.speechSynthesis.cancel();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // goToStep/readStep intentionally omitted — they are stable via useCallback
-  // and we only want to initialize recognition once
 
   const toggleListening = () => {
     if (!recognitionRef.current) return;
@@ -126,16 +165,59 @@ export default function CookingMode({ steps, onClose }) {
   return (
     <div className="fixed inset-0 bg-blue-900/90 backdrop-blur-xl flex flex-col items-center justify-center p-4 z-[100] text-white">
       <div className="w-full max-w-3xl bg-white/10 rounded-[2.5rem] border border-white/20 shadow-2xl p-6 flex flex-col h-full max-h-[90vh]">
-        <div className="flex justify-between items-center mb-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-white">Cooking Mode</h2>
-          <button onClick={handleClose} className="text-white/70 hover:text-white transition-colors p-2">
-            <X size={28} />
-          </button>
+          <div className="flex items-center gap-2">
+            {ingredients?.length > 0 && (
+              <button
+                onClick={() => setShowIngredients(v => !v)}
+                className={`p-2 rounded-xl transition-colors ${showIngredients ? 'bg-white/30' : 'bg-white/15 hover:bg-white/25'}`}
+                title="Toggle ingredient list"
+              >
+                <List size={20} />
+              </button>
+            )}
+            <button onClick={handleClose} className="text-white/70 hover:text-white transition-colors p-2">
+              <X size={28} />
+            </button>
+          </div>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 overflow-y-auto custom-scrollbar">
+
+        {/* Ingredient panel */}
+        {showIngredients && ingredients?.length > 0 && (
+          <div className="bg-white/10 rounded-2xl border border-white/20 p-4 mb-4 max-h-44 overflow-y-auto">
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Ingredients</p>
+            <div className="space-y-1">
+              {ingredients.map((ing, i) => (
+                <p key={i} className="text-xs text-white/80 font-medium">{ing}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Substitute suggestion */}
+        {(fetchingSub || substituteMsg) && (
+          <div className="bg-amber-400/20 border border-amber-300/30 rounded-2xl px-4 py-3 mb-4 flex items-start gap-2">
+            {fetchingSub
+              ? <Loader2 size={14} className="animate-spin text-amber-300 mt-0.5 shrink-0" />
+              : <RefreshCw size={14} className="text-amber-300 mt-0.5 shrink-0" />}
+            <p className="text-xs text-amber-100 leading-relaxed">{fetchingSub ? 'Finding a substitution…' : substituteMsg}</p>
+            {substituteMsg && !fetchingSub && (
+              <button onClick={() => setSubstituteMsg(null)} className="ml-auto text-white/40 hover:text-white/80 shrink-0">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Step display */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 overflow-y-auto">
           <p className="text-sm font-bold text-white/60 uppercase tracking-widest">Step {currentStepIndex + 1} of {steps.length}</p>
           <p className="text-3xl font-bold leading-relaxed">{steps[currentStepIndex]}</p>
         </div>
+
+        {/* Controls */}
         <div className="flex justify-center items-center gap-4 mt-6">
           <button
             onClick={() => goToStep(currentStepIndex - 1)}
@@ -146,7 +228,7 @@ export default function CookingMode({ steps, onClose }) {
           </button>
           <button
             onClick={toggleListening}
-            className={`p-4 rounded-full ${isListening ? 'bg-red-500' : 'bg-[#6BAEE0]'} text-white shadow-lg transition-all`}
+            className={`p-4 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-[#6BAEE0]'} text-white shadow-lg transition-all`}
           >
             {isListening ? <MicOff size={28} /> : <Mic size={28} />}
           </button>
@@ -161,7 +243,7 @@ export default function CookingMode({ steps, onClose }) {
             <ChevronRight size={24} />
           </button>
         </div>
-        <p className="text-xs text-white/50 text-center mt-4">Say "Next", "Back", "Repeat", or "Stop"</p>
+        <p className="text-xs text-white/50 text-center mt-3">Say "Next", "Back", "Repeat", "I don't have [ingredient]", or "Ingredients"</p>
       </div>
     </div>
   );
