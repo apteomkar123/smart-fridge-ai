@@ -68,12 +68,13 @@ export default function PersonalShopper({ shoppingList, householdList = [], onCl
   const [checked, setChecked] = useState(new Set());
 
   const activeList = useMemo(() => {
-    const personal = (shoppingList || []).filter(i => !i.household_id);
-    const household = householdList || [];
+    const all = shoppingList || [];
+    const personal = all.filter(i => !i.household_id);
+    const hhItems = all.filter(i => !!i.household_id);
     if (listSource === 'personal') return personal;
-    if (listSource === 'household') return household;
-    return [...personal, ...household];
-  }, [shoppingList, householdList, listSource]);
+    if (listSource === 'household') return hhItems;
+    return all;
+  }, [shoppingList, listSource]);
 
   const grouped = useMemo(() => {
     const map = {};

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, Share2, Play, RefreshCw, Plus, Star, Refrigerator, Check, Wand2, Loader2, RotateCcw, Dumbbell, ChefHat } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
-import { parseRecipeIngredientMeasurements, cleanIngredientLocally, estimateNutrition, isRecipeMeat, isRecipeFish, isRecipeVegan, matchesRecipeFilter, locallyAdaptRecipe } from './recipeUtils';
+import { parseRecipeIngredientMeasurements, cleanIngredientLocally, normalizeIngredientTokens, fuzzyTokenMatch, stripIngredientNotes, estimateNutrition, isRecipeMeat, isRecipeFish, isRecipeVegan, matchesRecipeFilter, locallyAdaptRecipe } from './recipeUtils';
 
 // Returns true if pantryQty (count) satisfies the needed amount from a recipe ingredient string
 const _pantryHasEnough = (ingredient, pantryQty) => {
@@ -113,10 +113,18 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
     }
   };
 
+  // Build both an exact set AND a token set for fuzzy matching
   const pantryItemsSet = useMemo(
     () => new Set((fridge || []).map(f => cleanIngredientLocally(f.raw_name || f.item_name || ''))),
     [fridge]
   );
+  const pantryTokenSet = useMemo(
+    () => new Set((fridge || []).flatMap(f => normalizeIngredientTokens(f.raw_name || f.item_name || ''))),
+    [fridge]
+  );
+  const isInPantry = (cleaned) =>
+    pantryItemsSet.has(cleaned) ||
+    normalizeIngredientTokens(cleaned).some(t => fuzzyTokenMatch(t, pantryTokenSet));
 
   const handleAddToPantry = (ing) => {
     const cleaned = cleanIngredientLocally(ing);
@@ -293,7 +301,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
             <div className="space-y-3">
               {(displayRecipe.ingredients || []).map((ing, idx) => {
                 const cleaned = cleanIngredientLocally(ing);
-                const inPantry = pantryItemsSet.has(cleaned);
+                const inPantry = isInPantry(cleaned);
                 // Look up this ingredient's pantry quantity from the fridge list
                 const fridgeItem = inPantry
                   ? (fridge || []).find(f => cleanIngredientLocally(f.raw_name || f.item_name || '') === cleaned)
@@ -320,10 +328,10 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
                           <RefreshCw size={12} className={loadingSub === ing ? 'animate-spin' : ''} />
                         </button>
                         {!addedItems?.has(cleaned) && (
-                          <button onClick={() => onAddIngredient(cleaned)} className="bg-sky-50 text-[#6BAEE0] p-1 rounded-md" title="Add to shopping list"><Plus size={12} /></button>
+                          <button onClick={() => onAddIngredient(cleanIngredientLocally(stripIngredientNotes(ing)))} className="bg-sky-50 text-[#6BAEE0] p-1 rounded-md" title="Add to shopping list"><Plus size={12} /></button>
                         )}
                         {onAddToPantry && (
-                          pantryAdded.has(ing) || inPantry ? (
+                          pantryAdded.has(ing) || isInPantry(cleaned) ? (
                             <span className="bg-emerald-50 text-emerald-400 p-1 rounded-md"><Check size={12} /></span>
                           ) : (
                             <button onClick={() => handleAddToPantry(ing)} className="bg-emerald-50 text-emerald-500 p-1 rounded-md hover:bg-emerald-100 transition-colors" title="Add to pantry"><Refrigerator size={12} /></button>

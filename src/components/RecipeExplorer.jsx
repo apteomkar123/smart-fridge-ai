@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { Search, Filter, Star } from 'lucide-react';
+import { Filter, Star } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
+import SearchWithHistory from './SearchWithHistory';
 
 export default function RecipeExplorer() {
   const {
@@ -50,14 +51,12 @@ export default function RecipeExplorer() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Search & Filter Header */}
       <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-        <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search recipes, ingredients, or filter names (e.g. Breakfast)..."
+        <div className="mb-6">
+          <SearchWithHistory
             value={recipeSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full bg-blue-50/50 border border-blue-100 pl-12 pr-6 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all"
+            onChange={handleSearchChange}
+            placeholder="Search recipes, ingredients, or type a filter…"
+            namespace="recipes"
           />
         </div>
         

@@ -189,6 +189,18 @@ export const formatIngredientMeasurement = (ingredientString, multiplier) => {
   return `${1 * multiplier} each ${nameOnly}`;
 };
 
+// Strip parenthetical notes from ingredient names: "maple syrup (optional)" → "maple syrup"
+export const stripIngredientNotes = (ing) =>
+  String(ing || '')
+    .replace(/\s*\([^)]*\)/g, '')   // remove (anything in parens)
+    .replace(/\s*,?\s*optional\b.*/i, '')  // remove ", optional..." suffix
+    .replace(/\s*,?\s*to taste\b.*/i, '')  // remove ", to taste"
+    .replace(/\s*,?\s*or to taste\b.*/i, '')
+    .trim();
+
+// Cooking-method-only words that should never appear as standalone ingredients after splitting
+const _COOKING_METHOD_ONLY = /^(boiled?|mashed?|fried|baked|grilled?|steamed?|saut[eé]ed?|roasted?|cooked?|drained?|rinsed?|peeled?|sliced?|diced?|chopped?|minced?|grated?|shredded?|beaten?|softened?|melted?|toasted?)(\s+and\s+\w+)?$/i;
+
 const _cleanStep = (s) => String(s || '')
   .replace(/\r\n?/g, '\n')
   .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars
@@ -273,7 +285,7 @@ export const recipeCategoryMatches = (recipe, patterns) => {
 
 // Word-boundary patterns prevent false positives: "graham" won't match "ham", "butternut" won't match "butter"
 const MEAT_PATTERN = /\b(chicken|beef|pork|lamb|turkey|bacon|sausage|ham|veal|duck|venison|mutton|meat|meatball|mincemeat|mince|pepperoni|salami|brisket|chorizo|lard|suet|gelatin)\b/;
-const FISH_PATTERN = /\b(fish|salmon|tuna|shrimp|crab|lobster|anchovies|anchovy|trout|cod|seafood|tilapia|halibut|sardine|prawn|mussel|clam|oyster|scallop|squid|calamari|eel|mackerel|herring|catfish|swordfish|snapper|bass|grouper|haddock|mahi|pollock|carp|kingfish|pomfret|hilsa|bream|perch|plaice|flounder|sole|turbot|monkfish|sea bass|red snapper|barramundi|whitefish|cockle|whelk|abalone|octopus|langoustine|crawfish|crayfish)\b/;
+const FISH_PATTERN = /\b(fishs?|salmons?|tunas?|shrimps?|crabs?|lobsters?|anchovies|anchovy|trouts?|cods?|seafood|tilapias?|halibuts?|sardines?|prawns?|mussels?|clams?|oysters?|scallops?|squids?|calamari|eels?|mackerels?|herrings?|catfish|swordfish|snappers?|bass|groupers?|haddocks?|mahi|pollocks?|carps?|kingfish|pomfret|hilsa|breams?|perch|plaice|flounders?|sole|turbot|monkfish|sea bass|red snapper|barramundi|whitefish|cockles?|whelks?|abalone|octopus|langoustine|crawfish|crayfish|octopi|calamares?|whitebait|sprats?|pilchard|kippers?|roe|caviar|surimi|fishmeal)\b/;
 // Plant milks/creams are excluded from the non-vegan check
 const PLANT_BASE = /\b(oat|coconut|soy|almond|rice|cashew|hemp|macadamia|hazelnut)\b/;
 const NON_VEGAN_PATTERN = /\b(egg|eggs|milk|butter|cheese|cream|yogurt|honey|gelatin|paneer|whey|lard|suet|casein|lactose|rennet)\b/;

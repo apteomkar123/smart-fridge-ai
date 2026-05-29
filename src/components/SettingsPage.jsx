@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Users } from 'lucide-react';
+import { Settings, Users, UserRound, DollarSign, UserPlus } from 'lucide-react';
 import { useUser } from './UserContext';
 import HouseholdSettings from './HouseholdSettings';
 
 const DIETARY_OPTIONS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Kosher', 'Dairy-Free', 'Nut-Free', 'Low-Carb', 'High-Protein'];
 const NUTRITION_GOALS = ['Balanced', 'High Protein', 'Low Carb', 'Low Fat', 'Build Muscle', 'Lose Weight'];
 
-export default function SettingsPage() {
+export default function SettingsPage({ onNavigateFriends }) {
   const {
     userName: profileName,
     userSettings,
     handleUpdateProfileName: onUpdateName,
     handleUpdateSettings,
+    handleUpdatePersonalBudget,
   } = useUser();
 
+  const [tab, setTab] = useState('profile');
   const [displayName, setDisplayName] = useState(profileName || '');
   const [dietary, setDietary] = useState(userSettings?.dietary_restrictions || []);
   const [goal, setGoal] = useState(userSettings?.nutrition_goal || 'Balanced');
@@ -22,6 +24,8 @@ export default function SettingsPage() {
   const [heightFt, setHeightFt] = useState(String(userSettings?.height_ft || ''));
   const [heightIn, setHeightIn] = useState(String(userSettings?.height_in || ''));
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const personalBudget = userSettings?.personal_budget_limit || 0;
 
   useEffect(() => { setDisplayName(profileName || ''); }, [profileName]);
 
@@ -62,6 +66,19 @@ export default function SettingsPage() {
         <h2 className="text-[14px] font-bold text-slate-400">Settings</h2>
       </div>
 
+      {/* Tab switcher */}
+      <div className="bg-white/80 backdrop-blur-lg rounded-[2rem] border border-white/20 shadow-xl shadow-blue-900/5 p-1.5 flex gap-1">
+        <button onClick={() => setTab('profile')}
+          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${tab === 'profile' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+          <UserRound size={13} /> Profile
+        </button>
+        <button onClick={() => setTab('household')}
+          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${tab === 'household' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+          <Users size={13} /> Household
+        </button>
+      </div>
+
+      {tab === 'profile' && <>
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-6">
         {/* Display Name */}
         <div>
@@ -165,12 +182,43 @@ export default function SettingsPage() {
         </button>
       </section>
 
-      {/* ── Household Settings ── */}
-      <div className="flex items-center gap-2 px-2 mt-4">
-        <Users className="text-[#6BAEE0]" size={18} />
-        <h2 className="text-[14px] font-bold text-slate-400">Household Settings</h2>
-      </div>
-      <HouseholdSettings />
+      {/* Personal Monthly Budget */}
+      <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign className="text-[#6BAEE0]" size={16} />
+          <h3 className="text-[13px] font-bold text-slate-400">Personal Monthly Budget</h3>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">$</span>
+            <input
+              type="number" min="0" step="0.01"
+              value={budgetInput || (personalBudget > 0 ? personalBudget.toFixed(2) : '')}
+              onChange={e => setBudgetInput(e.target.value)}
+              placeholder={personalBudget > 0 ? personalBudget.toFixed(2) : 'Not set'}
+              style={{ fontSize: '16px' }}
+              className="w-full bg-blue-50/50 border border-blue-100 pl-7 pr-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none"
+            />
+          </div>
+          <button onClick={() => { if (handleUpdatePersonalBudget) handleUpdatePersonalBudget(budgetInput); setBudgetInput(''); }}
+            className="bg-[#6BAEE0] text-white px-5 py-3 rounded-2xl text-xs font-black shadow-md shadow-blue-100">
+            Save
+          </button>
+        </div>
+      </section>
+
+      {/* Invite Friends */}
+      <button
+        onClick={() => onNavigateFriends?.()}
+        className="w-full flex items-center justify-center gap-2 bg-white/80 backdrop-blur-lg border border-white/20 shadow-xl shadow-blue-900/5 py-4 rounded-[2rem] text-sm font-black text-[#6BAEE0] hover:bg-sky-50 transition-all"
+      >
+        <UserPlus size={18} /> Invite Friends
+      </button>
+      </>}
+
+      {tab === 'household' && (
+        <HouseholdSettings />
+      )}
     </div>
   );
 }

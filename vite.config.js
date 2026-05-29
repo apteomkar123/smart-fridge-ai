@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     port: 5193,
     strictPort: true,
-    host: '127.0.0.1'
+    host: '127.0.0.1',
+    proxy: {
+      '/.netlify/functions': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+      }
+    }
   }
 });

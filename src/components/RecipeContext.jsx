@@ -7,7 +7,8 @@ import {
   fuzzyTokenMatch,
   getStaticRecipeSteps,
   matchesRecipeFilter,
-  toTitleCase
+  toTitleCase,
+  stripIngredientNotes
 } from './recipeUtils';
 import { STATIC_RECIPES } from './staticRecipes';
 
@@ -19,27 +20,30 @@ const MEALDB_CACHE_KEY = 'hungry_mealdb_v7'; // bumped: smarter comma-split with
 const _INGREDIENT_MODIFIERS = /^(boneless|skinless|fresh|dried|frozen|canned|large|small|medium|extra|lean|ground|minced|diced|chopped|sliced|shredded|peeled|halved|quartered|roughly|finely|coarsely|thinly|thickly|packed|heaping|level|softened|beaten|rinsed|drained|trimmed|deveined|pitted|seeded|lightly|plain|reduced|low|full|whole|room\s+temperature|fat-free|sugar-free|gluten-free)$/i;
 
 // Split ingredients that accidentally contain multiple items in one string.
+// Returns true if a split fragment looks like a cooking instruction, not a real ingredient
+const _isCookingMethod = (s) =>
+  /^(boiled?|mashed?|fried|baked|grilled?|steamed?|saut[eé]ed?|roasted?|cooked?|drained?|rinsed?|peeled?|sliced?|diced?|chopped?|minced?|grated?|shredded?|beaten?|softened?|melted?|toasted?)(\s+and\s+\w+)?$/i.test(s.trim());
+
 const _normalizeIngredients = (ings) =>
   (ings || []).flatMap(ing => {
-    const s = String(ing || '').trim();
+    const s = stripIngredientNotes(String(ing || '').trim());
     if (!s) return [];
     // 1. Newlines always separate items
     const lines = s.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    if (lines.length > 1) return lines;
+    if (lines.length > 1) return lines.filter(l => !_isCookingMethod(l));
     // 2. Semicolons almost always separate list items
-    if (/;\s*\w/.test(s)) return s.split(/;\s*/).map(p => p.trim()).filter(Boolean);
+    if (/;\s*\w/.test(s)) return s.split(/;\s*/).map(p => p.trim()).filter(p => p && !_isCookingMethod(p));
     // 3. " + " always separates items
-    if (/ \+ /.test(s)) return s.split(/ \+ /).map(p => p.trim()).filter(Boolean);
+    if (/ \+ /.test(s)) return s.split(/ \+ /).map(p => p.trim()).filter(p => p && !_isCookingMethod(p));
     // 4. Comma splitting: split only when the word BEFORE the comma is NOT a modifier
     const commaParts = s.split(/,\s*/);
     if (commaParts.length > 1) {
-      // Check if any split point follows a modifier (don't split those)
       const safeToSplit = commaParts.every((part, i) => {
         if (i === 0) return true;
         const wordBeforeComma = commaParts[i - 1].trim().split(/\s+/).pop() || '';
         return !_INGREDIENT_MODIFIERS.test(wordBeforeComma);
       });
-      if (safeToSplit) return commaParts.map(p => p.trim()).filter(Boolean);
+      if (safeToSplit) return commaParts.map(p => p.trim()).filter(p => p && !_isCookingMethod(p));
     }
     return [s];
   });
@@ -328,17 +332,21 @@ export const RecipeProvider = ({ children, fridge }) => {
 
   const onSaveRecipe = async (recipe, householdId = null) => {
     if (!user) return;
-    if (!householdId && savedRecipes.some(r => r.recipe_id === String(recipe.id))) return;
-    const { data, error: err } = await supabase.from('saved_recipes').insert([{
+    const recipeIdStr = String(recipe.id);
+    if (!householdId && savedRecipes.some(r => r.recipe_id === recipeIdStr)) return;
+    const insertData = {
       user_id: user.id,
-      household_id: householdId || null,
-      recipe_id: String(recipe.id),
+      recipe_id: recipeIdStr,
       recipe_name: recipe.name,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      meal_type: [recipe.meal_type, recipe.cuisine].filter(Boolean).join(' ').trim() || 'General'
-    }]).select();
-    if (!err && data) setSavedRecipes(prev => [...prev, data[0]]);
+      ingredients: recipe.ingredients || [],
+      steps: recipe.steps || [],
+      meal_type: [recipe.meal_type, recipe.cuisine].filter(Boolean).join(' ').trim() || 'General',
+    };
+    // Only include household_id if provided (avoids error if column doesn't exist)
+    if (householdId) insertData.household_id = householdId;
+    const { data, error: err } = await supabase.from('saved_recipes').insert([insertData]).select();
+    if (err) { console.error('Save recipe error:', err.message); return; }
+    if (data) setSavedRecipes(prev => [...prev, data[0]]);
   };
 
   const onRemoveSavedRecipe = async (pkId) => {

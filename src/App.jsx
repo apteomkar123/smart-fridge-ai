@@ -57,6 +57,8 @@ function AppContent({ inventory }) {
     savedRecipes,
     onRemoveSavedRecipe,
     filteredSavedRecipes,
+    recipeSearch: _rs,
+    setRecipeSearch,
     savedSearch,
     setSavedSearch,
     savedCategoryFilters,
@@ -82,17 +84,17 @@ function AppContent({ inventory }) {
   const mainRef = useRef(null);
   const touchStartX = useRef(null);
 
-  // Open nav on left-edge swipe right (starts within 30px of left edge)
+  // Swipe right anywhere → open nav; swipe left anywhere when open → close nav
   const handleTouchStart = useCallback((e) => {
-    const touch = e.touches[0];
-    touchStartX.current = touch.clientX < 30 ? touch.clientX : null;
+    touchStartX.current = e.touches[0].clientX;
   }, []);
   const handleTouchEnd = useCallback((e) => {
     if (touchStartX.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    if (deltaX > 50) setNavOpen(true);
+    if (deltaX > 60 && !navOpen) setNavOpen(true);
+    else if (deltaX < -60 && navOpen) setNavOpen(false);
     touchStartX.current = null;
-  }, []);
+  }, [navOpen]);
   const [shopCategoryFilters, setShopCategoryFilters] = useState([]);
   const [shopDietFilters, setShopDietFilters] = useState([]);
   const [shopCuisineFilters, setShopCuisineFilters] = useState([]);
@@ -118,6 +120,9 @@ function AppContent({ inventory }) {
     triggerHaptic();
     setActiveTab(tab);
     setNavOpen(false);
+    // Clear search state on tab change
+    setSavedSearch('');
+    setRecipeSearch('');
   };
 
   return (
@@ -132,7 +137,7 @@ function AppContent({ inventory }) {
       )}
 
       {/* ── Left Slide-out Nav ─────────────────────────────────────────────── */}
-      <nav className={`fixed left-0 top-0 bottom-0 z-[55] flex flex-col bg-white/90 backdrop-blur-2xl border-r border-white/50 shadow-2xl shadow-blue-900/10 transition-transform duration-300 ease-out w-64 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <nav className={`fixed left-0 top-0 bottom-0 z-[55] flex flex-col bg-white/40 backdrop-blur-3xl border-r border-white/30 shadow-2xl shadow-blue-900/20 transition-transform duration-300 ease-out w-64 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 pt-8 pb-6 border-b border-blue-50">
           <span className="text-lg font-black text-[#6BAEE0] tracking-tight">Hungry</span>
           <button onClick={() => setNavOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
@@ -206,6 +211,8 @@ function AppContent({ inventory }) {
                   onAdd={handleAddShoppingItem}
                   onToggle={handleToggleShoppingCompleted}
                   onClear={handleClearShoppingItem}
+                  households={households}
+                  onMoveToHousehold={(itemId, hhId) => handleUpdateItem(itemId, { household_id: hhId })}
                 />
               </>
             )}
@@ -220,7 +227,7 @@ function AppContent({ inventory }) {
             )}
             {activeTab === 'household' && <HouseholdTab onAddShoppingItem={handleAddShoppingItem} />}
             {activeTab === 'friends' && <FriendsPage />}
-            {activeTab === 'settings' && <SettingsPage />}
+            {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}
             {activeTab === 'saved' && (
               <div className="space-y-6">
                 <div className="flex justify-end">

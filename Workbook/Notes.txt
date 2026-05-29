@@ -282,3 +282,21 @@ FEATURES:
 - Personal Shopper: full-screen shopping mode, store selector (TJs/Walmart/etc.), items grouped by category with store-specific aisle names
 - Add Recipe modal: Public/Private toggle + Save To personal or household selector
 - Friends page: share 'Add me on Hungry' link, search users by name, friend list, public cooking feed from Chef History
+BUGS IMPLEMENTED (session 2026-05-28 v5):
+- Nav: swipe right anywhere opens, swipe left anywhere closes, glassy bg-white/40 backdrop-blur-3xl
+- Shopping list: always shows categorized by aisle (Snacks + Bakery split); list/store toggle removed; persistence fixed (fetches personal + household items separately); "Move to household" button per item
+- Personal Shopper: now correctly filters personal/household/all from full shoppingList
+- Fish/seafood expanded to plural forms (sardines, shrimps, prawns, etc.) -- never vegetarian
+- Ingredient matching: RecipeModal green dots now use fuzzy token matching (not exact string)
+- Ingredient parsing: stripIngredientNotes() removes parentheticals "(optional)", "or to taste"; cooking methods filtered from split results ("Boiled and Mashed" discarded)
+- Save recipe: safe insert (no household_id unless provided), error logged to console
+- AI 404: Gemini model changed from gemini-2.5-flash to gemini-2.0-flash (GA stable); Vite proxy added for local dev (/.netlify/functions -> localhost:8888)
+- Mobile zoom: viewport meta has user-scalable=no; inputs have fontSize 16px
+- Search clears on tab switch (recipeSearch + savedSearch)
+- RecipeContext MealDB cache bumped to v7
+
+FEATURES IMPLEMENTED:
+- Settings split into Profile + Household tabs; personal monthly budget in Profile tab; Invite Friends button
+- Friends page redesigned: blue gradient header, compact share button, search bar, friend cards that expand to show cooking feed
+- SearchWithHistory component: last 4 searches shown as dropdown on any search bar (namespace-keyed localStorage)
+- Recipe search uses SearchWithHistory with history dropdown

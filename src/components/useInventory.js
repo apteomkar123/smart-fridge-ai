@@ -161,11 +161,21 @@ export const useInventory = (user, household) => {
       setFridge(normalizedFridge);
       calculateMacroMetrics(normalizedFridge.map(f => f.item_name));
 
-      const shopQuery = supabase.from('shopping_list').select('*').order('created_at', { ascending: true });
-      if (household?.id) shopQuery.eq('household_id', household.id);
-      else shopQuery.eq('user_id', user.id);
-
-      let { data: shopItems, error: shopError } = await shopQuery;
+      // Fetch personal items + all household items the user belongs to
+      let shopItems = [];
+      const { data: personalShop } = await supabase
+        .from('shopping_list').select('*')
+        .eq('user_id', user.id).is('household_id', null)
+        .order('created_at', { ascending: true });
+      shopItems = [...(personalShop || [])];
+      if (household?.id) {
+        const { data: hhShop } = await supabase
+          .from('shopping_list').select('*')
+          .eq('household_id', household.id)
+          .order('created_at', { ascending: true });
+        shopItems = [...shopItems, ...(hhShop || [])];
+      }
+      const shopError = null;
       if (shopError) throw shopError;
       setShoppingList(shopItems || []);
     } catch (err) {
