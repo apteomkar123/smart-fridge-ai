@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useAppWareSSO } from '../hooks/useAppWareSSO';
 
 export default function AuthManager() {
   const [authEmail, setAuthEmail] = useState('');
@@ -10,6 +11,7 @@ export default function AuthManager() {
   const [oauthLoading, setOauthLoading] = useState(null); // 'google' | 'apple' | null
   const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { triggerAppWareRedirect } = useAppWareSSO();
 
   const handleOAuth = async (provider) => {
     setOauthLoading(provider);
@@ -65,6 +67,20 @@ export default function AuthManager() {
       
       {!isForgotPasswordView && (
         <div className="mt-6 space-y-3 font-sans">
+          {/* AppWare SSO */}
+          <button
+            type="button"
+            onClick={triggerAppWareRedirect}
+            disabled={!!oauthLoading}
+            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#1F6FB8] to-[#6BAEE0] py-3.5 rounded-xl text-sm font-bold text-white shadow-md shadow-blue-200 transition-all disabled:opacity-60 hover:opacity-95"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="white" fillOpacity="0.25" />
+              <path d="M8 12h8M12 8v8" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Continue with AppWare
+          </button>
+
           {/* Google */}
           <button
             type="button"
