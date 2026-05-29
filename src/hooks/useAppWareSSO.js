@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 // AppWare SSO portal — update this URL when the portal is deployed
-const AUTH_PORTAL_URL = 'https://appware-auth.netlify.app';
+const AUTH_PORTAL_URL = 'https://authappware.netlify.app';
 
 export function useAppWareSSO() {
   useEffect(() => {
