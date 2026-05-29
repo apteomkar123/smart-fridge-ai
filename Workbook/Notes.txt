@@ -322,3 +322,11 @@ BUGS:
 FEATURES:
 - Show/hide password toggle (eye icon) added to password field on sign-in/sign-up screen
 - Chef History cards redesigned: bigger collapsed card with photo thumbnail, recipe name, date, notes preview; tap to expand into full detail view showing recipe name, description/ingredients, photos grid, notes, and a "View Full Recipe" button
+
+IMPLEMENTED (session 2026-05-29 session 4):
+BUGS:
+- Chef History card tap now correctly expands to chef history detail view (not recipe modal); expanded card shows date + time cooked, "Cooked by [name]", ingredient pills, photos grid, notes — "View Full Recipe" button is the only path to the recipe modal
+
+FEATURES:
+- Recipe modal header (title, star, share, X) is now sticky — locks at top as user scrolls through ingredients and steps
+- Nav "Hungry" text now uses same Pacifico logo-text font as the app header

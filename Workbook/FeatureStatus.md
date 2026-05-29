@@ -24,6 +24,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Quantity controls per item
 
 ### Recipes
+- Recipe modal header (title, star, share, X) is sticky — stays locked at top as user scrolls through ingredients and steps
 - Recipe explorer powered by MealDB + Spoonacular + static recipes, sorted by pantry match %
 - Search by name, ingredient, or filter keyword
 - Filter by meal type, diet, and cuisine
@@ -55,7 +56,8 @@ A living document tracking what's shipped, what works, and what's blocked until 
 ### Chef History
 - Automatically logged when a recipe is marked as Cooked
 - Collapsed card shows photo thumbnail, recipe name, date, meal type, notes preview
-- Tap card to expand into a full detail view (name, description/ingredients, photos grid, notes)
+- Tap card to expand into a full chef history detail view — does NOT open the recipe modal
+- Expanded view shows: recipe name, date + time cooked, "Cooked by [name]", ingredient preview pills, photos grid
 - Add personal notes per entry (tap "My Thoughts" area to edit)
 - Add photos per entry (from expanded card)
 - Delete individual photos
@@ -137,4 +139,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29 (session 3)*
+*Last updated: 2026-05-29 (session 4)*

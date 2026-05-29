@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChefHat, Camera, Star, Trash2, Check, Lock, Globe, ChevronDown } from 'lucide-react';
+import { X, ChefHat, Camera, Star, Trash2, Check, Lock, Globe, ChevronDown, Clock, User } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
+import { useUser } from './UserContext';
 
-function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete, onOpenRecipe, onTogglePrivacy }) {
+function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete, onOpenRecipe, onTogglePrivacy }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(entry.notes || '');
@@ -22,11 +23,12 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
     e.target.value = '';
   };
 
-  const cookedDate = new Date(entry.cookedAt).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric'
-  });
+  const cookedAt = new Date(entry.cookedAt);
+  const cookedDate = cookedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const cookedTime = cookedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
   const hasPhotos = entry.photos && entry.photos.length > 0;
+  const photoCount = entry.photos?.length || 0;
 
   if (!expanded) {
     return (
@@ -43,7 +45,7 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-[9px] font-black text-[#6BAEE0] uppercase bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full tracking-widest">{entry.meal_type || 'Recipe'}</span>
               <span className="text-[9px] text-slate-300 font-mono">{cookedDate}</span>
             </div>
@@ -51,13 +53,13 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
             {entry.notes ? (
               <p className="text-xs text-amber-700/70 mt-1.5 line-clamp-1 italic">"{entry.notes}"</p>
             ) : (
-              <p className="text-xs text-slate-300 mt-1.5 italic">Tap to expand &amp; add notes</p>
+              <p className="text-xs text-slate-300 mt-1.5 italic">Tap to expand</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             {hasPhotos && (
               <span className="text-[10px] font-black text-[#6BAEE0] bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full">
-                {entry.photos.length} photo{entry.photos.length > 1 ? 's' : ''}
+                {photoCount} photo{photoCount > 1 ? 's' : ''}
               </span>
             )}
             <ChevronDown size={16} className="text-slate-300" />
@@ -68,23 +70,35 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
   }
 
   // Expanded card
-  const photoCount = entry.photos?.length || 0;
   const gridCols = photoCount === 1 ? '1fr' : photoCount === 2 ? '1fr 1fr' : 'repeat(3, 1fr)';
 
   return (
-    <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-2xl overflow-hidden">
-      {/* Hero header */}
-      <div className="relative p-6 pb-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="bg-white/92 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-2xl overflow-hidden">
+      {/* Header */}
+      <div className="p-6 pb-4">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="text-[9px] font-black text-[#6BAEE0] uppercase bg-sky-50 border border-sky-100 px-2.5 py-1 rounded-full tracking-widest">{entry.meal_type || 'Recipe'}</span>
-              <span className="text-[10px] text-slate-400 font-mono">{cookedDate}</span>
               {!entry.isPrivate && <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Public</span>}
             </div>
-            <h2 className="font-black text-slate-800 text-2xl leading-tight tracking-tight">{entry.recipeName}</h2>
+            <h2 className="font-black text-slate-800 text-2xl leading-tight tracking-tight mb-3">{entry.recipeName}</h2>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <Clock size={11} className="text-[#6BAEE0]" />
+                <span className="font-bold">{cookedDate}</span>
+                <span className="text-slate-300">·</span>
+                <span>{cookedTime}</span>
+              </div>
+              {displayName && (
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <User size={11} className="text-[#6BAEE0]" />
+                  <span>Cooked by <span className="font-bold text-slate-600">{displayName}</span></span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex gap-2 shrink-0 mt-1">
+          <div className="flex gap-2 shrink-0">
             <button onClick={() => onDelete(entry.id)} className="w-9 h-9 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center transition-colors">
               <Trash2 size={15} />
             </button>
@@ -94,11 +108,11 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
           </div>
         </div>
 
-        {/* Description / ingredient preview */}
+        {/* Description or ingredient pills */}
         {entry.description ? (
-          <p className="text-sm text-slate-500 leading-relaxed mb-3">{entry.description}</p>
+          <p className="text-sm text-slate-500 leading-relaxed">{entry.description}</p>
         ) : entry.ingredients?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          <div className="flex flex-wrap gap-1.5">
             {entry.ingredients.slice(0, 5).map((ing, i) => {
               const label = typeof ing === 'string'
                 ? ing.replace(/^\d[\d./]*\s*(tbsp|tsp|cup|cups|g|kg|oz|lb|ml|l)?\s*/i, '').split(',')[0].trim()
@@ -118,9 +132,12 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
         )}
       </div>
 
-      {/* Photos grid */}
+      {/* Photos */}
       {hasPhotos && (
         <div className="px-6 mb-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 mb-2.5">
+            {photoCount === 1 ? 'Photo' : `${photoCount} Photos`}
+          </p>
           <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
             {entry.photos.map((photo, i) => (
               <div key={i} className="relative" style={{ aspectRatio: '1' }}>
@@ -137,7 +154,7 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
         </div>
       )}
 
-      {/* Notes / My Thoughts */}
+      {/* My Thoughts / Notes */}
       <div className="px-6 mb-5">
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 mb-2">My Thoughts</p>
         {editingNotes ? (
@@ -164,7 +181,7 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
         )}
       </div>
 
-      {/* Primary action */}
+      {/* Actions */}
       <div className="px-6 pb-6 space-y-3">
         <button
           onClick={() => onOpenRecipe(entry)}
@@ -194,7 +211,10 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
 
 export default function ChefHistory() {
   const { setActiveModalRecipe, masterRecipes } = useRecipes();
+  const { user, userName } = useUser();
   const [history, setHistory] = useState([]);
+
+  const displayName = userName || user?.email?.split('@')[0] || 'Chef';
 
   useEffect(() => {
     try {
@@ -209,25 +229,11 @@ export default function ChefHistory() {
     try { localStorage.setItem('hungry_chef_history', JSON.stringify(next)); } catch {}
   };
 
-  const handleUpdateNotes = (id, notes) => {
-    persist(history.map(e => e.id === id ? { ...e, notes } : e));
-  };
-
-  const handleAddPhoto = (id, dataUrl) => {
-    persist(history.map(e => e.id === id ? { ...e, photos: [...(e.photos || []), dataUrl] } : e));
-  };
-
-  const handleDeletePhoto = (id, index) => {
-    persist(history.map(e => e.id === id ? { ...e, photos: (e.photos || []).filter((_, i) => i !== index) } : e));
-  };
-
-  const handleDelete = (id) => {
-    persist(history.filter(e => e.id !== id));
-  };
-
-  const handleTogglePrivacy = (id) => {
-    persist(history.map(e => e.id === id ? { ...e, isPrivate: !e.isPrivate } : e));
-  };
+  const handleUpdateNotes = (id, notes) => persist(history.map(e => e.id === id ? { ...e, notes } : e));
+  const handleAddPhoto = (id, dataUrl) => persist(history.map(e => e.id === id ? { ...e, photos: [...(e.photos || []), dataUrl] } : e));
+  const handleDeletePhoto = (id, index) => persist(history.map(e => e.id === id ? { ...e, photos: (e.photos || []).filter((_, i) => i !== index) } : e));
+  const handleDelete = (id) => persist(history.filter(e => e.id !== id));
+  const handleTogglePrivacy = (id) => persist(history.map(e => e.id === id ? { ...e, isPrivate: !e.isPrivate } : e));
 
   const handleOpenRecipe = (entry) => {
     const found = masterRecipes.find(r => String(r.id) === String(entry.recipeId));
@@ -263,6 +269,7 @@ export default function ChefHistory() {
           <HistoryCard
             key={entry.id}
             entry={entry}
+            displayName={displayName}
             onUpdateNotes={handleUpdateNotes}
             onAddPhoto={handleAddPhoto}
             onDeletePhoto={handleDeletePhoto}

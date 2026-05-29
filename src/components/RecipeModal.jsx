@@ -267,46 +267,48 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
 
   return (
     <div className="fixed inset-0 bg-blue-900/20 backdrop-blur-xl flex items-center justify-center p-4 z-[60] overflow-y-auto">
-      <div className="bg-white/90 backdrop-blur-2xl p-8 rounded-[3rem] shadow-2xl border border-white/50 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
-        {/* Auto-adapting spinner */}
-        {adapting?.startsWith('auto_') && (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-            <Loader2 size={14} className="animate-spin text-amber-500 shrink-0" />
-            <p className="text-[11px] font-bold text-amber-700">
-              Adapting recipe for your {adapting.replace('auto_', '')} preference…
-            </p>
-          </div>
-        )}
+      <div className="bg-white/90 backdrop-blur-2xl rounded-[3rem] shadow-2xl border border-white/50 w-full max-w-2xl relative max-h-[90vh] flex flex-col overflow-hidden">
+        {/* ── Sticky header ─────────────────────────────────────────────────── */}
+        <div className="shrink-0 px-8 pt-8 bg-white/90 backdrop-blur-2xl rounded-t-[3rem]">
+          {/* Auto-adapting spinner */}
+          {adapting?.startsWith('auto_') && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+              <Loader2 size={14} className="animate-spin text-amber-500 shrink-0" />
+              <p className="text-[11px] font-bold text-amber-700">
+                Adapting recipe for your {adapting.replace('auto_', '')} preference…
+              </p>
+            </div>
+          )}
 
-        {/* Adapted recipe banner */}
-        {(adaptedRecipe || autoAdaptedRecipe) && !adapting && (
-          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold text-emerald-700">
-              {autoAdaptedRecipe && !adaptedRecipe
-                ? `Auto-adapted for your ${autoAdaptedRecipe._adaptedFor} preference`
-                : `Adapted for ${displayRecipe._adaptedFor}`}
-            </p>
-            {adaptedRecipe && (
-              <button onClick={() => setAdaptedRecipe(null)} className="shrink-0 text-[10px] font-black text-emerald-600 flex items-center gap-1 hover:underline">
-                <RotateCcw size={11} /> Revert to original
+          {/* Adapted recipe banner */}
+          {(adaptedRecipe || autoAdaptedRecipe) && !adapting && (
+            <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold text-emerald-700">
+                {autoAdaptedRecipe && !adaptedRecipe
+                  ? `Auto-adapted for your ${autoAdaptedRecipe._adaptedFor} preference`
+                  : `Adapted for ${displayRecipe._adaptedFor}`}
+              </p>
+              {adaptedRecipe && (
+                <button onClick={() => setAdaptedRecipe(null)} className="shrink-0 text-[10px] font-black text-emerald-600 flex items-center gap-1 hover:underline">
+                  <RotateCcw size={11} /> Revert to original
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Proteinized banner */}
+          {proteinResult && (
+            <div className="mb-4 bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold text-violet-700">
+                💪 +{Math.round(proteinResult.proteinAdded / 4)}g protein/serving via {proteinResult.proteinIngredient}
+              </p>
+              <button onClick={() => setProteinResult(null)} className="shrink-0 text-[10px] font-black text-violet-600 flex items-center gap-1 hover:underline">
+                <RotateCcw size={11} /> Revert
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Proteinized banner */}
-        {proteinResult && (
-          <div className="mb-4 bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold text-violet-700">
-              💪 +{Math.round(proteinResult.proteinAdded / 4)}g protein/serving via {proteinResult.proteinIngredient}
-            </p>
-            <button onClick={() => setProteinResult(null)} className="shrink-0 text-[10px] font-black text-violet-600 flex items-center gap-1 hover:underline">
-              <RotateCcw size={11} /> Revert
-            </button>
-          </div>
-        )}
-
-        <div className="flex justify-between items-start border-b border-blue-50 pb-5 mb-6">
+          <div className="flex justify-between items-start border-b border-blue-50 pb-5 mb-0">
           <div>
             <span className="bg-sky-50 text-[#6BAEE0] font-mono text-[9px] px-3 py-1 rounded-full uppercase font-black tracking-widest border border-sky-100">{displayRecipe.meal_type}</span>
             <h3 className="text-2xl font-black text-slate-800 tracking-tighter mt-2">{displayRecipe.name}</h3>
@@ -343,6 +345,10 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
             <button onClick={() => setModal(null)} className="p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
           </div>
         </div>
+        </div>{/* end sticky header */}
+
+        {/* ── Scrollable content ─────────────────────────────────────────────── */}
+        <div className="overflow-y-auto px-8 pb-8 pt-6 flex-1">
 
         {onAddIngredient && (
           <button
@@ -503,6 +509,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
             </button>
           )}
         </div>
+        </div>{/* end scrollable content */}
       </div>
     </div>
   );

@@ -160,7 +160,7 @@ function AppContent({ inventory }) {
       {/* ── Floating Bubble Nav ────────────────────────────────────────────── */}
       <nav className={`fixed left-3 top-3 z-[55] flex flex-col bg-white/30 backdrop-blur-3xl border border-white/50 shadow-2xl shadow-blue-900/20 rounded-[2rem] w-56 max-h-[92dvh] overflow-y-auto transition-all duration-300 ease-out ${navOpen ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 -translate-x-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/30">
-          <span className="text-base font-black text-[#6BAEE0] tracking-tight">Hungry</span>
+          <span className="logo-text text-xl">Hungry</span>
           <button onClick={() => setNavOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
             <X size={16} />
           </button>
