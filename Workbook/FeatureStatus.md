@@ -30,8 +30,8 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Recipe detail modal with full ingredient list and steps
 - Pantry match indicator per ingredient (green/amber dot)
 - Add individual missing ingredients to shopping list
-- Add ALL missing ingredients to shopping list in one tap
-- Save recipe to My Saved Recipes
+- Add ALL missing ingredients to shopping list in one tap (button at top of recipe card)
+- Save recipe to My Saved Recipes or directly to a household (from both the modal and the recipe explorer cards)
 - Share recipe to a specific household
 - Deep link sharing (unique URL per recipe)
 - Convert recipe: Make Vegetarian / Make Vegan / Add Meat (local + AI)
@@ -80,7 +80,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Friends
 - Friend codes (8-character code based on user ID)
-- Add friends by code
+- Add friends by code (input inside card, Send button stays inside on all screen sizes)
 - Search for friends by display name
 - Send friend requests
 - Accept / decline incoming friend requests
@@ -94,6 +94,8 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Set age, weight, height
 - Set personal budget limit
 - Create / join / manage households
+- Default shopping list destination (personal or a specific household)
+- Default saved recipes destination (personal or a specific household)
 - Sign out
 
 ### Infrastructure
@@ -131,4 +133,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29*
+*Last updated: 2026-05-29 (session 2)*

@@ -26,4 +26,26 @@ Add a button that allows the user to add all the items from a recipe that they d
 
 Show members of a household
 
-Build an onboarding layout. Build this using [text](Onboarding.md)
+Build an onboarding layout. Build this using Onboarding.md
+
+The "Send" box in the "Add friend by code" box is outside the "add friend by code" box
+
+The loading animation with the book writing, chef hat, and mixing bowl is near perfect. The hat just looks a little goofy, and also blends in with the white background. Have the hat moving just like that, design the hat better, and put it in a blue circle. Add more detail to the hat. The blue in the blue circle should be the same blue color as the rest of the app.
+
+AI Nutrition Coach needs to be considering dietary restrictions. Recipes should have the dietary restriction substitutions made, and ingredients should be suggested according to dietary restrictions.
+
+Adding a recipe to a household shared list should be more intuitive, right now the only way to do it is to open the card and star it from there.
+
+Household members are not being shown. Are they being stored to a database?
+
+Move the "Add all missing ingredients to my shopping list" button to the top of the recipe card.
+
+In shopping list, when changing the marking to a household, the same dropdown appears 3 times right under another.
+
+Marking an ingredient as done duplicates the entire shopping list.
+
+Shopping list disappears everytime the web app is reloaded.
+
+When an item is added to a household from the main shopping list, the item should also show up in the shared shopping list for the household.
+
+Allow the user to select whether they want their default for shopping list to be a particular household, or personal. Same goes for saved recipes.

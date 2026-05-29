@@ -350,8 +350,13 @@ export const RecipeProvider = ({ children, fridge }) => {
     setIsStoreAlertOpen(true);
   }, [fridge, processedRecipes]);
 
-  const onSaveRecipe = async (recipe, householdId = null) => {
+  const onSaveRecipe = async (recipe, householdId = undefined) => {
     if (!user) return;
+    // If no householdId passed, use the user's default recipe destination preference
+    if (householdId === undefined) {
+      const defaultDest = localStorage.getItem('hungry_default_recipe_dest') || 'personal';
+      householdId = defaultDest === 'personal' ? null : defaultDest;
+    }
     const recipeIdStr = String(recipe.id);
     if (!householdId && savedRecipes.some(r => r.recipe_id === recipeIdStr)) return;
     const insertData = {

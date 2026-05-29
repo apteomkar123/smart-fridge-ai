@@ -161,26 +161,36 @@ export const useInventory = (user, household) => {
       setFridge(normalizedFridge);
       calculateMacroMetrics(normalizedFridge.map(f => f.item_name));
 
-      // Fetch personal items + all household items the user belongs to
-      let shopItems = [];
-      const { data: personalShop } = await supabase
+      // Fetch ALL shopping items belonging to this user (any household_id) plus household items
+      const { data: allMyShop } = await supabase
         .from('shopping_list').select('*')
-        .eq('user_id', user.id).is('household_id', null)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
-      shopItems = [...(personalShop || [])];
+      let shopItems = [...(allMyShop || [])];
+
+      // Also fetch household items added by OTHER members
       if (household?.id) {
         const { data: hhShop } = await supabase
           .from('shopping_list').select('*')
           .eq('household_id', household.id)
+          .neq('user_id', user.id)
           .order('created_at', { ascending: true });
         shopItems = [...shopItems, ...(hhShop || [])];
       }
-      const shopError = null;
-      if (shopError) throw shopError;
-      setShoppingList(shopItems || []);
+
+      // Deduplicate by ID to prevent any double-rendering
+      const seen = new Set();
+      shopItems = shopItems.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+
+      setShoppingList(shopItems);
     } catch (err) {
       console.error('Inventory sync error:', err);
       setError(err.message);
+      // Keep whatever is in localStorage — don't blank the UI on a failed fetch
+      try {
+        const cached = localStorage.getItem('hungry_shopping_v1');
+        if (cached) setShoppingList(JSON.parse(cached));
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -266,10 +276,14 @@ export const useInventory = (user, household) => {
       return;
     }
 
+    // Respect user's default destination preference
+    const defaultDest = localStorage.getItem('hungry_default_shopping_dest') || 'personal';
+    const householdId = defaultDest === 'personal' ? null : defaultDest;
+
     const tempId = `temp-${Date.now()}`;
     const newItem = {
       user_id: user.id,
-      household_id: null, // always personal by default; user can move to household
+      household_id: householdId,
       item_name: sanitized,
       is_completed: false,
       price

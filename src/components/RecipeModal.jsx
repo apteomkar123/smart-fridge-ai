@@ -344,6 +344,15 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
           </div>
         </div>
 
+        {onAddIngredient && (
+          <button
+            onClick={handleAddAllMissing}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm bg-sky-50 text-[#6BAEE0] border border-sky-200 hover:bg-sky-100 active:scale-95 transition-all mb-6"
+          >
+            <ShoppingCart size={16} /> Add All Missing to Shopping List
+          </button>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <section className="space-y-4">
             <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ingredients</h4>
@@ -484,14 +493,6 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
               <Play size={18} fill="currentColor" /> Start Cooking
             </button>
           </div>
-          {onAddIngredient && (
-            <button
-              onClick={handleAddAllMissing}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm bg-sky-50 text-[#6BAEE0] border border-sky-200 hover:bg-sky-100 active:scale-95 transition-all"
-            >
-              <ShoppingCart size={16} /> Add All Missing to Shopping List
-            </button>
-          )}
           {onMarkCooked && (
             <button
               onClick={() => { if (!cooked) { onMarkCooked(displayRecipe); setCooked(true); } }}

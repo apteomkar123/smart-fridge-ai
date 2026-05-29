@@ -85,7 +85,10 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
       const pct = (v) => Math.round((v / totalMacros) * 100);
       // Large random seed + timestamp forces the AI to produce different results every call
       const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const prompt = `[Session:${seed}] A user's current pantry macros: Protein ${metrics.protein || 0}g (${pct(metrics.protein)}%), Carbs ${metrics.carbs || 0}g (${pct(metrics.carbs)}%), Fat ${metrics.fat || 0}g (${pct(metrics.fat)}%). Goal: ${focus}. Pick 3 FRESH, CREATIVE, UNEXPECTED ingredients AND 2 FRESH, CREATIVE recipes NOT commonly suggested. Avoid generic staples. Return ONLY valid JSON: {"ingredients":[{"name":"...","amount":"...","reason":"under 25 words"}],"recipes":[{"name":"...","reason":"under 25 words"}]}`;
+      const restrictions = userSettings?.dietary_restrictions?.length
+        ? `The user has these dietary restrictions: ${userSettings.dietary_restrictions.join(', ')}. ALL suggestions MUST comply strictly — no exceptions.`
+        : '';
+      const prompt = `[Session:${seed}] A user's current pantry macros: Protein ${metrics.protein || 0}g (${pct(metrics.protein)}%), Carbs ${metrics.carbs || 0}g (${pct(metrics.carbs)}%), Fat ${metrics.fat || 0}g (${pct(metrics.fat)}%). Goal: ${focus}. ${restrictions} Pick 3 FRESH, CREATIVE, UNEXPECTED ingredients AND 2 FRESH, CREATIVE recipes NOT commonly suggested. Avoid generic staples. Return ONLY valid JSON: {"ingredients":[{"name":"...","amount":"...","reason":"under 25 words"}],"recipes":[{"name":"...","reason":"under 25 words"}]}`;
 
       const res = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',

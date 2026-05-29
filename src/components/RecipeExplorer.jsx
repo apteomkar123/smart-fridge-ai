@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
-import { Filter, Star } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Filter, Star, Users } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
+import { useUser } from './UserContext';
 import SearchWithHistory from './SearchWithHistory';
 
 export default function RecipeExplorer() {
+  const [shareMenuId, setShareMenuId] = useState(null);
+  const { households } = useUser();
   const {
     processedRecipes: recipes,
     recipeSearch,
@@ -46,6 +49,8 @@ export default function RecipeExplorer() {
     () => new Map((savedRecipes || []).map(sr => [sr.recipe_id, sr.id])),
     [savedRecipes]
   );
+
+  const closeShareMenu = () => setShareMenuId(null);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -108,17 +113,44 @@ export default function RecipeExplorer() {
               <div className="h-1.5 flex-1 bg-blue-50 rounded-full overflow-hidden mr-4">
                 <div className="h-full bg-[#6BAEE0]/60 rounded-full transition-all duration-1000" style={{ width: `${recipe.matchPercentage}%` }} />
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const pkId = savedRecipesMap.get(String(recipe.id));
-                  if (pkId) onRemoveSavedRecipe(pkId);
-                  else onSaveRecipe(recipe);
-                }}
-                className={`transition-colors ${savedRecipesMap.has(String(recipe.id)) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}
-              >
-                <Star size={18} fill={savedRecipesMap.has(String(recipe.id)) ? "currentColor" : "none"} />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Share to household — only shown when user has households */}
+                {households?.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShareMenuId(shareMenuId === recipe.id ? null : recipe.id); }}
+                      className="text-slate-300 hover:text-[#6BAEE0] transition-colors"
+                      title="Share to household"
+                    >
+                      <Users size={15} />
+                    </button>
+                    {shareMenuId === recipe.id && (
+                      <div className="absolute right-0 bottom-7 bg-white border border-blue-100 rounded-2xl shadow-xl z-20 min-w-[160px] p-2 space-y-1">
+                        {households.map(h => (
+                          <button
+                            key={h.id}
+                            onClick={(e) => { e.stopPropagation(); onSaveRecipe(recipe, h.id); setShareMenuId(null); }}
+                            className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-sky-50 hover:text-[#6BAEE0] transition-all flex items-center gap-2"
+                          >
+                            <Users size={11} /> {h.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const pkId = savedRecipesMap.get(String(recipe.id));
+                    if (pkId) onRemoveSavedRecipe(pkId);
+                    else onSaveRecipe(recipe);
+                  }}
+                  className={`transition-colors ${savedRecipesMap.has(String(recipe.id)) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}
+                >
+                  <Star size={18} fill={savedRecipesMap.has(String(recipe.id)) ? "currentColor" : "none"} />
+                </button>
+              </div>
             </div>
           </div>
         ))}

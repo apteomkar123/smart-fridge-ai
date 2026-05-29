@@ -65,6 +65,18 @@ export default function HouseholdTab({ onAddShoppingItem }) {
     loadHouseholdShopping();
   }, [loadHouseholdRecipes, loadHouseholdShopping]);
 
+  // Real-time subscription: refresh household shopping list when any row changes
+  useEffect(() => {
+    if (!selectedHHId) return;
+    const channel = supabase
+      .channel(`hh-shopping-${selectedHHId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_list', filter: `household_id=eq.${selectedHHId}` },
+        () => loadHouseholdShopping()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedHHId, loadHouseholdShopping]);
+
   useEffect(() => {
     if (!selectedHHId || !user) return;
     // Load household members from profiles table

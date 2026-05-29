@@ -200,9 +200,9 @@ export default function FriendsPage() {
             placeholder="Enter friend's code…"
             maxLength={8}
             style={{ fontSize: '16px' }}
-            className="flex-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm font-black text-slate-800 tracking-widest focus:border-sky-400 focus:outline-none uppercase"
+            className="flex-1 min-w-0 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm font-black text-slate-800 focus:border-sky-400 focus:outline-none uppercase"
           />
-          <button onClick={addFriendByCode} className="bg-[#6BAEE0] text-white px-4 py-3 rounded-2xl text-xs font-black shadow-md">Send</button>
+          <button onClick={addFriendByCode} className="shrink-0 bg-[#6BAEE0] text-white px-4 py-3 rounded-2xl text-xs font-black shadow-md">Send</button>
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Users, UserRound, DollarSign, UserPlus } from 'lucide-react';
+import { Settings, Users, UserRound, DollarSign, UserPlus, ShoppingCart, Star } from 'lucide-react';
 import { useUser } from './UserContext';
 import HouseholdSettings from './HouseholdSettings';
 
@@ -10,6 +10,7 @@ export default function SettingsPage({ onNavigateFriends }) {
   const {
     userName: profileName,
     userSettings,
+    households,
     handleUpdateProfileName: onUpdateName,
     handleUpdateSettings,
     handleUpdatePersonalBudget,
@@ -26,6 +27,17 @@ export default function SettingsPage({ onNavigateFriends }) {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [budgetInput, setBudgetInput] = useState('');
   const personalBudget = userSettings?.personal_budget_limit || 0;
+  const [defaultShoppingDest, setDefaultShoppingDest] = useState(() =>
+    localStorage.getItem('hungry_default_shopping_dest') || 'personal'
+  );
+  const [defaultRecipeDest, setDefaultRecipeDest] = useState(() =>
+    localStorage.getItem('hungry_default_recipe_dest') || 'personal'
+  );
+
+  const saveDefaultDests = (shopping, recipe) => {
+    localStorage.setItem('hungry_default_shopping_dest', shopping);
+    localStorage.setItem('hungry_default_recipe_dest', recipe);
+  };
 
   useEffect(() => { setDisplayName(profileName || ''); }, [profileName]);
 
@@ -206,6 +218,59 @@ export default function SettingsPage({ onNavigateFriends }) {
           </button>
         </div>
       </section>
+
+      {/* Default Destinations — only shown when user has at least one household */}
+      {households?.length > 0 && (
+        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-5">
+          <h3 className="text-[13px] font-bold text-slate-400">Defaults</h3>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              <ShoppingCart size={11} /> New Shopping List Items
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => { setDefaultShoppingDest('personal'); saveDefaultDests('personal', defaultRecipeDest); }}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${defaultShoppingDest === 'personal' ? 'bg-[#6BAEE0] text-white border-[#6BAEE0]' : 'bg-white text-slate-400 border-blue-100 hover:border-sky-300'}`}
+              >
+                👤 Personal
+              </button>
+              {households.map(h => (
+                <button
+                  key={h.id}
+                  onClick={() => { setDefaultShoppingDest(h.id); saveDefaultDests(h.id, defaultRecipeDest); }}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${defaultShoppingDest === h.id ? 'bg-[#6BAEE0] text-white border-[#6BAEE0]' : 'bg-white text-slate-400 border-blue-100 hover:border-sky-300'}`}
+                >
+                  👥 {h.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              <Star size={11} /> Save Recipe To
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => { setDefaultRecipeDest('personal'); saveDefaultDests(defaultShoppingDest, 'personal'); }}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${defaultRecipeDest === 'personal' ? 'bg-[#6BAEE0] text-white border-[#6BAEE0]' : 'bg-white text-slate-400 border-blue-100 hover:border-sky-300'}`}
+              >
+                👤 My Saved Recipes
+              </button>
+              {households.map(h => (
+                <button
+                  key={h.id}
+                  onClick={() => { setDefaultRecipeDest(h.id); saveDefaultDests(defaultShoppingDest, h.id); }}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${defaultRecipeDest === h.id ? 'bg-[#6BAEE0] text-white border-[#6BAEE0]' : 'bg-white text-slate-400 border-blue-100 hover:border-sky-300'}`}
+                >
+                  👥 {h.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Invite Friends */}
       <button
