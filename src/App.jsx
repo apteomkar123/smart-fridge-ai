@@ -338,12 +338,12 @@ function AppContent({ inventory }) {
                   </div>
                 </div>
 
-                <div className="grid gap-4">
+                <div className="grid gap-4 overflow-x-hidden">
                   {filteredSavedRecipes.length === 0 ? (
                     <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
                   ) : (
                     filteredSavedRecipes.map(recipe => (
-                      <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm hover:shadow-md transition-all group">
+                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group overflow-hidden">
                         <div
                           className="flex-1 cursor-pointer min-w-0"
                           onClick={() => setActiveModalRecipe({
@@ -366,7 +366,7 @@ function AppContent({ inventory }) {
                                 <Users size={11} /> Share
                               </button>
                               {savedShareMenuId === recipe.id && (
-                                <div className="absolute right-0 bottom-9 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[160px] p-2 space-y-1">
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[160px] p-2 space-y-1">
                                   {households.map(h => (
                                     <button
                                       key={h.id}

@@ -10,7 +10,8 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Email / password sign in and sign up
 - Show/hide password toggle (eye icon) on password field
 - Forgot password (email reset link)
-- Sign in with Google (OAuth via Supabase — requires Google provider enabled in Supabase dashboard; set VITE_APP_URL in Netlify env vars to your production URL and add it to Supabase Redirect URLs allowlist to fix localhost redirect issue)
+- **Sign in with AppWare** — redirects to AppWare SSO portal, returns with session token; browser back resets sign-in view correctly
+- Google and Apple sign-in removed (replaced by AppWare SSO)
 - Onboarding flow — 5-screen liquid-glass intro + preferences sheet (name, dietary restrictions, nutrition goal), written to Supabase on completion
 
 ### Pantry
@@ -84,6 +85,8 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Household
 - **Settle Up** — shows per-member cost split from household shopping list; Venmo deep-link and Splitwise link per member
+- **Potluck / Event** — collapsible Event panel per household; add items needed for the event, claim them with one tap, live readiness progress bar
+- Household member list now queries both `active_household_id` and legacy `household_id` so all members show correctly
 - Create a household with a generated invite code
 - Join a household via invite code
 - Switch between multiple households
@@ -153,4 +156,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29 (session 5)*
+*Last updated: 2026-05-29 (session 6)*

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink } from 'lucide-react';
+import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink, PartyPopper, HandHeart } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
@@ -10,6 +10,39 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
   const { savedRecipes, setActiveModalRecipe, onSaveRecipe, onRemoveSavedRecipe, masterRecipes } = useRecipes();
 
   const [selectedHHId, setSelectedHHId] = useState(activeHousehold?.id || null);
+
+  // ── Potluck / Event ─────────────────────────────────────────
+  const EVENT_KEY = `hungry_event_${selectedHHId}`;
+  const [eventName, setEventName] = useState('');
+  const [eventItems, setEventItems] = useState([]);
+  const [newEventItem, setNewEventItem] = useState('');
+  const [showEventPanel, setShowEventPanel] = useState(false);
+
+  useEffect(() => {
+    try { setEventItems(JSON.parse(localStorage.getItem(EVENT_KEY) || '[]')); } catch { setEventItems([]); }
+  }, [EVENT_KEY]);
+
+  const persistEvent = (items) => {
+    setEventItems(items);
+    try { localStorage.setItem(EVENT_KEY, JSON.stringify(items)); } catch {}
+  };
+
+  const addEventItem = () => {
+    const name = newEventItem.trim();
+    if (!name) return;
+    persistEvent([...eventItems, { id: Date.now(), name, claimedBy: null }]);
+    setNewEventItem('');
+  };
+
+  const claimEventItem = (id) => {
+    const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You';
+    persistEvent(eventItems.map(i => i.id === id ? { ...i, claimedBy: i.claimedBy ? null : displayName } : i));
+  };
+
+  const deleteEventItem = (id) => persistEvent(eventItems.filter(i => i.id !== id));
+
+  const readyCount = eventItems.filter(i => i.claimedBy).length;
+  const readyPct = eventItems.length > 0 ? Math.round((readyCount / eventItems.length) * 100) : 0;
   const [hhRecipes, setHhRecipes] = useState([]);
   const [newShopItem, setNewShopItem] = useState('');
   const [loadingRecipes, setLoadingRecipes] = useState(false);
@@ -50,9 +83,9 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
 
   useEffect(() => {
     if (!selectedHHId || !user) return;
-    // Load household members from profiles table
+    // Load household members — match on either active_household_id (new) or household_id (old schema)
     supabase.from('profiles').select('id, display_name')
-      .eq('active_household_id', selectedHHId)
+      .or(`active_household_id.eq.${selectedHHId},household_id.eq.${selectedHHId}`)
       .then(({ data }) => setMembers(data || []));
     // Load current user's friends
     supabase.from('friendships').select('friend_id')
@@ -297,6 +330,100 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
               </div>
             );
           })()}
+        </section>
+      )}
+
+      {/* ── Potluck / Event Panel ──────────────────────────────── */}
+      {selectedHH && (
+        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+          <button
+            onClick={() => setShowEventPanel(v => !v)}
+            className="w-full flex items-center justify-between gap-2"
+          >
+            <h2 className="text-[14px] font-bold text-slate-400 flex items-center gap-2">
+              <PartyPopper size={15} className="text-violet-400" /> Potluck / Event
+            </h2>
+            <ChevronDown size={14} className={`text-slate-300 transition-transform ${showEventPanel ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showEventPanel && (
+            <div className="mt-4 space-y-4">
+              {/* Event name */}
+              <input
+                type="text"
+                value={eventName}
+                onChange={e => setEventName(e.target.value)}
+                placeholder="Event name (e.g. Friday BBQ)"
+                className="w-full bg-violet-50/50 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
+              />
+
+              {/* Progress bar */}
+              {eventItems.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      {eventName || 'Event'} Readiness
+                    </span>
+                    <span className="text-[10px] font-black text-violet-500">{readyPct}% Ready</span>
+                  </div>
+                  <div className="h-2 bg-violet-50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-violet-400 rounded-full transition-all duration-500"
+                      style={{ width: `${readyPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Add item */}
+              <form onSubmit={e => { e.preventDefault(); addEventItem(); }} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newEventItem}
+                  onChange={e => setNewEventItem(e.target.value)}
+                  placeholder="Add item needed (e.g. Buns, Charcoal)…"
+                  className="flex-1 bg-slate-50 border border-slate-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
+                />
+                <button type="submit" className="bg-violet-400 text-white p-3 rounded-2xl shadow-md">
+                  <Plus size={18} />
+                </button>
+              </form>
+
+              {/* Item list */}
+              {eventItems.length === 0 ? (
+                <p className="text-xs text-slate-300 italic text-center py-2">No items yet — add what you need for the event</p>
+              ) : (
+                <div className="space-y-2">
+                  {eventItems.map(item => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${item.claimedBy ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <button
+                        onClick={() => claimEventItem(item.id)}
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${item.claimedBy ? 'bg-emerald-400 border-emerald-400' : 'border-slate-300 hover:border-violet-400'}`}
+                      >
+                        {item.claimedBy && <Check size={10} className="text-white" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-xs font-bold ${item.claimedBy ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                          {item.name}
+                        </span>
+                        {item.claimedBy && (
+                          <p className="text-[9px] text-emerald-500 font-black flex items-center gap-1 mt-0.5">
+                            <HandHeart size={9} /> Claimed by {item.claimedBy}
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => deleteEventItem(item.id)} className="text-slate-200 hover:text-red-400 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
     </div>

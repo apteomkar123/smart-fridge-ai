@@ -342,4 +342,14 @@ FEATURES:
 - Settle Up: Household tab shows per-member cost split from shared shopping list with Venmo deep-link and Splitwise link
 - Taste Profile Heatmap: New "Taste" analytics tab with cuisine bar chart, mastery badges, meal-type breakdown, and cook count stats
 - Virtual Sous Chef: Cooking Mode now accepts ingredient list prop; voice commands "I don't have [X]" and "substitute for [X]" trigger real-time AI substitution suggestions; "Ingredients" command shows ingredient panel
-- Features deferred (require external APIs or native iOS): Smart Price-Drop Watch (requires Kroger/Target API), Interactive Potluck Households (requires schema migration), Community Pantry Swap (requires geolocation + Supabase)
+- Features deferred (require external APIs or native iOS): Smart Price-Drop Watch (requires Kroger/Target API), Community Pantry Swap (requires geolocation + Supabase)
+
+IMPLEMENTED (session 2026-05-29 session 6):
+BUGS:
+- Household member list now queries both active_household_id and household_id (old schema) so all members show
+- Saved recipes cards: reduced padding, added overflow-hidden, fixed share dropdown direction (top-full) so it doesn't bleed off screen
+- AuthManager: popstate listener resets forgot-password and sign-up state so sign-in buttons reappear after browser back
+- Removed Google and Apple sign-in buttons; sign-in via AppWare SSO only
+
+FEATURES:
+- Potluck / Event panel in Household tab: add items needed for an event, claim them, live readiness progress bar (localStorage-persisted per household)
