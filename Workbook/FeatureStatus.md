@@ -8,8 +8,9 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Auth
 - Email / password sign in and sign up
+- Show/hide password toggle (eye icon) on password field
 - Forgot password (email reset link)
-- Sign in with Google (OAuth via Supabase — requires Google provider enabled in Supabase dashboard)
+- Sign in with Google (OAuth via Supabase — requires Google provider enabled in Supabase dashboard; set VITE_APP_URL in Netlify env vars to your production URL and add it to Supabase Redirect URLs allowlist to fix localhost redirect issue)
 - Onboarding flow — 5-screen liquid-glass intro + preferences sheet (name, dietary restrictions, nutrition goal), written to Supabase on completion
 
 ### Pantry
@@ -53,11 +54,14 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Chef History
 - Automatically logged when a recipe is marked as Cooked
-- Add personal notes per entry
-- Add photos per entry
+- Collapsed card shows photo thumbnail, recipe name, date, meal type, notes preview
+- Tap card to expand into a full detail view (name, description/ingredients, photos grid, notes)
+- Add personal notes per entry (tap "My Thoughts" area to edit)
+- Add photos per entry (from expanded card)
 - Delete individual photos
 - Toggle public / private visibility
-- Re-open the original recipe from history
+- "View Full Recipe" button in expanded card opens the full recipe modal
+- Recipe description saved alongside history entry when available
 
 ### Analytics
 - Nutrition overview — protein / carbs / fat breakdown with distribution bars
@@ -133,4 +137,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29 (session 2)*
+*Last updated: 2026-05-29 (session 3)*

@@ -550,6 +550,7 @@ export const useInventory = (user, household) => {
         recipeId: String(recipe.id),
         recipeName: recipe.name,
         meal_type: recipe.meal_type || '',
+        description: recipe.description || recipe.summary || '',
         ingredients: recipe.ingredients || [],
         steps: recipe.steps || [],
         cookedAt: new Date().toISOString(),

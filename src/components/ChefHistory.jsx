@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChefHat, Camera, Star, Trash2, Plus, Edit3, Check, Lock, Globe } from 'lucide-react';
+import { X, ChefHat, Camera, Star, Trash2, Check, Lock, Globe, ChevronDown } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 
 function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete, onOpenRecipe, onTogglePrivacy }) {
+  const [expanded, setExpanded] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(entry.notes || '');
   const fileRef = useRef(null);
@@ -25,88 +26,167 @@ function HistoryCard({ entry, onUpdateNotes, onAddPhoto, onDeletePhoto, onDelete
     month: 'short', day: 'numeric', year: 'numeric'
   });
 
-  return (
-    <div className="bg-white/80 backdrop-blur-lg rounded-[2rem] border border-white/20 shadow-md p-5 space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenRecipe(entry)}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] font-black text-slate-400 uppercase bg-blue-50 px-2 py-0.5 rounded-md tracking-widest">{entry.meal_type || 'Recipe'}</span>
-            <span className="text-[9px] text-slate-300 font-mono">{cookedDate}</span>
+  const hasPhotos = entry.photos && entry.photos.length > 0;
+
+  if (!expanded) {
+    return (
+      <div
+        className="bg-white/85 backdrop-blur-lg rounded-[2rem] border border-white/20 shadow-md p-5 cursor-pointer hover:shadow-lg active:scale-[0.99] transition-all"
+        onClick={() => setExpanded(true)}
+      >
+        <div className="flex items-center gap-4">
+          {hasPhotos ? (
+            <img src={entry.photos[0]} alt="" className="w-20 h-20 rounded-2xl object-cover border border-blue-50 shrink-0" />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100 flex items-center justify-center shrink-0">
+              <ChefHat size={28} className="text-[#6BAEE0]" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[9px] font-black text-[#6BAEE0] uppercase bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full tracking-widest">{entry.meal_type || 'Recipe'}</span>
+              <span className="text-[9px] text-slate-300 font-mono">{cookedDate}</span>
+            </div>
+            <h3 className="font-black text-slate-800 tracking-tight text-base leading-tight">{entry.recipeName}</h3>
+            {entry.notes ? (
+              <p className="text-xs text-amber-700/70 mt-1.5 line-clamp-1 italic">"{entry.notes}"</p>
+            ) : (
+              <p className="text-xs text-slate-300 mt-1.5 italic">Tap to expand &amp; add notes</p>
+            )}
           </div>
-          <h3 className="font-black text-slate-800 tracking-tight text-sm leading-tight hover:text-[#6BAEE0] transition-colors">{entry.recipeName}</h3>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {hasPhotos && (
+              <span className="text-[10px] font-black text-[#6BAEE0] bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full">
+                {entry.photos.length} photo{entry.photos.length > 1 ? 's' : ''}
+              </span>
+            )}
+            <ChevronDown size={16} className="text-slate-300" />
+          </div>
         </div>
-        <button onClick={() => onDelete(entry.id)} className="text-slate-200 hover:text-red-400 transition-colors shrink-0 p-1">
-          <Trash2 size={16} />
-        </button>
+      </div>
+    );
+  }
+
+  // Expanded card
+  const photoCount = entry.photos?.length || 0;
+  const gridCols = photoCount === 1 ? '1fr' : photoCount === 2 ? '1fr 1fr' : 'repeat(3, 1fr)';
+
+  return (
+    <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-2xl overflow-hidden">
+      {/* Hero header */}
+      <div className="relative p-6 pb-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-black text-[#6BAEE0] uppercase bg-sky-50 border border-sky-100 px-2.5 py-1 rounded-full tracking-widest">{entry.meal_type || 'Recipe'}</span>
+              <span className="text-[10px] text-slate-400 font-mono">{cookedDate}</span>
+              {!entry.isPrivate && <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Public</span>}
+            </div>
+            <h2 className="font-black text-slate-800 text-2xl leading-tight tracking-tight">{entry.recipeName}</h2>
+          </div>
+          <div className="flex gap-2 shrink-0 mt-1">
+            <button onClick={() => onDelete(entry.id)} className="w-9 h-9 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center transition-colors">
+              <Trash2 size={15} />
+            </button>
+            <button onClick={() => setExpanded(false)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Description / ingredient preview */}
+        {entry.description ? (
+          <p className="text-sm text-slate-500 leading-relaxed mb-3">{entry.description}</p>
+        ) : entry.ingredients?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {entry.ingredients.slice(0, 5).map((ing, i) => {
+              const label = typeof ing === 'string'
+                ? ing.replace(/^\d[\d./]*\s*(tbsp|tsp|cup|cups|g|kg|oz|lb|ml|l)?\s*/i, '').split(',')[0].trim()
+                : ing;
+              return (
+                <span key={i} className="text-[10px] font-bold bg-slate-50 border border-slate-100 text-slate-500 px-2.5 py-1 rounded-full">
+                  {label}
+                </span>
+              );
+            })}
+            {entry.ingredients.length > 5 && (
+              <span className="text-[10px] font-bold bg-blue-50 border border-blue-100 text-[#6BAEE0] px-2.5 py-1 rounded-full">
+                +{entry.ingredients.length - 5} more
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Photos */}
-      {entry.photos && entry.photos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {entry.photos.map((photo, i) => (
-            <div key={i} className="relative shrink-0">
-              <img
-                src={photo}
-                alt="cooked"
-                className="w-20 h-20 rounded-2xl object-cover border border-blue-50"
-              />
-              <button
-                onClick={() => onDeletePhoto(entry.id, i)}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-400 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-500 transition-colors"
-              >
-                <X size={10} strokeWidth={3} />
-              </button>
-            </div>
-          ))}
+      {/* Photos grid */}
+      {hasPhotos && (
+        <div className="px-6 mb-5">
+          <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
+            {entry.photos.map((photo, i) => (
+              <div key={i} className="relative" style={{ aspectRatio: '1' }}>
+                <img src={photo} alt="cooked" className="w-full h-full rounded-2xl object-cover border border-blue-50" />
+                <button
+                  onClick={() => onDeletePhoto(entry.id, i)}
+                  className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-400 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-500 transition-colors"
+                >
+                  <X size={11} strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Notes */}
-      {editingNotes ? (
-        <div className="space-y-2">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="How did it turn out? Any tweaks you'd make?"
-            rows={3}
-            autoFocus
-            className="w-full bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-xs text-slate-800 focus:border-sky-400 focus:outline-none resize-none placeholder:text-slate-300"
-          />
-          <button onClick={saveNotes} className="flex items-center gap-1.5 bg-[#6BAEE0] text-white px-4 py-2 rounded-xl text-xs font-black">
-            <Check size={11} /> Save
+      {/* Notes / My Thoughts */}
+      <div className="px-6 mb-5">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 mb-2">My Thoughts</p>
+        {editingNotes ? (
+          <div className="space-y-2">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="How did it turn out? Any tweaks you'd make?"
+              rows={3}
+              autoFocus
+              className="w-full bg-amber-50/60 border border-amber-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-amber-300 focus:outline-none resize-none placeholder:text-slate-300"
+            />
+            <button onClick={saveNotes} className="flex items-center gap-1.5 bg-[#6BAEE0] text-white px-4 py-2 rounded-xl text-xs font-black">
+              <Check size={11} /> Save
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setEditingNotes(true)}
+            className={`w-full text-left text-sm rounded-2xl px-4 py-4 border transition-all ${entry.notes ? 'bg-amber-50 border-amber-100 text-amber-800' : 'bg-slate-50 border-dashed border-slate-200 text-slate-400 italic hover:border-sky-300 hover:bg-sky-50/30'}`}
+          >
+            {entry.notes || 'Tap to add your thoughts on this recipe…'}
           </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setEditingNotes(true)}
-          className={`w-full text-left text-xs rounded-2xl px-4 py-3 border transition-all ${entry.notes ? 'bg-amber-50 border-amber-100 text-amber-800' : 'bg-slate-50 border-slate-100 text-slate-400 italic hover:border-sky-200'}`}
-        >
-          {entry.notes || 'Add your thoughts on this recipe…'}
-        </button>
-      )}
+        )}
+      </div>
 
-      {/* Actions */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-1.5 text-[10px] font-black px-3 py-2 bg-violet-50 text-violet-600 border border-violet-100 rounded-xl hover:bg-violet-100 transition-all"
-        >
-          <Camera size={12} /> Add Photo
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+      {/* Primary action */}
+      <div className="px-6 pb-6 space-y-3">
         <button
           onClick={() => onOpenRecipe(entry)}
-          className="flex items-center gap-1.5 text-[10px] font-black px-3 py-2 bg-sky-50 text-[#6BAEE0] border border-sky-100 rounded-xl hover:bg-sky-100 transition-all"
+          className="w-full bg-[#6BAEE0] hover:bg-[#5da0cf] active:scale-[0.98] text-white font-black py-4 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-100 transition-all"
         >
-          <Star size={12} /> View Recipe
+          <Star size={15} /> View Full Recipe
         </button>
-        <button
-          onClick={() => onTogglePrivacy(entry.id)}
-          className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl transition-all ${entry.isPrivate ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
-        >
-          {entry.isPrivate ? <><Lock size={12} /> Private</> : <><Globe size={12} /> Public</>}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-black py-3 bg-violet-50 text-violet-600 border border-violet-100 rounded-xl hover:bg-violet-100 transition-all"
+          >
+            <Camera size={13} /> Add Photo
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+          <button
+            onClick={() => onTogglePrivacy(entry.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-black py-3 rounded-xl transition-all ${entry.isPrivate ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
+          >
+            {entry.isPrivate ? <><Lock size={13} /> Private</> : <><Globe size={13} /> Public</>}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -150,7 +230,6 @@ export default function ChefHistory() {
   };
 
   const handleOpenRecipe = (entry) => {
-    // Try to find the original recipe in master list; fall back to the saved snapshot
     const found = masterRecipes.find(r => String(r.id) === String(entry.recipeId));
     setActiveModalRecipe(found || {
       id: entry.recipeId,

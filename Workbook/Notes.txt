@@ -314,3 +314,11 @@ BUGS:
 
 FEATURES:
 - AI loading animation: 3 rotating frames (book writing, chef hat tilting, pot stirring) with SVG animations; shown full-screen while AI generates recipe or meal plan
+
+IMPLEMENTED (session 2026-05-29 session 3):
+BUGS:
+- Continue with Google OAuth now uses VITE_APP_URL env var (falls back to window.location.origin) — set VITE_APP_URL to your Netlify URL and add it to Supabase Redirect URLs allowlist to fix localhost redirect on Safari
+
+FEATURES:
+- Show/hide password toggle (eye icon) added to password field on sign-in/sign-up screen
+- Chef History cards redesigned: bigger collapsed card with photo thumbnail, recipe name, date, notes preview; tap to expand into full detail view showing recipe name, description/ingredients, photos grid, notes, and a "View Full Recipe" button

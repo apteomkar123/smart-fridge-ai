@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export default function AuthManager() {
@@ -8,13 +9,15 @@ export default function AuthManager() {
   const [authLoading, setAuthLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(null); // 'google' | 'apple' | null
   const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleOAuth = async (provider) => {
     setOauthLoading(provider);
     try {
+      const redirectTo = import.meta.env.VITE_APP_URL || window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo },
       });
       if (error) throw error;
     } catch (err) {
@@ -116,7 +119,14 @@ export default function AuthManager() {
         {!isForgotPasswordView && isSignUp && <p className="text-xs text-slate-400 mb-2">Create a new account</p>}
         
         <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Email Address" />
-        {!isForgotPasswordView && <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Password" />}
+        {!isForgotPasswordView && (
+          <div className="relative">
+            <input type={showPassword ? 'text' : 'password'} required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-white border border-blue-100 px-4 py-3 pr-11 rounded-xl text-sm font-bold text-slate-800 focus:border-sky-400 focus:outline-none" placeholder="Password" />
+            <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        )}
         
         <button type="submit" disabled={authLoading} className="w-full bg-[#6BAEE0] hover:bg-[#5da0cf] text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-100">
           {authLoading ? "Processing..." : isForgotPasswordView ? "Send Reset Link" : isSignUp ? "Create Account" : "Sign In"}
