@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Filter, Star, Users } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
@@ -6,7 +6,24 @@ import SearchWithHistory from './SearchWithHistory';
 
 export default function RecipeExplorer() {
   const [shareMenuId, setShareMenuId] = useState(null);
+  const shareMenuRef = useRef(null);
   const { households } = useUser();
+
+  // Close share menu when clicking outside of it
+  useEffect(() => {
+    if (!shareMenuId) return;
+    const handler = (e) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target)) {
+        setShareMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [shareMenuId]);
   const {
     processedRecipes: recipes,
     recipeSearch,
@@ -116,7 +133,7 @@ export default function RecipeExplorer() {
               <div className="flex items-center gap-2">
                 {/* Household share — dropdown anchored above the button */}
                 {households?.length > 0 && (
-                  <div className="relative">
+                  <div className="relative" ref={shareMenuId === recipe.id ? shareMenuRef : null}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setShareMenuId(shareMenuId === recipe.id ? null : recipe.id); }}
                       className="flex items-center gap-1 text-[9px] font-black text-slate-400 hover:text-[#6BAEE0] border border-slate-200 hover:border-sky-200 px-2 py-1.5 rounded-xl transition-all"

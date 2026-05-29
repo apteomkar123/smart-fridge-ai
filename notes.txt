@@ -65,3 +65,11 @@ Shopping items added to the main shopping list and then switched to a household 
 Fix the shopping list logic. Random things are happenning. When I check off one item, multiple items are getting checked off, when I uncheck one item multiple items are getting unchecked, items are getting duplicated, etc. This is especially happenning when the items are added from the recipe card's "add all missing items" feature
 
 The share recipe from explorer feature you claimed to add does not show up. Do better.
+
+Shopping list items, when added to a household from the personal list, still aren't showing up in the shared household list.
+
+Once the share pill on the recipe is opened, it doesn't close, even though it should be closing when tapped outside of it.
+
+Improve the chef's hat image in the animation, it looks so ugly and weird right now, that's not at all what a chef's hat looks like.
+
+Add that share pill button to saved recipes as well

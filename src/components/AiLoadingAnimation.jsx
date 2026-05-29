@@ -32,24 +32,37 @@ const FRAMES = [
     label: 'Chef is thinking…',
     animation: (
       <svg viewBox="0 0 80 80" className="w-20 h-20" fill="none">
-        {/* Blue circle */}
+        {/* Blue circle background */}
         <circle cx="40" cy="40" r="36" fill="#6BAEE0" />
-        {/* Hat tilts on its brim centre */}
+        {/* Whole hat tilts left/right from the brim bottom */}
         <g>
-          <animateTransform attributeName="transform" type="rotate" values="-8,40,57; 8,40,57; -8,40,57" dur="1s" repeatCount="indefinite" />
-          {/* Brim — flat band */}
-          <rect x="21" y="53" width="38" height="8" rx="4" fill="white" />
-          {/* Brim inner fold line */}
-          <line x1="21" y1="57" x2="59" y2="57" stroke="#daeaf6" strokeWidth="1" />
-          {/* Dome — tall puffed cylinder, pointed at top */}
-          <path d="M26,54 C26,54 24,42 25,33 C26,24 32,18 40,18 C48,18 54,24 55,33 C56,42 54,54 54,54 Z" fill="white" />
-          {/* Dome crease / fold line on left side */}
-          <path d="M30,50 C29,42 28,34 30,27" stroke="#daeaf6" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          {/* Dome crease on right side */}
-          <path d="M50,50 C51,42 52,34 50,27" stroke="#daeaf6" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          {/* Pleats / puff lines at top */}
-          <path d="M35,20 C34,22 34,26 35,28" stroke="#daeaf6" strokeWidth="1" strokeLinecap="round" fill="none" />
-          <path d="M45,20 C46,22 46,26 45,28" stroke="#daeaf6" strokeWidth="1" strokeLinecap="round" fill="none" />
+          <animateTransform attributeName="transform" type="rotate" values="-7,40,62; 7,40,62; -7,40,62" dur="1s" repeatCount="indefinite" />
+
+          {/* ── Brim: wide, short, flat band ── */}
+          <rect x="17" y="55" width="46" height="9" rx="4.5" fill="white" />
+          {/* Brim shadow line */}
+          <rect x="17" y="59" width="46" height="2" rx="1" fill="#d8eaf6" />
+
+          {/* ── Dome: tall cylinder with rounded top ── */}
+          {/* Left side: nearly straight, slight inward taper at top */}
+          {/* Right side: mirror */}
+          {/* Top: gently curved arch */}
+          <path d="
+            M 28 56
+            L 27 44
+            C 26 34 28 24 40 20
+            C 52 24 54 34 53 44
+            L 52 56
+            Z
+          " fill="white" />
+
+          {/* Vertical pleat crease lines on dome */}
+          <line x1="33" y1="54" x2="32" y2="30" stroke="#d8eaf6" strokeWidth="1.2" strokeLinecap="round" />
+          <line x1="40" y1="54" x2="40" y2="21" stroke="#d8eaf6" strokeWidth="1.2" strokeLinecap="round" />
+          <line x1="47" y1="54" x2="48" y2="30" stroke="#d8eaf6" strokeWidth="1.2" strokeLinecap="round" />
+
+          {/* Top dome edge highlight */}
+          <path d="M 30 30 C 28 24 34 19 40 20 C 46 19 52 24 50 30" stroke="#d8eaf6" strokeWidth="1" strokeLinecap="round" fill="none" />
         </g>
       </svg>
     ),

@@ -5,7 +5,7 @@ import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
 import { cleanIngredientLocally } from './recipeUtils';
 
-export default function HouseholdTab({ onAddShoppingItem }) {
+export default function HouseholdTab({ onAddShoppingItem, shoppingRefreshKey }) {
   const { households, household: activeHousehold, handleUpdateBudgetLimit, user } = useUser();
   const { savedRecipes, setActiveModalRecipe, onSaveRecipe, onRemoveSavedRecipe, masterRecipes } = useRecipes();
 
@@ -64,6 +64,11 @@ export default function HouseholdTab({ onAddShoppingItem }) {
     loadHouseholdRecipes();
     loadHouseholdShopping();
   }, [loadHouseholdRecipes, loadHouseholdShopping]);
+
+  // Refresh shopping when an item is moved from the main list into this household
+  useEffect(() => {
+    if (shoppingRefreshKey > 0) loadHouseholdShopping();
+  }, [shoppingRefreshKey, loadHouseholdShopping]);
 
   // Real-time subscription: refresh household shopping list on any shopping_list change.
   // No filter — catches rows being moved INTO this household (household_id updated from null).

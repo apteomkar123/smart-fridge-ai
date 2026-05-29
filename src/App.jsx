@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound } from 'lucide-react';
+import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2 } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
@@ -58,6 +58,7 @@ function AppContent({ inventory }) {
     activeModalRecipe,
     setActiveModalRecipe,
     savedRecipes,
+    onSaveRecipe,
     onRemoveSavedRecipe,
     filteredSavedRecipes,
     recipeSearch: _rs,
@@ -84,6 +85,19 @@ function AppContent({ inventory }) {
   const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
   const [isShopperOpen, setIsShopperOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [hhShoppingRefreshKey, setHhShoppingRefreshKey] = useState(0);
+  const [savedShareMenuId, setSavedShareMenuId] = useState(null);
+  const savedShareMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!savedShareMenuId) return;
+    const close = (e) => {
+      if (savedShareMenuRef.current && !savedShareMenuRef.current.contains(e.target)) setSavedShareMenuId(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('touchstart', close); };
+  }, [savedShareMenuId]);
   const mainRef = useRef(null);
   const touchStartX = useRef(null);
 
@@ -218,7 +232,7 @@ function AppContent({ inventory }) {
                   onClear={handleClearShoppingItem}
                   onRename={handleRenameShoppingItem}
                   households={households}
-                  onMoveToHousehold={(itemId, hhId) => handleMoveShoppingItem(itemId, hhId)}
+                  onMoveToHousehold={(itemId, hhId) => { handleMoveShoppingItem(itemId, hhId); setHhShoppingRefreshKey(k => k + 1); }}
                 />
               </>
             )}
@@ -231,7 +245,7 @@ function AppContent({ inventory }) {
                 onAddShoppingItem={handleAddShoppingItem}
               />
             )}
-            {activeTab === 'household' && <HouseholdTab onAddShoppingItem={handleAddShoppingItem} />}
+            {activeTab === 'household' && <HouseholdTab onAddShoppingItem={handleAddShoppingItem} shoppingRefreshKey={hhShoppingRefreshKey} />}
             {activeTab === 'friends' && <FriendsPage />}
             {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}
             {activeTab === 'saved' && (
@@ -322,7 +336,7 @@ function AppContent({ inventory }) {
                     filteredSavedRecipes.map(recipe => (
                       <div key={recipe.id} className="bg-white/80 p-6 rounded-3xl border border-blue-100 flex justify-between items-center shadow-sm hover:shadow-md transition-all group">
                         <div
-                          className="flex-1 cursor-pointer"
+                          className="flex-1 cursor-pointer min-w-0"
                           onClick={() => setActiveModalRecipe({
                             ...recipe,
                             id: recipe.recipe_id,
@@ -331,9 +345,43 @@ function AppContent({ inventory }) {
                           })}
                         >
                           <span className="text-[8px] font-mono font-black text-slate-400 uppercase bg-blue-50/50 px-2 py-1 rounded-md">{recipe.meal_type}</span>
-                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors">{recipe.recipe_name}</h3>
+                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors truncate">{recipe.recipe_name}</h3>
                         </div>
-                        <button onClick={() => onRemoveSavedRecipe(recipe.id)} className="text-red-300 hover:text-red-500 transition-colors p-2"><Trash2 size={20} /></button>
+                        <div className="flex items-center gap-1 shrink-0 ml-3">
+                          {households?.length > 0 && (
+                            <div className="relative" ref={savedShareMenuId === recipe.id ? savedShareMenuRef : null}>
+                              <button
+                                onClick={() => setSavedShareMenuId(savedShareMenuId === recipe.id ? null : recipe.id)}
+                                className="flex items-center gap-1 text-[9px] font-black text-slate-400 hover:text-[#6BAEE0] border border-slate-200 hover:border-sky-200 px-2 py-1.5 rounded-xl transition-all"
+                              >
+                                <Users size={11} /> Share
+                              </button>
+                              {savedShareMenuId === recipe.id && (
+                                <div className="absolute right-0 bottom-9 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[160px] p-2 space-y-1">
+                                  {households.map(h => (
+                                    <button
+                                      key={h.id}
+                                      onClick={() => {
+                                        onSaveRecipe({
+                                          id: recipe.recipe_id,
+                                          name: recipe.recipe_name,
+                                          meal_type: recipe.meal_type,
+                                          ingredients: recipe.ingredients || [],
+                                          steps: recipe.steps || []
+                                        }, h.id);
+                                        setSavedShareMenuId(null);
+                                      }}
+                                      className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-sky-50 hover:text-[#6BAEE0] transition-all flex items-center gap-2"
+                                    >
+                                      <Users size={11} /> {h.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <button onClick={() => onRemoveSavedRecipe(recipe.id)} className="text-red-300 hover:text-red-500 transition-colors p-2"><Trash2 size={20} /></button>
+                        </div>
                       </div>
                     ))
                   )}
