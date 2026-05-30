@@ -13,17 +13,18 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - **Sign in with AppWare** — "Sync your AppWare apps!" tagline above button; redirects to SSO portal, returns with session token; browser back resets sign-in view correctly
 - Google and Apple sign-in removed (replaced by AppWare SSO)
 - Onboarding flow — 5-screen liquid-glass intro + preferences sheet (name, dietary restrictions, nutrition goal), written to Supabase on completion
-- **Interactive Tutorial** — runs automatically on first login (after onboarding); 8-step walkthrough covering all features; skip or dismiss marks it complete; Re-run Tutorial button in Settings; confetti on finish
+- **Interactive Tutorial** — runs automatically on first login (after onboarding); 10-step walkthrough now covers all features (added Community Recipes, Friends & Profiles, Events); skip or dismiss marks it complete; Re-run Tutorial button in Settings; confetti on finish; intro text no longer has quotation marks
 
 ### Pantry
 - Add items manually
 - Scan a grocery receipt via photo upload (AI parsing)
-- Barcode lookup (Open Food Facts API)
+- Barcode lookup (Open Food Facts API) — barcode input now uses a Plus button (like manual add) instead of a symbol bar
 - Edit item details inline
 - Remove items
 - Expiry date tracking
-- Assign items to a personal or household pantry
+- Assign items to a personal or household pantry — household picker dropdown when multiple households exist
 - Quantity controls per item
+- Pantry item names displayed in Title Case (regardless of how they were stored)
 
 ### Recipes
 - Recipe modal header (title, star, share, X) is sticky — stays locked at top as user scrolls through ingredients and steps
@@ -53,7 +54,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Full Kroger/Target grocery store API integration requires API keys (planned)
 
 ### Shopping List
-- Add items manually
+- Add items manually — items are now stored with their original casing (Title Case), not lowercased
 - Items auto-grouped by aisle (Produce, Dairy, Meat, Bakery, etc.)
 - Check off items
 - Delete items
@@ -119,9 +120,10 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Sign out
 
 ### Community Recipes / Explore (top-level nav section)
-- Category rows with horizontal scroll: Trending, Healthy, Comfort Food, Breakfast, Seafood, Dessert, Beef, Asian, Indian, Mexican, Italian, American, High Protein, Quick & Easy
-- Each recipe card shows the dish photo and name; tap to open full recipe card with ingredients and steps
-- Search bar at top queries TheMealDB by name in real-time
+- Category rows with horizontal scroll (limited to 8 cards): Trending, Healthy, Comfort Food, Breakfast, Seafood, Dessert, Beef, Asian, Indian, Mexican, Italian, American, High Protein, Quick & Easy
+- **View More** — arrow + "View More" button at the end of each scroll row expands to a full grid; "View All" link in row header also expands; "Show Less" collapses back
+- Each recipe card shows the dish photo and name (title-cased); tap to open full recipe card with ingredients and steps
+- Search bar at top queries TheMealDB by name in real-time; results are title-cased
 - Category data cached per-row for 6 hours in localStorage
 
 ### Friends
@@ -129,17 +131,32 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Profile shows: avatar, cook count, cuisine mastery badges, Chef History feed (public entries), Favorites tab (saved recipes from Supabase)
 - Tapping any recipe in the profile opens it as a full recipe card
 
-### Potluck (top-level section in nav)
-- Create named events with auto-generated 8-character invite codes
+### Events (formerly Potluck — renamed in nav)
+- Create named events with auto-generated 8-character invite codes (generated client-side as fallback)
+- Event creation includes optional date, time, and venue fields
 - Share event via URL (`?potluck=CODE`) — anyone with the link joins and can claim items
 - Claim/unclaim items per event; host can delete items and the whole event
 - Readiness progress bar; backed by `potluck_events` + `potluck_items` Supabase tables
+- View Full Details card shows each attendee's dietary restrictions (pulled from their profile settings)
+- RSVP view shows who's bringing what, unclaimed items, and the user's own dietary restrictions
 
 ### Cooking Mode (Virtual Sous Chef)
 - Voice navigation: "Next", "Back", "Repeat", "Stop", "Ingredients"
 - **Voice substitution**: say "I don't have [ingredient]" or "substitute for [X]" → AI fetches a real-time substitution suggestion
 - Ingredient panel toggle (tap list icon or say "Ingredients") shows full ingredient list during cooking
 - Mic pulses red when active; screen stay-awake via Wake Lock API
+
+### AppWare Ecosystem Features
+- **#1 Kitchen Concert** — when Cooking Mode opens, writes a `cooking_started` event to `cross_app_activity` with a genre seed mapped from recipe cuisine (Italian → classical, Indian → world-music, etc.) so Jukebox can queue a matching playlist
+- **#3 Smart Grocery Split** — when a priced pantry item is moved to a household, automatically creates a `Groceries` transaction in Roomies and splits it among household members
+- **#4 Potluck Planner** — "✨ Smart Suggestions" button in the Household → Potluck panel fetches each member's `hungry_settings.dietary_restrictions` and generates a filtered item suggestion list (vegan/vegetarian/meat-safe); also writes `potluck_created` signal to `cross_app_activity`
+- **#5 AppWare Wrap** — new "🌐 Wrap" tab in Analytics dashboard; shows monthly cross-app stats: recipes cooked, chores done (Roomies), bills paid (Roomies), top cuisine, pantry value, and currently playing track (Jukebox `now_playing` table)
+- **#6 Mood-Food Matching** — on app load, reads most recent `mood_signal` event from `cross_app_activity` (written by Jukebox) and pre-selects the matching mood in Recipe Explorer
+- **#7 Who's Home? Shopping Alerts** — Household tab shows an amber banner when any household member has their Roomies presence set to "🛒 At the Store" (written by Hungry's Personal Shopper mode)
+- **#10 Late-Night Snack Mode** — on app load, reads most recent `late_night_active` event from Jukebox (past 2 hours) and pre-selects "late_night" mood in Recipe Explorer
+- **#11 Grocery Gig Status** — Personal Shopper sets Roomies `user_presence` to `status='Away', custom_text='🛒 At the Store'` on open; resets to `Available` when closed
+- **#12 Soundtrack of My Life** — when a recipe is marked as Cooked, queries the Jukebox `now_playing` table and saves the current track (`track_title`, `artist`, `album`, `artwork_url`, `platform`) into `chef_history.soundtrack`
+- **#14 Nutritional BPM (write side)** — when the Analytics page loads and the user's macro breakdown is below their stated goal (e.g. protein < 20g on High Protein goal), writes a `nutrition_shortfall` event to `cross_app_activity` so Jukebox can suggest a workout playlist and Roomies can surface high-effort chores first
 
 ### Infrastructure
 - Progressive Web App (PWA) — installable on home screen, offline support via service worker
@@ -176,4 +193,25 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-30 (session 8)*
+### Analytics
+- **Taste Profile** — meal_type and cuisine are now split correctly when stored to chef history; combined values like "breakfast Indian" are parsed into separate meal_type and cuisine fields
+- Saved recipe cuisine filter now correctly uses `r.cuisine` (not `r.meal_type`) for filtering
+
+### Infrastructure
+- PWA manifest icons separated into `"purpose": "any"` and `"purpose": "maskable"` to prevent iOS home screen icon showing a black background; `background_color` updated to `#6BAEE0`
+
+---
+
+## ❌ Not Yet Implemented (from session 9 Changes.md)
+
+| Feature | Reason |
+|---|---|
+| **Substitutions in Explore section** (tag instead of picture) | Requires hooking dietary restrictions into CommunityRecipes' recipe modal and the substitution engine — left for next session |
+| **Interactive step-by-step tutorial with tap targets** | Complex UI overlay with highlight masks and animated arrows — current tutorial improved (10 steps, no quotes) but not fully interactive |
+| **Recipe images on suggested recipes card** | Already implemented for MealDB and Spoonacular; AI-generated recipes don't have images by design |
+| **Better ingredient alternatives in shopping list** | Requires AI call per item against user's nutrition goal — deferred |
+| **Store item location map** | Requires store-specific APIs (Kroger, Target, etc.) — deferred pending API keys |
+| **Personal Shopper unavailable item substitution** | Requires web search or store inventory API — deferred |
+| **Visual heat map for taste profile** | Deferred — current bar chart with mastery badges is functional |
+
+*Last updated: 2026-05-30 (session 9)*
