@@ -262,9 +262,22 @@ export const useInventory = (user, household) => {
   }, [user, resolveSanitizedTokenOnline, performMutation]);
 
   const handleToggleItemHousehold = useCallback(async (id, newHouseholdId) => {
-    setFridge(prev => prev.map(item => item.id === id ? { ...item, household_id: newHouseholdId } : item));
+    const item = fridge.find(i => i.id === id);
+    setFridge(prev => prev.map(i => i.id === id ? { ...i, household_id: newHouseholdId } : i));
     await performMutation('fridge_inventory', 'UPDATE', { household_id: newHouseholdId }, id);
-  }, [performMutation]);
+
+    // Feature #3: Smart Grocery Split — when a priced item is shared to a household,
+    // push it as a Groceries transaction so Roomies can split the cost automatically.
+    if (newHouseholdId && item?.price > 0 && user?.id) {
+      supabase.from('transactions').insert({
+        household_id: newHouseholdId,
+        paid_by: user.id,
+        amount: item.price,
+        memo: `${item.raw_name || item.item_name} (from Hungry)`,
+        category: 'Groceries',
+      }).then(() => {});
+    }
+  }, [fridge, performMutation, user]);
 
   const handleRemoveItem = useCallback(async (id) => {
     setFridge(prev => prev.filter(item => item.id !== id));
@@ -275,9 +288,10 @@ export const useInventory = (user, household) => {
     if (!itemName || !user) return;
     const sanitized = cleanIngredientLocally(itemName);
     if (!sanitized) return;
+    const displayName = toTitleCase(itemName.trim());
 
     // Use ref so concurrent adds (from handleAddAllMissing) see the latest state
-    const alreadyLocal = shoppingListRef.current.some(i => i.item_name?.toLowerCase() === sanitized.toLowerCase());
+    const alreadyLocal = shoppingListRef.current.some(i => cleanIngredientLocally(i.item_name) === sanitized);
     if (alreadyLocal) return; // silent skip — batch adds shouldn't alert
 
     // Respect user's default destination preference
@@ -288,7 +302,7 @@ export const useInventory = (user, household) => {
     const newItem = {
       user_id: user.id,
       household_id: householdId,
-      item_name: sanitized,
+      item_name: displayName,
       is_completed: false,
       price
     };
@@ -555,6 +569,23 @@ export const useInventory = (user, household) => {
       } catch {}
     }
 
+    // Normalize meal_type and cuisine — split combined values like "breakfast Indian"
+    const _CUISINE_WORDS = ['indian', 'chinese', 'mexican', 'japanese', 'korean', 'jamaican', 'latin', 'african', 'mediterranean', 'thai', 'italian', 'french', 'american', 'british', 'greek', 'spanish', 'turkish', 'moroccan', 'vietnamese', 'filipino', 'pakistani'];
+    const _MEAL_WORDS = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'main', 'starter', 'side', 'salad', 'soup', 'bread', 'pasta'];
+    let _mt = (recipe.meal_type || '').trim();
+    let _cu = (recipe.cuisine || '').trim();
+    if (_mt) {
+      const _lower = _mt.toLowerCase();
+      for (const cw of _CUISINE_WORDS) {
+        if (_lower.includes(cw) && !_cu) {
+          _cu = cw.charAt(0).toUpperCase() + cw.slice(1);
+          _mt = _mt.replace(new RegExp(cw, 'i'), '').trim() || 'Main';
+          break;
+        }
+      }
+    }
+    if (!_mt) _mt = 'Main';
+
     // Log to Chef History in localStorage
     try {
       const history = JSON.parse(localStorage.getItem('hungry_chef_history') || '[]');
@@ -562,8 +593,8 @@ export const useInventory = (user, household) => {
         id: `cooked-${Date.now()}`,
         recipeId: String(recipe.id),
         recipeName: recipe.name,
-        meal_type: recipe.meal_type || '',
-        cuisine: recipe.cuisine || '',
+        meal_type: _mt,
+        cuisine: _cu,
         description: recipe.description || recipe.summary || '',
         ingredients: recipe.ingredients || [],
         steps: recipe.steps || [],

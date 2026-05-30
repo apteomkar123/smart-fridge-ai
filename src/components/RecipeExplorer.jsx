@@ -12,9 +12,14 @@ const MOODS = [
   { key: 'adventurous', label: '🌍 Adventurous',   keywords: ['indian', 'thai', 'korean', 'ethiopian', 'moroccan', 'peruvian', 'vietnamese', 'jamaican', 'fusion', 'spicy'] },
 ];
 
-export default function RecipeExplorer() {
+export default function RecipeExplorer({ initialMood = null }) {
   const [shareMenuId, setShareMenuId] = useState(null);
-  const [selectedMood, setSelectedMood] = useState(null);
+  const [selectedMood, setSelectedMood] = useState(initialMood);
+
+  // Sync if Jukebox mood signal arrives after initial render
+  useEffect(() => {
+    if (initialMood && !selectedMood) setSelectedMood(initialMood);
+  }, [initialMood]);
   const shareMenuRef = useRef(null);
   const { households } = useUser();
 

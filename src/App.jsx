@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper, Globe } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
@@ -27,7 +28,7 @@ import ChefHistory from './components/ChefHistory';
 import AddRecipeModal from './components/AddRecipeModal';
 
 function AppContent({ inventory }) {
-  const { household: activeHousehold, households, showTutorial, dismissTutorial } = useUser();
+  const { user, household: activeHousehold, households, showTutorial, dismissTutorial } = useUser();
   const {
     fridge,
     shoppingList,
@@ -85,6 +86,28 @@ function AppContent({ inventory }) {
 
   const [activeTab, setActiveTab] = useState('pantry');
   const [isCookingMode, setIsCookingMode] = useState(false);
+  const [jukeboxMood, setJukeboxMood] = useState(null); // Features #6 + #10
+
+  // Features #6 + #10: Read the most recent mood/late-night signal from Jukebox
+  useEffect(() => {
+    if (!user?.id) return;
+    const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // last 2 hours
+    supabase.from('cross_app_activity')
+      .select('activity_type, payload, created_at')
+      .eq('user_id', user.id)
+      .in('activity_type', ['mood_signal', 'late_night_active'])
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const ev = data[0];
+        const mood = ev.activity_type === 'late_night_active'
+          ? 'late_night'
+          : ev.payload?.mood || null;
+        setJukeboxMood(mood);
+      });
+  }, [user?.id]);
   const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
   const [isShopperOpen, setIsShopperOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -136,7 +159,7 @@ function AppContent({ inventory }) {
     { tab: 'chefHistory', icon: <Clock size={22} />,          label: 'Chef History' },
     { tab: 'analytics',   icon: <BarChart3 size={22} />,      label: 'Analytics' },
     { tab: 'household',   icon: <Users size={22} />,          label: 'Household' },
-    { tab: 'potluck',     icon: <PartyPopper size={22} />,    label: 'Potluck' },
+    { tab: 'potluck',     icon: <PartyPopper size={22} />,    label: 'Events' },
     { tab: 'community',   icon: <Globe size={22} />,          label: 'Explore' },
     { tab: 'friends',     icon: <UserRound size={22} />,     label: 'Friends' },
     { tab: 'settings',    icon: <Settings size={22} />,      label: 'Settings' },
@@ -221,7 +244,7 @@ function AppContent({ inventory }) {
                 setQuantityForItem={setQuantityForItem}
               />
             )}
-            {activeTab === 'recipes' && <RecipeExplorer />}
+            {activeTab === 'recipes' && <RecipeExplorer initialMood={jukeboxMood} />}
             {activeTab === 'shopping' && (
               <>
                 <div className="flex justify-end mb-4">
@@ -349,9 +372,9 @@ function AppContent({ inventory }) {
                     <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
                   ) : (
                     filteredSavedRecipes.map(recipe => (
-                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative">
+                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
                         <div
-                          className="flex-1 cursor-pointer min-w-0"
+                          className="flex-1 cursor-pointer min-w-0 overflow-hidden"
                           onClick={() => setActiveModalRecipe({
                             ...recipe,
                             id: recipe.recipe_id,
@@ -360,7 +383,7 @@ function AppContent({ inventory }) {
                           })}
                         >
                           <span className="text-[8px] font-mono font-black text-slate-400 uppercase bg-blue-50/50 px-2 py-1 rounded-md">{recipe.meal_type}</span>
-                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors truncate">{recipe.recipe_name}</h3>
+                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors truncate pr-1">{recipe.recipe_name}</h3>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 ml-3">
                           {households?.length > 0 && (

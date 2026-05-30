@@ -490,17 +490,17 @@ export const RecipeProvider = ({ children, fridge }) => {
       })
       .filter(r => {
         if (savedCategoryFilters.length === 0) return true;
-        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.meal_type || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
+        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.cuisine || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
         return savedCategoryFilters.some(f => matchesRecipeFilter(n, f));
       })
       .filter(r => {
         if (savedDietFilters.length === 0) return true;
-        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.meal_type || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
+        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.cuisine || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
         return savedDietFilters.some(f => matchesRecipeFilter(n, f));
       })
       .filter(r => {
         if (savedCuisineFilters.length === 0) return true;
-        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.meal_type || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
+        const n = { meal_type: r.meal_type, name: r.recipe_name, cuisine: r.cuisine || '', cleanedIngredients: r.ingredients ? r.ingredients.map(cleanIngredientLocally) : [] };
         return savedCuisineFilters.some(f => matchesRecipeFilter(n, f));
       });
   }, [savedRecipes, debouncedSavedSearch, savedCategoryFilters, savedDietFilters, savedCuisineFilters]);

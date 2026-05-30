@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { DollarSign, BarChart, ShoppingBag, TrendingDown, PieChart, Target, Sparkles, Loader2, RefreshCw, Star, Plus, Leaf, AlertTriangle, CalendarDays, Edit2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { DollarSign, BarChart, ShoppingBag, TrendingDown, PieChart, Target, Sparkles, Loader2, RefreshCw, Star, Plus, Leaf, AlertTriangle, CalendarDays, Edit2, Globe } from 'lucide-react';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
+import { supabase } from '../supabaseClient';
 
 const MACRO_GOALS = [
   { key: 'protein', label: 'Protein', emoji: '💪', color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-200' },
@@ -18,10 +19,13 @@ const ECO_RATINGS = [
 ];
 
 export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAddShoppingItem }) {
-  const { household, userSettings, handleUpdatePersonalBudget, handleUpdateBudgetLimit } = useUser();
+  const { user, household, userSettings, handleUpdatePersonalBudget, handleUpdateBudgetLimit } = useUser();
   const { onSaveRecipe, onRemoveSavedRecipe, processedRecipes, savedRecipes, setActiveModalRecipe, generateMealPlan, prepLoading, activeMealPlan, setActiveMealPlan, setIsMealPrepOpen, generateRecipeByName, findRecipeByName } = useRecipes();
 
   const [dashTab, setDashTab] = useState('nutrition');
+  const [appWrapData, setAppWrapData] = useState(null);
+  const [appWrapLoading, setAppWrapLoading] = useState(false);
+  const nutritionShortfallWritten = useRef(false);
   const [selectedMacro, setSelectedMacro] = useState(null);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -68,6 +72,65 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
     const uniqueStores = [...new Set(fridge.map(item => item.storeName).filter(Boolean))];
     return { expiringItems, expiredItems, atRiskValue, ecoRating, uniqueStores };
   }, [fridge]);
+
+  // Feature #14: Nutritional BPM — write shortfall signal to cross_app_activity once per session
+  useEffect(() => {
+    if (!user?.id || nutritionShortfallWritten.current) return;
+    const goal = userSettings?.nutrition_goal || 'Balanced';
+    const lowProtein = goal === 'High Protein' && metrics.protein < 20;
+    const lowCarbs   = goal === 'Low Carb'     && metrics.carbs   > 50;
+    const lowFat     = goal === 'Low Fat'       && metrics.fat     > 30;
+    if (lowProtein || lowCarbs || lowFat) {
+      nutritionShortfallWritten.current = true;
+      const shortfall = lowProtein ? 'protein' : lowCarbs ? 'carbs' : 'fat';
+      supabase.from('cross_app_activity').insert({
+        user_id: user.id,
+        app: 'hungry',
+        activity_type: 'nutrition_shortfall',
+        is_public: false,
+        payload: { shortfall, goal, protein: metrics.protein, carbs: metrics.carbs, fat: metrics.fat },
+      }).then(() => {});
+    }
+  }, [user?.id, metrics, userSettings?.nutrition_goal]);
+
+  // Feature #5: AppWare Wrap — aggregate monthly cross-app stats
+  const loadAppWrap = async () => {
+    if (!user?.id) return;
+    setAppWrapLoading(true);
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    try {
+      const { data: events } = await supabase
+        .from('cross_app_activity')
+        .select('app, activity_type, payload, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString());
+
+      const history = (() => { try { return JSON.parse(localStorage.getItem('hungry_chef_history') || '[]'); } catch { return []; } })();
+      const thisMonth = history.filter(e => new Date(e.cookedAt) >= monthStart);
+
+      const choresDone = (events || []).filter(e => e.activity_type === 'chore_completed').length;
+      const billsPaid  = (events || []).some(e => e.activity_type === 'all_bills_paid');
+      const topCuisine = (() => {
+        const counts = {};
+        thisMonth.forEach(e => { if (e.cuisine) counts[e.cuisine] = (counts[e.cuisine] || 0) + 1; });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      })();
+
+      const { data: np } = await supabase
+        .from('now_playing').select('track_title, artist').eq('user_id', user.id).single();
+
+      setAppWrapData({
+        recipesCookedThisMonth: thisMonth.length,
+        choresDoneThisMonth: choresDone,
+        billsPaidThisMonth: billsPaid,
+        topCuisineThisMonth: topCuisine,
+        currentlyPlaying: np ? `${np.track_title} — ${np.artist}` : null,
+        pantryWorth: fridge.reduce((s, i) => s + (i.price || 0), 0),
+      });
+    } catch {}
+    setAppWrapLoading(false);
+  };
 
   // ── AI Coach ────────────────────────────────────────────────────────────
   const askAiCoach = async (macroKey) => {
@@ -193,6 +256,12 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
           className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${dashTab === 'taste' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
         >
           🌍 Taste
+        </button>
+        <button
+          onClick={() => { setDashTab('appware'); if (!appWrapData) loadAppWrap(); }}
+          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${dashTab === 'appware' ? 'bg-violet-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Globe size={13} /> Wrap
         </button>
       </div>
 
@@ -686,6 +755,58 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
           </div>
         );
       })()}
+
+      {/* Feature #5: AppWare Wrap ──────────────────────────────────────── */}
+      {dashTab === 'appware' && (
+        <div className="space-y-5">
+          <section className="bg-gradient-to-br from-violet-50 to-sky-50 border border-violet-100 p-6 rounded-[2.5rem] shadow-xl">
+            <h3 className="text-[14px] font-bold text-violet-500 mb-1 flex items-center gap-2"><Globe size={15} /> AppWare Monthly Wrap</h3>
+            <p className="text-[10px] text-slate-400 mb-5">Your life across all three apps this month</p>
+
+            {appWrapLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 size={24} className="animate-spin text-violet-400" /></div>
+            ) : !appWrapData ? (
+              <button onClick={loadAppWrap} className="w-full py-3 rounded-2xl bg-violet-100 text-violet-600 text-xs font-black hover:bg-violet-200 transition-all">Load My Wrap</button>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/80 rounded-2xl p-4 text-center border border-violet-100">
+                    <p className="text-2xl font-black text-[#6BAEE0]">{appWrapData.recipesCookedThisMonth}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">🍽️ Recipes Cooked</p>
+                  </div>
+                  <div className="bg-white/80 rounded-2xl p-4 text-center border border-violet-100">
+                    <p className="text-2xl font-black text-emerald-500">{appWrapData.choresDoneThisMonth}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">✅ Chores Done</p>
+                  </div>
+                  <div className="bg-white/80 rounded-2xl p-4 text-center border border-violet-100">
+                    <p className="text-lg font-black text-amber-500">${appWrapData.pantryWorth.toFixed(0)}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">🥦 Pantry Value</p>
+                  </div>
+                  <div className="bg-white/80 rounded-2xl p-4 text-center border border-violet-100">
+                    <p className="text-lg font-black text-violet-500">{appWrapData.billsPaidThisMonth ? '✓ Paid' : 'Pending'}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">💸 Bills</p>
+                  </div>
+                </div>
+                {appWrapData.topCuisineThisMonth && (
+                  <div className="bg-white/80 rounded-2xl px-4 py-3 border border-violet-100 flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-500">Top cuisine this month</p>
+                    <p className="text-sm font-black text-violet-500">{appWrapData.topCuisineThisMonth}</p>
+                  </div>
+                )}
+                {appWrapData.currentlyPlaying && (
+                  <div className="bg-white/80 rounded-2xl px-4 py-3 border border-violet-100 flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-500">🎵 Now on Jukebox</p>
+                    <p className="text-xs font-black text-violet-500 truncate max-w-[180px]">{appWrapData.currentlyPlaying}</p>
+                  </div>
+                )}
+                <button onClick={loadAppWrap} className="w-full flex items-center justify-center gap-1.5 text-[10px] font-black text-violet-400 py-2 hover:text-violet-600 transition-colors">
+                  <RefreshCw size={11} /> Refresh
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
     </div>
   );

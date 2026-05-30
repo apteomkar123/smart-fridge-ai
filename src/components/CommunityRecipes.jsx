@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Loader2, ChefHat, X, Flame, Leaf, Globe, Star, Clock, Zap } from 'lucide-react';
+import { Search, Loader2, X, Globe, ChevronRight, ArrowRight } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
+import { toTitleCase } from './recipeUtils';
 
 const MEALDB = 'https://www.themealdb.com/api/json/v1/1';
 
@@ -22,6 +23,7 @@ const CATEGORY_ROWS = [
 ];
 
 const CACHE_KEY = 'hungry_community_';
+const SCROLL_LIMIT = 8;
 
 function MealCard({ meal, onOpen }) {
   return (
@@ -38,7 +40,7 @@ function MealCard({ meal, onOpen }) {
         />
       </div>
       <p className="text-xs font-bold text-slate-700 line-clamp-2 leading-tight group-hover:text-[#6BAEE0] transition-colors">
-        {meal.strMeal}
+        {toTitleCase(meal.strMeal)}
       </p>
     </button>
   );
@@ -47,6 +49,7 @@ function MealCard({ meal, onOpen }) {
 function CategoryRow({ row, onOpen }) {
   const [meals, setMeals] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const cacheKey = CACHE_KEY + row.key;
@@ -67,16 +70,56 @@ function CategoryRow({ row, onOpen }) {
 
   if (loaded && meals.length === 0) return null;
 
+  const displayMeals = showAll ? meals : meals.slice(0, SCROLL_LIMIT);
+
   return (
     <div className="mb-6">
-      <p className="text-sm font-black text-slate-700 px-1 mb-3">{row.label}</p>
+      <div className="flex items-center justify-between px-1 mb-3">
+        <p className="text-sm font-black text-slate-700">{row.label}</p>
+        {loaded && meals.length > SCROLL_LIMIT && !showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="flex items-center gap-1 text-[10px] font-black text-[#6BAEE0] hover:text-[#4d96d1] transition-colors"
+          >
+            View All <ChevronRight size={12} />
+          </button>
+        )}
+        {showAll && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="text-[10px] font-black text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            Show Less
+          </button>
+        )}
+      </div>
       {!loaded ? (
         <div className="flex gap-3">
           {[0, 1, 2, 3].map(i => <div key={i} className="shrink-0 w-36 h-36 rounded-3xl bg-slate-100 animate-pulse" />)}
         </div>
+      ) : showAll ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {displayMeals.map(m => (
+            <button key={m.idMeal} onClick={() => onOpen(m.idMeal)} className="text-left group">
+              <div className="aspect-square rounded-2xl overflow-hidden bg-slate-100 mb-2">
+                <img src={m.strMealThumb} alt={m.strMeal} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+              </div>
+              <p className="text-xs font-bold text-slate-700 line-clamp-2 group-hover:text-[#6BAEE0] transition-colors">{toTitleCase(m.strMeal)}</p>
+            </button>
+          ))}
+        </div>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {meals.map(m => <MealCard key={m.idMeal} meal={m} onOpen={onOpen} />)}
+          {displayMeals.map(m => <MealCard key={m.idMeal} meal={m} onOpen={onOpen} />)}
+          {meals.length > SCROLL_LIMIT && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="shrink-0 w-28 h-36 rounded-3xl bg-violet-50 border border-violet-100 flex flex-col items-center justify-center gap-2 hover:bg-violet-100 transition-all group"
+            >
+              <ArrowRight size={20} className="text-violet-400 group-hover:translate-x-1 transition-transform" />
+              <span className="text-[10px] font-black text-violet-500">View More</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -105,7 +148,7 @@ export default function CommunityRecipes() {
       const steps = (m.strInstructions || '').split(/\r?\n+/).map(s => s.trim()).filter(s => s.length > 8);
       setActiveModalRecipe({
         id: `mealdb-${m.idMeal}`,
-        name: m.strMeal,
+        name: toTitleCase(m.strMeal),
         meal_type: m.strCategory || 'General',
         cuisine: m.strArea || '',
         image: m.strMealThumb || '',
@@ -172,7 +215,7 @@ export default function CommunityRecipes() {
                   <div className="aspect-square rounded-2xl overflow-hidden bg-slate-100 mb-2">
                     <img src={m.strMealThumb} alt={m.strMeal} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                   </div>
-                  <p className="text-xs font-bold text-slate-700 line-clamp-2 group-hover:text-[#6BAEE0] transition-colors">{m.strMeal}</p>
+                  <p className="text-xs font-bold text-slate-700 line-clamp-2 group-hover:text-[#6BAEE0] transition-colors">{toTitleCase(m.strMeal)}</p>
                   {m.strCategory && <p className="text-[9px] text-slate-400 font-mono mt-0.5">{m.strCategory}</p>}
                 </button>
               ))}

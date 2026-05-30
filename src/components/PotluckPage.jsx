@@ -1,23 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PartyPopper, Plus, Trash2, Check, Share2, HandHeart, X, Loader2, Link, ChevronDown, ChevronUp } from 'lucide-react';
+import { PartyPopper, Plus, Trash2, Check, Share2, HandHeart, X, Loader2, Link, ChevronDown, ChevronUp, Calendar, Clock, MapPin, Users, UserCheck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 
+function genCode() {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
 export default function PotluckPage() {
-  const { user } = useUser();
+  const { user, userSettings } = useUser();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newEventName, setNewEventName] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventTime, setNewEventTime] = useState('');
+  const [newEventVenue, setNewEventVenue] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [activeCardId, setActiveCardId] = useState(null);
   const [newItem, setNewItem] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [copied, setCopied] = useState(null);
 
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Guest';
+  const myDietaryRestrictions = userSettings?.dietary_restrictions || [];
 
-  // Check URL for ?potluck=CODE on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('potluck');
@@ -43,7 +51,6 @@ export default function PotluckPage() {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  // Auto-join if joinCode is present
   useEffect(() => {
     if (joinCode && user) handleJoin(joinCode);
   }, [joinCode, user]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -53,14 +60,37 @@ export default function PotluckPage() {
     if (!newEventName.trim() || !user) return;
     setCreating(true);
     try {
+      const eventCode = genCode();
+      const payload = {
+        name: newEventName.trim(),
+        host_id: user.id,
+        event_code: eventCode,
+        event_date: newEventDate || null,
+        event_time: newEventTime || null,
+        venue: newEventVenue.trim() || null,
+      };
       const { data, error } = await supabase.from('potluck_events')
-        .insert([{ name: newEventName.trim(), host_id: user.id }])
+        .insert([payload])
         .select('*, potluck_items(*)')
         .single();
       if (!error && data) {
         setEvents(prev => [data, ...prev]);
         setExpandedId(data.id);
         setNewEventName('');
+        setNewEventDate('');
+        setNewEventTime('');
+        setNewEventVenue('');
+      } else if (error) {
+        // Fallback: some columns may not exist yet — retry without optional fields
+        const { data: d2, error: e2 } = await supabase.from('potluck_events')
+          .insert([{ name: newEventName.trim(), host_id: user.id, event_code: eventCode }])
+          .select('*, potluck_items(*)')
+          .single();
+        if (!e2 && d2) {
+          setEvents(prev => [d2, ...prev]);
+          setExpandedId(d2.id);
+          setNewEventName('');
+        }
       }
     } catch {}
     setCreating(false);
@@ -135,7 +165,7 @@ export default function PotluckPage() {
     const link = `${import.meta.env.VITE_APP_URL || window.location.origin}?potluck=${ev.event_code}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: `Join my Potluck: ${ev.name}`, url: link });
+        await navigator.share({ title: `Join my Event: ${ev.name}`, url: link });
       } else {
         await navigator.clipboard.writeText(link);
         setCopied(ev.id);
@@ -148,7 +178,7 @@ export default function PotluckPage() {
     return (
       <div className="bg-white/80 backdrop-blur-lg p-8 rounded-[2.5rem] border border-white/20 shadow-xl text-center space-y-3">
         <PartyPopper size={32} className="text-slate-200 mx-auto" />
-        <p className="text-sm font-black text-slate-400">Sign in to use Potluck</p>
+        <p className="text-sm font-black text-slate-400">Sign in to use Events</p>
       </div>
     );
   }
@@ -159,26 +189,49 @@ export default function PotluckPage() {
       <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
         <div className="flex items-center gap-2 mb-5">
           <PartyPopper size={18} className="text-violet-400" />
-          <h2 className="text-[14px] font-bold text-slate-400">Potluck &amp; Events</h2>
+          <h2 className="text-[14px] font-bold text-slate-400">Events &amp; Potluck</h2>
         </div>
 
         {/* Create new event */}
-        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
+        <form onSubmit={handleCreate} className="space-y-2 mb-4">
           <input
             type="text"
             value={newEventName}
             onChange={e => setNewEventName(e.target.value)}
-            placeholder="New event name (e.g. Friday BBQ)"
-            className="flex-1 bg-violet-50/60 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
+            placeholder="Event name (e.g. Friday BBQ)"
+            className="w-full bg-violet-50/60 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
           />
-          <button
-            type="submit"
-            disabled={creating || !newEventName.trim()}
-            className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-1.5 disabled:opacity-60 transition-all shadow-md shadow-violet-200"
-          >
-            {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Create
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              value={newEventDate}
+              onChange={e => setNewEventDate(e.target.value)}
+              className="bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
+            />
+            <input
+              type="time"
+              value={newEventTime}
+              onChange={e => setNewEventTime(e.target.value)}
+              className="bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newEventVenue}
+              onChange={e => setNewEventVenue(e.target.value)}
+              placeholder="Venue / location (optional)"
+              className="flex-1 bg-slate-50 border border-slate-100 px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={creating || !newEventName.trim()}
+              className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 disabled:opacity-60 transition-all shadow-md shadow-violet-200"
+            >
+              {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Create
+            </button>
+          </div>
         </form>
 
         {/* Join via code */}
@@ -220,6 +273,7 @@ export default function PotluckPage() {
           const pct = items.length > 0 ? Math.round((claimed / items.length) * 100) : 0;
           const isExpanded = expandedId === ev.id;
           const isHost = ev.host_id === user.id;
+          const isCardOpen = activeCardId === ev.id;
 
           return (
             <div key={ev.id} className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-xl overflow-hidden">
@@ -229,13 +283,31 @@ export default function PotluckPage() {
                 onClick={() => setExpandedId(isExpanded ? null : ev.id)}
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-black text-slate-800 text-lg leading-tight">{ev.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-slate-800 text-lg leading-tight truncate">{ev.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="text-[9px] font-black text-violet-500 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full tracking-widest uppercase">
                         Code: {ev.event_code}
                       </span>
                       {isHost && <span className="text-[9px] font-black text-[#6BAEE0] bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full">Host</span>}
+                    </div>
+                    {/* Date / time / venue */}
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {ev.event_date && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                          <Calendar size={10} /> {new Date(ev.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                      {ev.event_time && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                          <Clock size={10} /> {ev.event_time}
+                        </span>
+                      )}
+                      {ev.venue && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                          <MapPin size={10} /> {ev.venue}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -270,7 +342,64 @@ export default function PotluckPage() {
                     </div>
                   </div>
                 )}
+
+                {/* View Details button */}
+                <button
+                  onClick={e => { e.stopPropagation(); setActiveCardId(isCardOpen ? null : ev.id); }}
+                  className="mt-3 text-[10px] font-black text-violet-500 hover:text-violet-700 flex items-center gap-1 transition-colors"
+                >
+                  <Users size={10} /> {isCardOpen ? 'Hide Details' : 'View Full Details'}
+                </button>
               </div>
+
+              {/* Full Event Card */}
+              {isCardOpen && (
+                <div className="px-6 pb-5 border-t border-violet-50 pt-4 space-y-4 bg-violet-50/30">
+                  <h4 className="text-[11px] font-black text-violet-600 uppercase tracking-widest">Event Details</h4>
+
+                  {/* My RSVP & dietary restrictions */}
+                  <div className="bg-white rounded-2xl border border-violet-100 px-4 py-3 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">My Info</p>
+                    <div className="flex items-center gap-2">
+                      <UserCheck size={13} className="text-emerald-500" />
+                      <p className="text-xs font-bold text-slate-700">{displayName}</p>
+                    </div>
+                    {myDietaryRestrictions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {myDietaryRestrictions.map(r => (
+                          <span key={r} className="text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">{r}</span>
+                        ))}
+                      </div>
+                    )}
+                    {myDietaryRestrictions.length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic">No dietary restrictions set — update in Settings</p>
+                    )}
+                  </div>
+
+                  {/* Claimed items summary */}
+                  {items.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-violet-100 px-4 py-3">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Who's Bringing What</p>
+                      <div className="space-y-1.5">
+                        {items.filter(i => i.claimed_by_id).map(i => (
+                          <div key={i.id} className="flex items-center gap-2">
+                            <Check size={10} className="text-emerald-500 shrink-0" />
+                            <span className="text-xs text-slate-600 flex-1">{i.name}</span>
+                            <span className="text-[9px] font-black text-emerald-500">{i.claimed_by_id === user.id ? 'You' : i.claimed_by_name}</span>
+                          </div>
+                        ))}
+                        {items.filter(i => !i.claimed_by_id).map(i => (
+                          <div key={i.id} className="flex items-center gap-2">
+                            <X size={10} className="text-slate-300 shrink-0" />
+                            <span className="text-xs text-slate-400">{i.name}</span>
+                            <span className="text-[9px] text-slate-300">unclaimed</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Expanded: item list + add */}
               {isExpanded && (

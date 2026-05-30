@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Camera, Plus, AlertCircle, Trash2, Scan, Loader2, X, Users, User, GripVertical, ChevronRight, Mic, MicOff, UtensilsCrossed, Check } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { estimateNutrition, categorizeItem, CATEGORY_ICONS } from './recipeUtils';
+import { estimateNutrition, categorizeItem, CATEGORY_ICONS, toTitleCase } from './recipeUtils';
 
 const CATEGORIES = ['Proteins', 'Dairy & Eggs', 'Fruits', 'Vegetables', 'Beverages', 'Snacks', 'Frozen', 'Sauces', 'Spices', 'General'];
 
@@ -190,7 +190,7 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
 }
 
 // ─── Category Bottom Sheet ────────────────────────────────────────────────────
-function CategorySheet({ category, items, onClose, onItemTap, onRemove, households, getHouseholdLabel, cycleItemHousehold, setCategoryOverrides, onAdjustQty }) {
+function CategorySheet({ category, items, onClose, onItemTap, onRemove, households, getHouseholdLabel, cycleItemHousehold, pickItemHousehold, hhPickerItemId, setCategoryOverrides, onAdjustQty }) {
   const [dragOverCat, setDragOverCat] = useState(null);
   const colorCls = CATEGORY_COLORS[category];
   const otherCats = CATEGORIES.filter(c => c !== category);
@@ -255,7 +255,7 @@ function CategorySheet({ category, items, onClose, onItemTap, onRemove, househol
 
                 <button className="flex-1 text-left min-w-0" onClick={() => onItemTap(item)}>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-slate-700">{item.raw_name}</span>
+                    <span className="text-xs font-bold text-slate-700">{toTitleCase(item.raw_name || item.item_name || '')}</span>
                     {expiring && <AlertCircle size={10} className="text-orange-400 animate-pulse shrink-0" />}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -283,15 +283,37 @@ function CategorySheet({ category, items, onClose, onItemTap, onRemove, househol
                 </div>
 
                 {households.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => cycleItemHousehold(item)}
-                    className={`shrink-0 flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full uppercase border transition-all ${
-                      item.household_id ? 'text-[#6BAEE0] bg-sky-50 border-sky-100' : 'text-slate-300 bg-slate-50 border-slate-100'
-                    }`}
-                  >
-                    {item.household_id ? <Users size={9} /> : <User size={9} />}
-                  </button>
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => cycleItemHousehold(item)}
+                      className={`flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full uppercase border transition-all ${
+                        item.household_id ? 'text-[#6BAEE0] bg-sky-50 border-sky-100' : 'text-slate-300 bg-slate-50 border-slate-100'
+                      }`}
+                    >
+                      {item.household_id ? <Users size={9} /> : <User size={9} />}
+                      {item.household_id && <span className="max-w-10 truncate">{getHouseholdLabel(item.household_id)}</span>}
+                    </button>
+                    {hhPickerItemId === item.id && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[140px] p-2 space-y-1">
+                        <button
+                          onClick={() => pickItemHousehold(item, null)}
+                          className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <User size={11} /> Personal
+                        </button>
+                        {households.map(h => (
+                          <button
+                            key={h.id}
+                            onClick={() => pickItemHousehold(item, h.id)}
+                            className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-sky-50 hover:text-[#6BAEE0] flex items-center gap-2"
+                          >
+                            <Users size={11} /> {h.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <button onClick={() => onRemove(item.id)} className="text-slate-200 hover:text-red-400 transition-colors shrink-0 p-1">
@@ -318,6 +340,7 @@ export default function PantryManager({
   const [manualItem, setManualItem] = useState('');
   const [selectedHouseholdId, setSelectedHouseholdId] = useState(null);
   const [activeSheet, setActiveSheet] = useState(null);
+  const [hhPickerItemId, setHhPickerItemId] = useState(null);
   const [activeIngredient, setActiveIngredient] = useState(null);
   const [categoryOverrides, setCategoryOverrides] = useState(() => {
     try { return JSON.parse(localStorage.getItem('hungry_cat_overrides') || '{}'); } catch { return {}; }
@@ -475,9 +498,19 @@ export default function PantryManager({
 
   const cycleItemHousehold = (item) => {
     if (!handleToggleItemHousehold || households.length === 0) return;
-    const currentIdx = households.findIndex(h => h.id === item.household_id);
-    const next = currentIdx + 1 < households.length ? households[currentIdx + 1] : null;
-    handleToggleItemHousehold(item.id, next?.id || null);
+    if (households.length === 1) {
+      // Single household: simply toggle personal ↔ household
+      const next = item.household_id ? null : households[0].id;
+      handleToggleItemHousehold(item.id, next);
+    } else {
+      // Multiple households: open picker
+      setHhPickerItemId(hhPickerItemId === item.id ? null : item.id);
+    }
+  };
+
+  const pickItemHousehold = (item, hhId) => {
+    handleToggleItemHousehold(item.id, hhId);
+    setHhPickerItemId(null);
   };
 
   const getHouseholdLabel = (householdId) => {
@@ -576,17 +609,17 @@ export default function PantryManager({
           <input id="receipt-upload" type="file" accept="image/*" capture="environment" onChange={(e) => { e.target.value = ''; handleFileUpload(e.target.files[0]); }} className="hidden" />
           {receiptMessage && <p className="text-[12px] text-slate-500">{receiptMessage}</p>}
 
-          <div className="grid gap-3 sm:grid-cols-[2fr_auto]">
+          <div className="flex gap-2">
             <input
               type="text"
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && barcodeInput) handleBarcodeLookup(barcodeInput); }}
               placeholder="Enter barcode / UPC"
-              className="bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm"
+              className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold text-slate-800 focus:border-sky-400 focus:outline-none transition-all shadow-sm"
             />
-            <button type="button" onClick={() => handleBarcodeLookup(barcodeInput)} className="bg-[#6BAEE0] text-white px-5 py-4 rounded-2xl text-xs font-bold shadow-lg shadow-blue-100 hover:bg-[#5da0cf] transition-all">
-              {barcodeLoading ? <Loader2 className="animate-spin" size={20} /> : <Scan size={20} />}
+            <button type="button" onClick={() => handleBarcodeLookup(barcodeInput)} className="bg-[#6BAEE0] text-white p-4 rounded-2xl shadow-lg shadow-blue-100 active:scale-90 transition-all">
+              {barcodeLoading ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
             </button>
           </div>
 
@@ -741,6 +774,8 @@ export default function PantryManager({
           households={households}
           getHouseholdLabel={getHouseholdLabel}
           cycleItemHousehold={cycleItemHousehold}
+          pickItemHousehold={pickItemHousehold}
+          hhPickerItemId={hhPickerItemId}
           setCategoryOverrides={setCategoryOverrides}
           onAdjustQty={adjustQuantity}
         />

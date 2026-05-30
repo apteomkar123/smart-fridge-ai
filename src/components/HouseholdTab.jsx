@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink, PartyPopper, HandHeart } from 'lucide-react';
+import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink, PartyPopper, HandHeart, Sparkles, MapPin } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
 import { cleanIngredientLocally } from './recipeUtils';
+
+// Common potluck item suggestions by dietary category
+const POTLUCK_SUGGESTIONS = {
+  base: ['Paper Plates', 'Napkins', 'Cups', 'Ice', 'Charcoal', 'Lighter Fluid'],
+  meat: ['Burgers', 'Hot Dogs', 'Chicken Wings', 'Ribs', 'Steak'],
+  vegetarian: ['Veggie Burgers', 'Grilled Corn', 'Caprese Salad', 'Hummus & Pita', 'Potato Salad'],
+  vegan: ['Black Bean Burgers', 'Guacamole', 'Fruit Salad', 'Roasted Veggies', 'Vegan Pasta Salad'],
+  dessert: ['Brownies', 'Cookies', 'Watermelon', 'Ice Cream', 'S\'mores Kit'],
+  drinks: ['Lemonade', 'Iced Tea', 'Sparkling Water', 'Beer/Wine', 'Juice Boxes'],
+};
 
 export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDeleteHhItem }) {
   const { households, household: activeHousehold, handleUpdateBudgetLimit, user } = useUser();
@@ -60,6 +70,9 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
   const [members, setMembers] = useState([]);
   const [friends, setFriends] = useState([]);
   const [sentRequests, setSentRequests] = useState(new Set());
+  const [memberPresence, setMemberPresence] = useState({}); // profileId → {status, custom_text}
+  const [eventSuggestions, setEventSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const selectedHH = households.find(h => h.id === selectedHHId) || activeHousehold;
 
@@ -104,7 +117,21 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
       .from('household_members')
       .select('profile_id, profiles:profile_id(id, display_name)')
       .eq('household_id', selectedHHId)
-      .then(({ data }) => setMembers((data || []).map(m => m.profiles).filter(Boolean)));
+      .then(({ data }) => {
+        const loaded = (data || []).map(m => m.profiles).filter(Boolean);
+        setMembers(loaded);
+        // Feature #7: load presence now that we have the member IDs
+        if (loaded.length) {
+          supabase.from('user_presence')
+            .select('profile_id, status, custom_text')
+            .in('profile_id', loaded.map(m => m.id))
+            .then(({ data: pres }) => {
+              const map = {};
+              (pres || []).forEach(p => { map[p.profile_id] = p; });
+              setMemberPresence(map);
+            });
+        }
+      });
     // Load current user's accepted friends (unified friendships schema)
     supabase.from('friendships')
       .select('requester_id, addressee_id')
@@ -113,6 +140,7 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
       .then(({ data }) => setFriends(
         (data || []).map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id)
       ));
+
   }, [selectedHHId, user]);
 
   const sendFriendRequest = async (targetId) => {
@@ -168,6 +196,47 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
     setEditingBudget(false);
   };
 
+  // Feature #4: Potluck Planner — fetch member dietary restrictions and generate smart item list
+  const loadSmartSuggestions = useCallback(async () => {
+    if (!selectedHHId || !members.length) return;
+    setLoadingSuggestions(true);
+    try {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, hungry_settings')
+        .in('id', members.map(m => m.id));
+
+      const allRestrictions = new Set();
+      (profiles || []).forEach(p => {
+        const r = p.hungry_settings?.dietary_restrictions || [];
+        r.forEach(d => allRestrictions.add(d.toLowerCase()));
+      });
+
+      const isVegan = allRestrictions.has('vegan');
+      const isVegetarian = isVegan || allRestrictions.has('vegetarian');
+
+      const suggestions = [
+        ...POTLUCK_SUGGESTIONS.base,
+        ...(isVegan ? POTLUCK_SUGGESTIONS.vegan : isVegetarian ? POTLUCK_SUGGESTIONS.vegetarian : POTLUCK_SUGGESTIONS.meat),
+        ...POTLUCK_SUGGESTIONS.dessert,
+        ...POTLUCK_SUGGESTIONS.drinks,
+      ];
+      setEventSuggestions(suggestions);
+
+      // Write to cross_app_activity so Jukebox can queue a party playlist
+      if (user?.id) {
+        supabase.from('cross_app_activity').insert({
+          user_id: user.id,
+          app: 'hungry',
+          activity_type: 'potluck_created',
+          is_public: false,
+          payload: { household_id: selectedHHId, event_name: eventName, genre_seed: 'party' },
+        }).then(() => {});
+      }
+    } catch {}
+    setLoadingSuggestions(false);
+  }, [selectedHHId, members, user, eventName]);
+
   if (!households.length) {
     return (
       <div className="bg-white/80 backdrop-blur-lg p-8 rounded-[2.5rem] border border-white/20 shadow-xl text-center space-y-3">
@@ -220,6 +289,20 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
           </div>
         </div>
       )}
+
+      {/* Feature #7: At the Store banner */}
+      {(() => {
+        const atStore = members.filter(m => m.id !== user?.id && memberPresence[m.id]?.custom_text === '🛒 At the Store');
+        if (!atStore.length) return null;
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <MapPin size={16} className="text-amber-500 shrink-0" />
+            <p className="text-xs font-bold text-amber-700">
+              {atStore.map(m => m.display_name || 'A roommate').join(', ')} {atStore.length === 1 ? 'is' : 'are'} at the store — check the shared list!
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Household Members */}
       {members.length > 0 && (
@@ -398,6 +481,34 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
                       className="h-full bg-violet-400 rounded-full transition-all duration-500"
                       style={{ width: `${readyPct}%` }}
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Feature #4: Smart Suggestions */}
+              <button
+                type="button"
+                onClick={loadSmartSuggestions}
+                disabled={loadingSuggestions}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[11px] font-black text-violet-500 bg-violet-50 border border-violet-100 hover:bg-violet-100 transition-all"
+              >
+                <Sparkles size={13} />
+                {loadingSuggestions ? 'Generating…' : '✨ Smart Suggestions (filters by dietary needs)'}
+              </button>
+              {eventSuggestions.length > 0 && (
+                <div className="bg-violet-50 border border-violet-100 rounded-2xl p-3">
+                  <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-2">Tap to add:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {eventSuggestions.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => { setNewEventItem(s); }}
+                        className="text-[10px] font-bold bg-white border border-violet-200 text-violet-600 px-2.5 py-1 rounded-full hover:bg-violet-100 transition-all"
+                      >
+                        + {s}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
