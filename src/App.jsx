@@ -547,6 +547,7 @@ function AppContent({ inventory }) {
         <TutorialOverlay
           onComplete={dismissTutorial}
           onSkip={dismissTutorial}
+          onSwitchTab={switchTab}
         />
       )}
     </div>

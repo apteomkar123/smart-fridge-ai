@@ -668,7 +668,6 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
       </>}
 
       {dashTab === 'taste' && (() => {
-        // Build cuisine + meal-type stats from chef history
         const history = (() => { try { return JSON.parse(localStorage.getItem('hungry_chef_history') || '[]'); } catch { return []; } })();
         const cuisineCounts = {};
         const mealTypeCounts = {};
@@ -681,37 +680,96 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         const topCuisines = Object.entries(cuisineCounts).sort((a, b) => b[1] - a[1]);
         const topMealTypes = Object.entries(mealTypeCounts).sort((a, b) => b[1] - a[1]);
         const maxCuisine = topCuisines[0]?.[1] || 1;
-        const CUISINE_EMOJIS = { Indian: '🇮🇳', Chinese: '🇨🇳', Mexican: '🇲🇽', Japanese: '🇯🇵', Korean: '🇰🇷', Italian: '🇮🇹', French: '🇫🇷', American: '🇺🇸', Thai: '🇹🇭', Mediterranean: '🫒', African: '🌍', Caribbean: '🌴', Vietnamese: '🇻🇳', Greek: '🇬🇷', Spanish: '🇪🇸' };
+        const CUISINE_EMOJIS = { Indian: '🇮🇳', Chinese: '🇨🇳', Mexican: '🇲🇽', Japanese: '🇯🇵', Korean: '🇰🇷', Italian: '🇮🇹', French: '🇫🇷', American: '🇺🇸', Thai: '🇹🇭', Mediterranean: '🫒', African: '🌍', Caribbean: '🌴', Vietnamese: '🇻🇳', Greek: '🇬🇷', Spanish: '🇪🇸', British: '🇬🇧', Moroccan: '🇲🇦', Turkish: '🇹🇷', Filipino: '🇵🇭', Jamaican: '🇯🇲' };
         const masteryMsg = (count) => count >= 10 ? '🏆 Master Chef' : count >= 5 ? '⭐ Expert' : count >= 3 ? '👨‍🍳 Explorer' : '🌱 Beginner';
+
+        // World-region heat map
+        const WORLD_REGIONS = [
+          { name: 'South Asia',    icon: '🌏', cuisines: ['Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan'] },
+          { name: 'East Asia',     icon: '🥢', cuisines: ['Chinese', 'Japanese', 'Korean'] },
+          { name: 'SE Asia',       icon: '🌿', cuisines: ['Thai', 'Vietnamese', 'Filipino', 'Malaysian', 'Indonesian'] },
+          { name: 'Middle East',   icon: '🌙', cuisines: ['Turkish', 'Moroccan', 'Lebanese', 'Persian', 'Mediterranean', 'Greek'] },
+          { name: 'Europe',        icon: '🏰', cuisines: ['Italian', 'French', 'Spanish', 'British', 'German', 'Portuguese'] },
+          { name: 'Americas',      icon: '🌎', cuisines: ['American', 'Mexican', 'Caribbean', 'Jamaican', 'Latin', 'Brazilian'] },
+          { name: 'Africa',        icon: '🌍', cuisines: ['African', 'Ethiopian', 'Nigerian', 'Ghanaian'] },
+          { name: 'Oceania',       icon: '🌊', cuisines: ['Australian', 'New Zealand'] },
+        ];
+        const regionCounts = WORLD_REGIONS.map(r => ({
+          ...r,
+          count: r.cuisines.reduce((s, c) => s + (cuisineCounts[c] || 0), 0),
+        }));
+        const maxRegion = Math.max(...regionCounts.map(r => r.count), 1);
+        const heatColor = (count) => {
+          if (count === 0) return { bg: 'bg-slate-100', text: 'text-slate-300', border: 'border-slate-200', glow: '' };
+          const pct = count / maxRegion;
+          if (pct < 0.2) return { bg: 'bg-sky-50', text: 'text-sky-400', border: 'border-sky-100', glow: '' };
+          if (pct < 0.4) return { bg: 'bg-sky-100', text: 'text-sky-500', border: 'border-sky-200', glow: '' };
+          if (pct < 0.6) return { bg: 'bg-[#6BAEE0]/20', text: 'text-[#6BAEE0]', border: 'border-[#6BAEE0]/30', glow: '' };
+          if (pct < 0.8) return { bg: 'bg-[#6BAEE0]/40', text: 'text-[#1F6FB8]', border: 'border-[#6BAEE0]/50', glow: 'shadow-md shadow-sky-200' };
+          return { bg: 'bg-[#1F6FB8]', text: 'text-white', border: 'border-[#1F6FB8]', glow: 'shadow-lg shadow-sky-300' };
+        };
+
         return (
           <div className="space-y-5">
+            {/* World Heat Map */}
             <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-              <h3 className="text-[14px] font-bold text-slate-400 mb-5 flex items-center gap-2">🌍 Taste Profile</h3>
+              <h3 className="text-[14px] font-bold text-slate-400 mb-1 flex items-center gap-2">🌍 World Cuisine Heat Map</h3>
+              <p className="text-[10px] text-slate-400 mb-4">Brighter = more dishes cooked from that region</p>
               {history.length === 0 ? (
+                <p className="text-xs text-slate-300 italic text-center py-4">Cook some recipes to light up your map!</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-2 mb-4">
+                    {regionCounts.map(r => {
+                      const heat = heatColor(r.count);
+                      return (
+                        <div
+                          key={r.name}
+                          className={`flex flex-col items-center justify-center p-2 rounded-2xl border transition-all ${heat.bg} ${heat.border} ${heat.glow}`}
+                        >
+                          <span className="text-xl mb-0.5">{r.icon}</span>
+                          <span className={`text-[8px] font-black text-center leading-tight ${heat.text}`}>{r.name}</span>
+                          {r.count > 0 && <span className={`text-[9px] font-black mt-0.5 ${heat.text}`}>{r.count}×</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Heat map legend */}
+                  <div className="flex items-center gap-1 mb-2">
+                    <span className="text-[9px] text-slate-400 font-bold mr-1">Cool</span>
+                    {['bg-slate-100','bg-sky-50','bg-sky-100','bg-[#6BAEE0]/20','bg-[#6BAEE0]/40','bg-[#1F6FB8]'].map((c,i) => (
+                      <div key={i} className={`h-2 flex-1 rounded-sm ${c}`} />
+                    ))}
+                    <span className="text-[9px] text-slate-400 font-bold ml-1">Hot</span>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* Per-cuisine bar chart */}
+            <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+              <h3 className="text-[14px] font-bold text-slate-400 mb-5 flex items-center gap-2">🍽️ Cuisine Breakdown</h3>
+              {topCuisines.length === 0 ? (
                 <p className="text-xs text-slate-300 italic text-center py-4">Cook some recipes to build your taste profile!</p>
               ) : (
                 <div className="space-y-5">
-                  {topCuisines.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Cuisines Explored</p>
-                      <div className="space-y-3">
-                        {topCuisines.map(([cuisine, count]) => (
-                          <div key={cuisine}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-bold text-slate-600">{CUISINE_EMOJIS[cuisine] || '🍽️'} {cuisine}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-black text-slate-400">{masteryMsg(count)}</span>
-                                <span className="text-[10px] font-black text-[#6BAEE0]">{count}x</span>
-                              </div>
-                            </div>
-                            <div className="h-2 bg-blue-50 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#6BAEE0] rounded-full transition-all duration-700" style={{ width: `${Math.round((count / maxCuisine) * 100)}%` }} />
-                            </div>
+                  <div className="space-y-3">
+                    {topCuisines.map(([cuisine, count]) => (
+                      <div key={cuisine}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-slate-600">{CUISINE_EMOJIS[cuisine] || '🍽️'} {cuisine}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-black text-slate-400">{masteryMsg(count)}</span>
+                            <span className="text-[10px] font-black text-[#6BAEE0]">{count}×</span>
                           </div>
-                        ))}
+                        </div>
+                        <div className="h-2 bg-blue-50 rounded-full overflow-hidden">
+                          <div className="h-full bg-[#6BAEE0] rounded-full transition-all duration-700" style={{ width: `${Math.round((count / maxCuisine) * 100)}%` }} />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+
                   {topMealTypes.length > 0 && (
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Meal Types</p>
@@ -724,17 +782,17 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
                       </div>
                     </div>
                   )}
+
                   <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
                     <p className="text-xs font-black text-amber-700">
-                      {topCuisines.length === 0
-                        ? '🌱 Start cooking to unlock your taste profile!'
-                        : topCuisines.length >= 5
-                          ? `🌍 World Traveler! You've explored ${topCuisines.length} cuisines. Keep going!`
-                          : topCuisines[0][1] >= 5
-                            ? `🏆 ${topCuisines[0][0]} master! Try a new cuisine to expand your palate.`
-                            : `👨‍🍳 You've explored ${topCuisines.length} cuisine${topCuisines.length > 1 ? 's' : ''}. Cook more to unlock mastery badges!`}
+                      {topCuisines.length >= 5
+                        ? `🌍 World Traveler! You've explored ${topCuisines.length} cuisines. Keep going!`
+                        : topCuisines[0][1] >= 5
+                          ? `🏆 ${topCuisines[0][0]} master! Try a new cuisine to expand your palate.`
+                          : `👨‍🍳 You've explored ${topCuisines.length} cuisine${topCuisines.length > 1 ? 's' : ''}. Cook more to unlock mastery badges!`}
                     </p>
                   </div>
+
                   <div className="grid grid-cols-3 gap-3 text-center">
                     <div className="bg-blue-50 rounded-2xl p-3">
                       <p className="text-xl font-black text-[#6BAEE0]">{history.length}</p>
@@ -745,8 +803,8 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
                       <p className="text-[9px] text-slate-400 font-bold">Cuisines</p>
                     </div>
                     <div className="bg-violet-50 rounded-2xl p-3">
-                      <p className="text-xl font-black text-violet-500">{topMealTypes.length}</p>
-                      <p className="text-[9px] text-slate-400 font-bold">Meal Types</p>
+                      <p className="text-xl font-black text-violet-500">{regionCounts.filter(r => r.count > 0).length}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">Regions</p>
                     </div>
                   </div>
                 </div>
@@ -759,7 +817,7 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
       {/* Feature #5: AppWare Wrap ──────────────────────────────────────── */}
       {dashTab === 'appware' && (
         <div className="space-y-5">
-          <section className="bg-gradient-to-br from-violet-50 to-sky-50 border border-violet-100 p-6 rounded-[2.5rem] shadow-xl">
+          <section className="bg-linear-to-br from-violet-50 to-sky-50 border border-violet-100 p-6 rounded-[2.5rem] shadow-xl">
             <h3 className="text-[14px] font-bold text-violet-500 mb-1 flex items-center gap-2"><Globe size={15} /> AppWare Monthly Wrap</h3>
             <p className="text-[10px] text-slate-400 mb-5">Your life across all three apps this month</p>
 
@@ -796,7 +854,7 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
                 {appWrapData.currentlyPlaying && (
                   <div className="bg-white/80 rounded-2xl px-4 py-3 border border-violet-100 flex items-center justify-between">
                     <p className="text-xs font-bold text-slate-500">🎵 Now on Jukebox</p>
-                    <p className="text-xs font-black text-violet-500 truncate max-w-[180px]">{appWrapData.currentlyPlaying}</p>
+                    <p className="text-xs font-black text-violet-500 truncate max-w-45">{appWrapData.currentlyPlaying}</p>
                   </div>
                 )}
                 <button onClick={loadAppWrap} className="w-full flex items-center justify-center gap-1.5 text-[10px] font-black text-violet-400 py-2 hover:text-violet-600 transition-colors">

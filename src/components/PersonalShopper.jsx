@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { X, ShoppingCart, Check, ChevronDown, MapPin, Store } from 'lucide-react';
+import { X, ShoppingCart, Check, ChevronDown, MapPin, Store, Sparkles, Loader2 } from 'lucide-react';
 import { categorizeItem } from './recipeUtils';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
@@ -129,15 +129,91 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
   const [selectedStore, setSelectedStore] = useState(STORES[0]);
   const [listSource, setListSource] = useState('all');
   const [checked, setChecked] = useState(loadChecked);
+  const [subLoadingId, setSubLoadingId] = useState(null);
+  const [subResults, setSubResults] = useState({}); // itemId → suggestion
 
-  // Feature #11: Grocery Gig Status — update Roomies presence while shopping
+  const fetchSubstitution = useCallback(async (item) => {
+    if (subLoadingId || subResults[item.id]) return;
+    setSubLoadingId(item.id);
+    try {
+      const prompt = `The user is shopping at ${selectedStore} and cannot find "${item.item_name}". In one sentence, suggest: 1) another store where they can definitely find it, and 2) the best available substitution at ${selectedStore}. Be specific and concise. Format: "Try [store] for [item]. At ${selectedStore}, [substitution] works well instead."`;
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt, directMode: true }),
+      });
+      const text = await res.text();
+      setSubResults(prev => ({ ...prev, [item.id]: text.trim().replace(/^"|"$/g, '') }));
+    } catch {
+      setSubResults(prev => ({ ...prev, [item.id]: 'Could not fetch suggestion right now.' }));
+    }
+    setSubLoadingId(null);
+  }, [subLoadingId, subResults, selectedStore]);
+
+  // Feature #11 + #7: Grocery Gig Status + Who's Home? Alerts
+  // Sets Roomies presence to "At the Store" immediately, then refines with the
+  // actual store name once geolocation resolves (~1-2 seconds).
   useEffect(() => {
     if (!user?.id) return;
+
+    // Step 1: Immediately mark user as at the store (generic)
     supabase.from('user_presence').upsert({
       profile_id: user.id,
       status: 'Away',
       custom_text: '🛒 At the Store',
     }).then(() => {});
+
+    // Step 2: Try to identify the actual store via geolocation + Google Places API
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords: { latitude: lat, longitude: lng } }) => {
+          try {
+            const res = await fetch('/.netlify/functions/nearby-stores', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lat, lng }),
+            });
+            const { stores, atGroceryStore, configured } = await res.json();
+
+            if (!configured) return; // API key not set yet — generic text stays
+
+            const storeName = stores[0]?.name ?? null;
+            const customText = storeName ? `🛒 At ${storeName}` : '🛒 At the Store';
+
+            // Update presence with the actual store name
+            await supabase.from('user_presence').upsert({
+              profile_id: user.id,
+              status: 'Away',
+              custom_text: customText,
+            });
+
+            // Write richer cross_app_activity event so HouseholdTab can show store details
+            if (atGroceryStore) {
+              supabase.from('cross_app_activity').insert({
+                user_id: user.id,
+                app: 'hungry',
+                activity_type: 'at_grocery_store',
+                is_public: false,
+                payload: {
+                  store_name: storeName,
+                  vicinity: stores[0]?.vicinity ?? null,
+                  place_id: stores[0]?.place_id ?? null,
+                  lat,
+                  lng,
+                },
+              }).then(() => {});
+            }
+          } catch {
+            // Network error — generic presence text already set, no action needed
+          }
+        },
+        () => {
+          // Geolocation denied or unavailable — generic "At the Store" stays
+        },
+        { timeout: 8000, maximumAge: 60000 }
+      );
+    }
+
     return () => {
       supabase.from('user_presence').upsert({
         profile_id: user.id,
@@ -248,19 +324,33 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
               {items.map(item => {
                 const isChecked = checked.has(item.id);
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => toggle(item.id)}
-                    className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors ${isChecked ? 'bg-emerald-50' : 'bg-white hover:bg-slate-50'}`}
-                  >
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-emerald-400 border-emerald-400' : 'border-slate-300'}`}>
-                      {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                  <div key={item.id}>
+                    <div className={`flex items-center gap-4 px-5 py-4 transition-colors ${isChecked ? 'bg-emerald-50' : 'bg-white'}`}>
+                      <button onClick={() => toggle(item.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-emerald-400 border-emerald-400' : 'border-slate-300'}`}>
+                        {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                      </button>
+                      <span className={`text-sm font-semibold flex-1 ${isChecked ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                        {item.item_name}
+                      </span>
+                      {item.price > 0 && <span className="text-[11px] font-mono text-emerald-600 shrink-0">${Number(item.price).toFixed(2)}</span>}
+                      {!isChecked && (
+                        <button
+                          onClick={() => fetchSubstitution(item)}
+                          className="flex items-center gap-1 text-[9px] font-black text-slate-400 hover:text-violet-500 transition-colors shrink-0 ml-1"
+                          title="Can't find it? Get a substitution"
+                        >
+                          {subLoadingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                        </button>
+                      )}
                     </div>
-                    <span className={`text-sm font-semibold flex-1 ${isChecked ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                      {item.item_name}
-                    </span>
-                    {item.price > 0 && <span className="text-[11px] font-mono text-emerald-600 shrink-0">${Number(item.price).toFixed(2)}</span>}
-                  </button>
+                    {subResults[item.id] && !isChecked && (
+                      <div className="px-5 pb-3 bg-violet-50 flex items-start gap-2">
+                        <Sparkles size={11} className="text-violet-400 mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-violet-700 font-bold leading-relaxed flex-1">{subResults[item.id]}</p>
+                        <button onClick={() => setSubResults(p => { const n={...p}; delete n[item.id]; return n; })} className="text-violet-300 hover:text-violet-500 text-xs shrink-0">×</button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

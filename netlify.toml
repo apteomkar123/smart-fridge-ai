@@ -5,3 +5,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Google Places API key for the nearby-stores function.
+# Override this in Netlify Dashboard → Site → Environment Variables.
+# Do NOT commit a real key here — use the dashboard for production.
+[build.environment]
+  GOOGLE_PLACES_KEY = "your_google_places_api_key_here"

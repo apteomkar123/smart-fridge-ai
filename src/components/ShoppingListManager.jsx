@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Check, Trash2, ShoppingCart, Users, Pencil } from 'lucide-react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { Plus, Check, Trash2, ShoppingCart, Users, Pencil, Sparkles, Loader2 } from 'lucide-react';
 import { useUser } from './UserContext';
 
 const AISLES = [
@@ -22,11 +22,33 @@ const getAisle = (itemName) => {
 };
 
 export default function ShoppingListManager({ list = [], onAdd, onToggle, onClear, onRename, households = [], onMoveToHousehold }) {
+  const { userSettings } = useUser();
   const [shoppingInput, setShoppingInput] = useState('');
   const [movingId, setMovingId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [swapLoadingId, setSwapLoadingId] = useState(null);
+  const [swapResults, setSwapResults] = useState({}); // id → suggestion string
   const editRef = useRef(null);
+  const nutritionGoal = userSettings?.nutrition_goal || null;
+
+  const fetchSwap = useCallback(async (item) => {
+    if (swapLoadingId || swapResults[item.id]) return;
+    setSwapLoadingId(item.id);
+    try {
+      const prompt = `You are a nutrition coach. The user's goal is: "${nutritionGoal || 'Balanced diet'}". They have "${item.item_name}" on their shopping list. Suggest ONE better alternative ingredient that helps reach their goal. Reply in exactly this format (no extra text): "Instead of [item], try [alternative] — [one short reason]."`;
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt, directMode: true }),
+      });
+      const text = await res.text();
+      setSwapResults(prev => ({ ...prev, [item.id]: text.trim().replace(/^"|"$/g, '') }));
+    } catch {
+      setSwapResults(prev => ({ ...prev, [item.id]: 'Could not fetch suggestion right now.' }));
+    }
+    setSwapLoadingId(null);
+  }, [swapLoadingId, swapResults, nutritionGoal]);
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
@@ -55,29 +77,30 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
   };
 
   const renderItem = (item) => (
-    <div key={item.id} className={`bg-white border p-4 rounded-2xl flex items-center justify-between gap-3 transition-all ${item.is_completed ? 'border-transparent opacity-50' : 'border-blue-50 shadow-sm'}`}>
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <button onClick={() => onToggle(item.id, item.is_completed)} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${item.is_completed ? 'bg-sky-500 text-white' : 'bg-blue-50 text-transparent border border-blue-100'}`}>
-          <Check size={14} strokeWidth={4} />
-        </button>
-        {editingId === item.id ? (
-          <input
-            ref={editRef}
-            value={editingName}
-            onChange={e => setEditingName(e.target.value)}
-            onBlur={() => commitEdit(item)}
-            onKeyDown={e => { if (e.key === 'Enter') commitEdit(item); if (e.key === 'Escape') setEditingId(null); }}
-            className="flex-1 text-xs font-bold text-slate-700 bg-blue-50 border border-sky-300 rounded-lg px-2 py-1 focus:outline-none"
-            style={{ fontSize: '16px' }}
-          />
-        ) : (
-          <span
-            className={`text-xs font-bold text-slate-700 truncate flex-1 ${item.is_completed ? 'line-through text-slate-400' : ''}`}
-            onDoubleClick={() => !item.is_completed && startEditing(item)}
-          >{item.item_name}</span>
-        )}
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
+    <div key={item.id} className={`bg-white border rounded-2xl transition-all ${item.is_completed ? 'border-transparent opacity-50' : 'border-blue-50 shadow-sm'}`}>
+      <div className="flex items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <button onClick={() => onToggle(item.id, item.is_completed)} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${item.is_completed ? 'bg-sky-500 text-white' : 'bg-blue-50 text-transparent border border-blue-100'}`}>
+            <Check size={14} strokeWidth={4} />
+          </button>
+          {editingId === item.id ? (
+            <input
+              ref={editRef}
+              value={editingName}
+              onChange={e => setEditingName(e.target.value)}
+              onBlur={() => commitEdit(item)}
+              onKeyDown={e => { if (e.key === 'Enter') commitEdit(item); if (e.key === 'Escape') setEditingId(null); }}
+              className="flex-1 text-xs font-bold text-slate-700 bg-blue-50 border border-sky-300 rounded-lg px-2 py-1 focus:outline-none"
+              style={{ fontSize: '16px' }}
+            />
+          ) : (
+            <span
+              className={`text-xs font-bold text-slate-700 truncate flex-1 ${item.is_completed ? 'line-through text-slate-400' : ''}`}
+              onDoubleClick={() => !item.is_completed && startEditing(item)}
+            >{item.item_name}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
         {/* Move between personal ↔ household */}
         {households.length > 0 && onMoveToHousehold && !item.is_completed && (
           <div className="relative">
@@ -114,8 +137,29 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
         {!item.is_completed && onRename && (
           <button onClick={() => startEditing(item)} className="text-slate-200 hover:text-sky-400 transition-colors p-1.5"><Pencil size={14} /></button>
         )}
+        {/* AI Swap suggestion */}
+        {!item.is_completed && nutritionGoal && (
+          <button
+            onClick={(e) => { e.stopPropagation(); fetchSwap(item); }}
+            className="p-1.5 text-slate-300 hover:text-violet-400 transition-colors"
+            title="Suggest better alternative"
+          >
+            {swapLoadingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          </button>
+        )}
         <button onClick={() => onClear(item.id)} className="text-slate-200 hover:text-red-400 transition-colors p-1.5"><Trash2 size={14} /></button>
       </div>
+      </div>
+      {/* Swap suggestion result */}
+      {swapResults[item.id] && !item.is_completed && (
+        <div className="px-4 pb-3 flex items-start gap-2">
+          <Sparkles size={11} className="text-violet-400 mt-0.5 shrink-0" />
+          <p className="text-[10px] text-violet-600 font-bold leading-relaxed">{swapResults[item.id]}</p>
+          <button onClick={() => setSwapResults(prev => { const n = {...prev}; delete n[item.id]; return n; })} className="text-slate-200 hover:text-slate-400 shrink-0">
+            <span className="text-[10px]">×</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 

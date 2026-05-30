@@ -202,16 +202,25 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-## ❌ Not Yet Implemented (from session 9 Changes.md)
+### Interactive Tutorial (session 9 rewrite)
+- 11-step spotlight tutorial auto-navigates to each feature tab as steps advance
+- Pulsing ring + center dot + "HERE" label appear at a screen position matching the feature
+- Step dots at the bottom let users jump to any step; Back/Next buttons + confetti on finish
+- Tutorial card slides up from bottom with smooth cubic-bezier animation
 
-| Feature | Reason |
-|---|---|
-| **Substitutions in Explore section** (tag instead of picture) | Requires hooking dietary restrictions into CommunityRecipes' recipe modal and the substitution engine — left for next session |
-| **Interactive step-by-step tutorial with tap targets** | Complex UI overlay with highlight masks and animated arrows — current tutorial improved (10 steps, no quotes) but not fully interactive |
-| **Recipe images on suggested recipes card** | Already implemented for MealDB and Spoonacular; AI-generated recipes don't have images by design |
-| **Better ingredient alternatives in shopping list** | Requires AI call per item against user's nutrition goal — deferred |
-| **Store item location map** | Requires store-specific APIs (Kroger, Target, etc.) — deferred pending API keys |
-| **Personal Shopper unavailable item substitution** | Requires web search or store inventory API — deferred |
-| **Visual heat map for taste profile** | Deferred — current bar chart with mastery badges is functional |
+### Taste Profile Heat Map
+- 8-region world heat map (South Asia, East Asia, SE Asia, Middle East, Europe, Americas, Africa, Oceania) color-coded by dishes cooked — cool gray → hot deep blue
+- Each region tile shows emoji icon, name, and cook count; heat legend below
+- Per-cuisine bar chart and mastery badges retained alongside the map
+
+### Shopping List — AI Smart Swap
+- ✨ Sparkles button per unchecked item (appears when user has a nutrition goal set in Settings)
+- Calls AI with item name + nutrition goal to suggest a healthier/better alternative
+- Result appears inline below the item with a dismiss ×
+
+### Personal Shopper — Can't Find It?
+- ✨ Sparkles button per unchecked item in Personal Shopper mode
+- AI suggests: (1) another store where the item is definitely available, (2) a specific substitution at the selected store
+- Result appears as a violet callout below the item row with dismiss ×
 
 *Last updated: 2026-05-30 (session 9)*

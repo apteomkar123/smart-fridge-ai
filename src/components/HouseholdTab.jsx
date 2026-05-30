@@ -290,16 +290,23 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
         </div>
       )}
 
-      {/* Feature #7: At the Store banner */}
+      {/* Feature #7: Who's Home? — At the Store banner */}
       {(() => {
-        const atStore = members.filter(m => m.id !== user?.id && memberPresence[m.id]?.custom_text === '🛒 At the Store');
+        const atStore = members
+          .filter(m => m.id !== user?.id)
+          .map(m => ({ ...m, storeText: memberPresence[m.id]?.custom_text }))
+          .filter(m => m.storeText?.startsWith('🛒'));
         if (!atStore.length) return null;
         return (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-            <MapPin size={16} className="text-amber-500 shrink-0" />
-            <p className="text-xs font-bold text-amber-700">
-              {atStore.map(m => m.display_name || 'A roommate').join(', ')} {atStore.length === 1 ? 'is' : 'are'} at the store — check the shared list!
-            </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+            <MapPin size={16} className="text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              {atStore.map(m => (
+                <p key={m.id} className="text-xs font-bold text-amber-700">
+                  {m.display_name || 'A roommate'} is {m.storeText.replace('🛒 ', '')} — anything to add to the shared list?
+                </p>
+              ))}
+            </div>
           </div>
         );
       })()}
