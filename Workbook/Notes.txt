@@ -353,3 +353,16 @@ BUGS:
 
 FEATURES:
 - Potluck / Event panel in Household tab: add items needed for an event, claim them, live readiness progress bar (localStorage-persisted per household)
+
+IMPLEMENTED (session 2026-05-29 session 7):
+BUGS:
+- Saved recipe share dropdown: removed overflow-hidden from card so dropdown is no longer clipped; card is now relative-positioned
+- Shared recipes now refresh in HouseholdTab whenever savedRecipes length changes (covers shares from RecipeModal)
+- Household members: two parallel Supabase queries (active_household_id + household_id) merged and deduped — works on both old and new schema
+- meal_type and cuisine are now saved as separate columns (not combined) in onSaveRecipe, fixing the "Vegetarian Chinese" tag bug and Taste Profile
+- Household shopping list now fetched directly from Supabase by selectedHHId with local optimistic updates for toggle/delete
+
+FEATURES:
+- Potluck page: standalone top-level nav section; create events with invite codes, share via URL ?potluck=CODE, claim items, readiness bar; backed by potluck_events + potluck_items Supabase tables
+- appware-schema.sql: added household_members, potluck_events, potluck_items tables with RLS policies
+- Pantry item capitalization: toTitleCase already applied in handleAddManualItem (raw_name); Open Food Facts nutritional lookup already runs for barcode scans

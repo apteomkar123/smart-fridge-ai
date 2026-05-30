@@ -122,17 +122,48 @@ exception when duplicate_table then null;
 end $$;
 
 
+-- ── household_members (junction table) ───────────────────────
+create table if not exists public.household_members (
+  household_id uuid not null references public.households(id) on delete cascade,
+  profile_id   uuid not null references public.profiles(id)  on delete cascade,
+  joined_at    timestamptz not null default now(),
+  primary key (household_id, profile_id)
+);
+
+-- ── potluck_events ───────────────────────────────────────────
+create table if not exists public.potluck_events (
+  id          uuid primary key default uuid_generate_v4(),
+  host_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  event_code  text unique not null default upper(substring(md5(random()::text), 1, 8)),
+  created_at  timestamptz not null default now()
+);
+
+-- ── potluck_items ────────────────────────────────────────────
+create table if not exists public.potluck_items (
+  id               uuid primary key default uuid_generate_v4(),
+  event_id         uuid not null references public.potluck_events(id) on delete cascade,
+  name             text not null,
+  claimed_by_id    uuid references auth.users(id) on delete set null,
+  claimed_by_name  text,
+  created_at       timestamptz not null default now()
+);
+
+
 -- ════════════════════════════════════════════════════════════
 --  STEP 2: Enable RLS (idempotent)
 -- ════════════════════════════════════════════════════════════
 
-alter table public.households       enable row level security;
-alter table public.profiles         enable row level security;
-alter table public.fridge_inventory enable row level security;
-alter table public.shopping_list    enable row level security;
-alter table public.saved_recipes    enable row level security;
-alter table public.friendships      enable row level security;
-alter table public.friend_requests  enable row level security;
+alter table public.households        enable row level security;
+alter table public.profiles          enable row level security;
+alter table public.fridge_inventory  enable row level security;
+alter table public.shopping_list     enable row level security;
+alter table public.saved_recipes     enable row level security;
+alter table public.friendships       enable row level security;
+alter table public.friend_requests   enable row level security;
+alter table public.household_members enable row level security;
+alter table public.potluck_events    enable row level security;
+alter table public.potluck_items     enable row level security;
 
 
 -- ════════════════════════════════════════════════════════════
@@ -236,6 +267,37 @@ create policy "users can view their own requests"
   using (sender_id = auth.uid() or receiver_id = auth.uid());
 create policy "receiver can update status"
   on public.friend_requests for update using (receiver_id = auth.uid());
+
+
+-- household_members
+drop policy if exists "members can manage their own membership" on public.household_members;
+drop policy if exists "members can view household members"      on public.household_members;
+
+create policy "members can manage their own membership"
+  on public.household_members for all
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid());
+create policy "members can view household members"
+  on public.household_members for select
+  using (
+    household_id in (select household_id from public.household_members where profile_id = auth.uid())
+  );
+
+-- potluck_events
+drop policy if exists "authenticated users can view and create events" on public.potluck_events;
+drop policy if exists "host can manage their event"                    on public.potluck_events;
+
+create policy "authenticated users can view and create events"
+  on public.potluck_events for select using (auth.uid() is not null);
+create policy "host can manage their event"
+  on public.potluck_events for all
+  using (host_id = auth.uid()) with check (host_id = auth.uid());
+
+-- potluck_items
+drop policy if exists "authenticated users can manage potluck items" on public.potluck_items;
+
+create policy "authenticated users can manage potluck items"
+  on public.potluck_items for all
+  using (auth.uid() is not null) with check (auth.uid() is not null);
 
 
 -- ════════════════════════════════════════════════════════════

@@ -365,11 +365,11 @@ export const RecipeProvider = ({ children, fridge }) => {
       user_id: user.id,
       recipe_id: recipeIdStr,
       recipe_name: recipe.name,
+      meal_type: recipe.meal_type || 'General',
+      cuisine: recipe.cuisine || '',
       ingredients: recipe.ingredients || [],
       steps: recipe.steps || [],
-      meal_type: [recipe.meal_type, recipe.cuisine].filter(Boolean).join(' ').trim() || 'General',
     };
-    // Only include household_id if provided (avoids error if column doesn't exist)
     if (householdId) insertData.household_id = householdId;
     const { data, error: err } = await supabase.from('saved_recipes').insert([insertData]).select();
     if (err) { console.error('Save recipe error:', err.message); return; }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2 } from 'lucide-react';
+import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
@@ -12,6 +12,7 @@ import HouseholdSettings from './components/HouseholdSettings';
 import HouseholdTab from './components/HouseholdTab';
 import PersonalShopper from './components/PersonalShopper';
 import FriendsPage from './components/FriendsPage';
+import PotluckPage from './components/PotluckPage';
 import SettingsPage from './components/SettingsPage';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import MealPrepModal from './components/MealPrepModal';
@@ -130,9 +131,10 @@ function AppContent({ inventory }) {
     { tab: 'recipes',     icon: <ChefHat size={22} />,      label: 'Recipes' },
     { tab: 'shopping',    icon: <ShoppingCart size={22} />,  label: 'Shopping' },
     { tab: 'saved',       icon: <Star size={22} />,          label: 'Saved' },
-    { tab: 'chefHistory', icon: <Clock size={22} />,         label: 'Chef History' },
-    { tab: 'analytics',   icon: <BarChart3 size={22} />,     label: 'Analytics' },
-    { tab: 'household',   icon: <Users size={22} />,         label: 'Household' },
+    { tab: 'chefHistory', icon: <Clock size={22} />,          label: 'Chef History' },
+    { tab: 'analytics',   icon: <BarChart3 size={22} />,      label: 'Analytics' },
+    { tab: 'household',   icon: <Users size={22} />,          label: 'Household' },
+    { tab: 'potluck',     icon: <PartyPopper size={22} />,    label: 'Potluck' },
     { tab: 'friends',     icon: <UserRound size={22} />,     label: 'Friends' },
     { tab: 'settings',    icon: <Settings size={22} />,      label: 'Settings' },
   ];
@@ -256,6 +258,7 @@ function AppContent({ inventory }) {
               />
             )}
             {activeTab === 'friends' && <FriendsPage />}
+            {activeTab === 'potluck' && <PotluckPage />}
             {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}
             {activeTab === 'saved' && (
               <div className="space-y-6">
@@ -343,7 +346,7 @@ function AppContent({ inventory }) {
                     <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
                   ) : (
                     filteredSavedRecipes.map(recipe => (
-                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group overflow-hidden">
+                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative">
                         <div
                           className="flex-1 cursor-pointer min-w-0"
                           onClick={() => setActiveModalRecipe({

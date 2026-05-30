@@ -85,8 +85,9 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Household
 - **Settle Up** — shows per-member cost split from household shopping list; Venmo deep-link and Splitwise link per member
-- **Potluck / Event** — collapsible Event panel per household; add items needed for the event, claim them with one tap, live readiness progress bar
-- Household member list now queries both `active_household_id` and legacy `household_id` so all members show correctly
+- Household member list queries both `active_household_id` and `household_id` in parallel (deduped) — covers old and new schema
+- Household shared recipes refresh automatically when a recipe is shared from any screen
+- Shared shopping list fetched directly from Supabase per selected household (not relayed from active-household state)
 - Create a household with a generated invite code
 - Join a household via invite code
 - Switch between multiple households
@@ -114,6 +115,12 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Default shopping list destination (personal or a specific household)
 - Default saved recipes destination (personal or a specific household)
 - Sign out
+
+### Potluck (top-level section in nav)
+- Create named events with auto-generated 8-character invite codes
+- Share event via URL (`?potluck=CODE`) — anyone with the link joins and can claim items
+- Claim/unclaim items per event; host can delete items and the whole event
+- Readiness progress bar; backed by `potluck_events` + `potluck_items` Supabase tables
 
 ### Cooking Mode (Virtual Sous Chef)
 - Voice navigation: "Next", "Back", "Repeat", "Stop", "Ingredients"
@@ -156,4 +163,4 @@ These features are intentionally deferred until a native iOS app exists. The rea
 
 ---
 
-*Last updated: 2026-05-29 (session 6)*
+*Last updated: 2026-05-29 (session 7)*

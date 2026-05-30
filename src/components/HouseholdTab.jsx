@@ -5,11 +5,20 @@ import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
 import { cleanIngredientLocally } from './recipeUtils';
 
-export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], onToggleHhItem, onDeleteHhItem }) {
+export default function HouseholdTab({ onAddShoppingItem, hhShopItems = [], onToggleHhItem, onDeleteHhItem }) {
   const { households, household: activeHousehold, handleUpdateBudgetLimit, user } = useUser();
   const { savedRecipes, setActiveModalRecipe, onSaveRecipe, onRemoveSavedRecipe, masterRecipes } = useRecipes();
 
   const [selectedHHId, setSelectedHHId] = useState(activeHousehold?.id || null);
+  const [hhShopItems, setHhShopItems] = useState(hhShopItems);
+
+  // Re-fetch shopping list directly from Supabase when the selected household changes
+  // so items shared from the grocery list appear regardless of which household is "active"
+  useEffect(() => {
+    if (!selectedHHId) return;
+    supabase.from('shopping_list').select('*').eq('household_id', selectedHHId)
+      .then(({ data }) => setHhShopItems(data || []));
+  }, [selectedHHId]);
 
   // ── Potluck / Event ─────────────────────────────────────────
   const EVENT_KEY = `hungry_event_${selectedHHId}`;
@@ -81,27 +90,40 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
     loadHouseholdRecipes();
   }, [loadHouseholdRecipes]);
 
+  // Re-fetch when a recipe is saved from anywhere in the app (e.g. RecipeModal share)
+  const savedRecipesLen = savedRecipes?.length ?? 0;
+  useEffect(() => {
+    if (selectedHHId) loadHouseholdRecipes();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedRecipesLen]);
+
   useEffect(() => {
     if (!selectedHHId || !user) return;
-    // Load household members — match on either active_household_id (new) or household_id (old schema)
-    supabase.from('profiles').select('id, display_name')
-      .or(`active_household_id.eq.${selectedHHId},household_id.eq.${selectedHHId}`)
-      .then(({ data }) => setMembers(data || []));
-    // Load current user's friends
-    supabase.from('friendships').select('friend_id')
-      .eq('user_id', user.id)
-      .then(({ data }) => setFriends((data || []).map(f => f.friend_id)));
+    // Load members from the household_members junction table
+    supabase
+      .from('household_members')
+      .select('profile_id, profiles:profile_id(id, display_name)')
+      .eq('household_id', selectedHHId)
+      .then(({ data }) => setMembers((data || []).map(m => m.profiles).filter(Boolean)));
+    // Load current user's accepted friends (unified friendships schema)
+    supabase.from('friendships')
+      .select('requester_id, addressee_id')
+      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
+      .eq('status', 'accepted')
+      .then(({ data }) => setFriends(
+        (data || []).map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id)
+      ));
   }, [selectedHHId, user]);
 
   const sendFriendRequest = async (targetId) => {
     if (!user) return;
     setSentRequests(prev => new Set([...prev, targetId]));
-    await supabase.from('friendships').upsert([{ user_id: user.id, friend_id: targetId }]);
+    await supabase.from('friendships').insert([{ requester_id: user.id, addressee_id: targetId, status: 'pending' }]);
     setFriends(prev => [...prev, targetId]);
   };
 
   // Add directly with this household's id via the main hook so the item
-  // appears immediately in hhShoppingItems (which is derived from shoppingList).
+  // appears immediately in hhShopItems (which is derived from shoppingList).
   const addShoppingItem = async () => {
     const name = cleanIngredientLocally(newShopItem);
     if (!name || !selectedHHId || !user) return;
@@ -115,11 +137,16 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
     else localStorage.removeItem('hungry_default_shopping_dest');
   };
 
-  const toggleShopItem = (id, current) => {
+
+  const toggleShopItemLocal = (id, current) => {
+    setHhShopItems(prev => prev.map(i => i.id === id ? { ...i, is_completed: !current } : i));
+    supabase.from('shopping_list').update({ is_completed: !current }).eq('id', id).then(() => {});
     if (onToggleHhItem) onToggleHhItem(id, current);
   };
 
   const removeShopItem = (id) => {
+    setHhShopItems(prev => prev.filter(i => i.id !== id));
+    supabase.from('shopping_list').delete().eq('id', id).then(() => {});
     if (onDeleteHhItem) onDeleteHhItem(id);
   };
 
@@ -243,13 +270,13 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
           <button type="submit" className="bg-[#6BAEE0] text-white p-3 rounded-2xl shadow-md"><Plus size={18} /></button>
         </form>
 
-        {hhShoppingItems.length === 0 ? (
+        {hhShopItems.length === 0 ? (
           <p className="text-xs text-slate-300 italic text-center py-4">No items yet</p>
         ) : (
           <div className="space-y-2">
-            {hhShoppingItems.map(item => (
+            {hhShopItems.map(item => (
               <div key={item.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${item.is_completed ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50/50 border-blue-100'}`}>
-                <button onClick={() => toggleShopItem(item.id, item.is_completed)}
+                <button onClick={() => toggleShopItemLocal(item.id, item.is_completed)}
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${item.is_completed ? 'bg-emerald-400 border-emerald-400' : 'border-blue-200'}`}>
                   {item.is_completed && <Check size={10} className="text-white" />}
                 </button>
@@ -285,11 +312,11 @@ export default function HouseholdTab({ onAddShoppingItem, hhShoppingItems = [], 
       </section>
 
       {/* Settle Up */}
-      {members.length > 1 && hhShoppingItems.length > 0 && (
+      {members.length > 1 && hhShopItems.length > 0 && (
         <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
           <h2 className="text-[14px] font-bold text-slate-400 mb-4 flex items-center gap-2"><CreditCard size={15} /> Settle Up</h2>
           {(() => {
-            const totalSpend = hhShoppingItems.reduce((s, i) => s + (i.price || 0), 0);
+            const totalSpend = hhShopItems.reduce((s, i) => s + (i.price || 0), 0);
             const perPerson = members.length > 0 ? totalSpend / members.length : 0;
             const note = encodeURIComponent(`Hungry App: Grocery Split — ${selectedHH?.name || 'Household'}`);
             const amount = perPerson.toFixed(2);
