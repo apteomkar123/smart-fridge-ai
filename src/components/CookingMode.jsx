@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Mic, MicOff, ChevronLeft, ChevronRight, Volume2, List, RefreshCw, Loader2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { useUser } from './UserContext';
 
-export default function CookingMode({ steps, ingredients, onClose }) {
+const CUISINE_GENRE_MAP = {
+  italian: 'classical', french: 'jazz', indian: 'world-music', japanese: 'ambient',
+  mexican: 'latin', thai: 'world-music', chinese: 'world-music', greek: 'classical',
+  american: 'country', korean: 'k-pop', spanish: 'flamenco', mediterranean: 'jazz',
+};
+function cuisineToGenre(cuisine) {
+  if (!cuisine) return 'lo-fi';
+  return CUISINE_GENRE_MAP[cuisine.toLowerCase()] || 'lo-fi';
+}
+
+export default function CookingMode({ steps, ingredients, recipeName, cuisine, onClose }) {
+  const { user } = useUser();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [showIngredients, setShowIngredients] = useState(false);
@@ -44,6 +57,23 @@ export default function CookingMode({ steps, ingredients, onClose }) {
       }).catch(() => {});
     }
     return () => { wakeLockRef.current?.release().catch(() => {}); };
+  }, []);
+
+  // Feature #1: Kitchen Concert — signal Jukebox to queue a cuisine-matched playlist
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('cross_app_activity').insert({
+      user_id: user.id,
+      app: 'hungry',
+      activity_type: 'cooking_started',
+      is_public: false,
+      payload: {
+        recipe_name: recipeName || '',
+        cuisine: cuisine || '',
+        genre_seed: cuisineToGenre(cuisine),
+      },
+    }).then(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch substitution suggestion from AI

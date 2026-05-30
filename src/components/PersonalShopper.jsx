@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { X, ShoppingCart, Check, ChevronDown, MapPin, Store } from 'lucide-react';
 import { categorizeItem } from './recipeUtils';
+import { supabase } from '../supabaseClient';
+import { useUser } from './UserContext';
 
 const STORES = [
   "Trader Joe's", 'Whole Foods', 'Walmart', 'Target', 'Kroger',
@@ -123,9 +125,27 @@ const loadChecked = () => { try { return new Set(JSON.parse(localStorage.getItem
 const saveChecked = (set) => { try { localStorage.setItem(CHECKED_KEY, JSON.stringify([...set])); } catch {} };
 
 export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
+  const { user } = useUser();
   const [selectedStore, setSelectedStore] = useState(STORES[0]);
   const [listSource, setListSource] = useState('all');
   const [checked, setChecked] = useState(loadChecked);
+
+  // Feature #11: Grocery Gig Status — update Roomies presence while shopping
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('user_presence').upsert({
+      profile_id: user.id,
+      status: 'Away',
+      custom_text: '🛒 At the Store',
+    }).then(() => {});
+    return () => {
+      supabase.from('user_presence').upsert({
+        profile_id: user.id,
+        status: 'Available',
+        custom_text: null,
+      }).then(() => {});
+    };
+  }, [user?.id]);
 
   const activeList = useMemo(() => {
     const all = shoppingList || [];

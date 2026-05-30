@@ -1,12 +1,18 @@
+ALL CODE SHOULD BE WRITTEN KEEPING THE SHARED APPWARE ECOSYSTEM IN MIND. TAKE A LOOK AT THE PARENT DIRECTORY, APPWARE, TO FIGURE OUT EXACTLY WHAT THE DATABASE STRUCTURE IS THERE BEFORE YOU CREATE OBJECTS AND WRITE CODE.
+
 Use minimal tokens. Don't think about anything for too long, if you are unsure about what I'm asking for, ask me in a dialog box.
 
 If you are executing Changes.md, after execution, move everything from under "Bugs to fix" and "Features to add" to the bottom of notes.txt, do not move the text that says "BUGS TO FIX" or "FEATURES TO ADD" or the lines under them. Delete the text under "BUGS TO FIX" and "FEATURES TO ADD"
 
-AFTER YOU'VE GONE THROUGH THE WHOLE CONTEXT FILE:
+
+
+AFTER YOU'VE GONE THROUGH THE WHOLE CONTEXT FILE AND IMPLEMENTED IT:
 
 ----------------------------------------------------
 
 GO THROUGH THE WHOLE FILE AND MAKE SURE YOU'VE IMPLEMENTED EACH AND EVERY THING LISTED IN FILE PROPERLY AFTER YOU'RE DONE WITH THE CONTEXT FILE.
+
+ANY NEW FEATURES ADDED SHOULD BE ADDED TO THE TUTORIAL.
 
 RUN A SANITY CHECK.
 

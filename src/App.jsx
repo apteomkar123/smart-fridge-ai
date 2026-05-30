@@ -433,6 +433,8 @@ function AppContent({ inventory }) {
         <CookingMode
           steps={getStaticRecipeSteps(activeModalRecipe)}
           ingredients={activeModalRecipe.ingredients || []}
+          recipeName={activeModalRecipe.name || activeModalRecipe.strMeal || ''}
+          cuisine={activeModalRecipe.cuisine || activeModalRecipe.strArea || ''}
           onClose={() => setIsCookingMode(false)}
         />
       )}

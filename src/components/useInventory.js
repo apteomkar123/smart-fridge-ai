@@ -542,6 +542,19 @@ export const useInventory = (user, household) => {
       return u ? { ...item, quantity: u.qty } : item;
     }));
 
+    // Feature #12: Soundtrack of My Life — capture what's playing in Jukebox right now
+    let soundtrack = null;
+    if (user?.id) {
+      try {
+        const { data: np } = await supabase
+          .from('now_playing')
+          .select('track_title, artist, album, artwork_url, platform')
+          .eq('user_id', user.id)
+          .single();
+        if (np) soundtrack = np;
+      } catch {}
+    }
+
     // Log to Chef History in localStorage
     try {
       const history = JSON.parse(localStorage.getItem('hungry_chef_history') || '[]');
@@ -556,7 +569,8 @@ export const useInventory = (user, household) => {
         steps: recipe.steps || [],
         cookedAt: new Date().toISOString(),
         notes: '',
-        photos: []
+        photos: [],
+        soundtrack,
       });
       localStorage.setItem('hungry_chef_history', JSON.stringify(history.slice(0, 100)));
     } catch {}
