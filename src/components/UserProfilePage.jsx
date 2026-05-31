@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { UserRound, Lock, Globe, ChefHat, Clock, Star, BarChart3, Camera, MessageSquare, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserRound, Lock, Globe, ChefHat, Clock, Star, BarChart3, Camera, MessageSquare, Save, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
+import UserProfileModal from './UserProfileModal';
 
 const FEATURE_ITEMS = [
   { key: 'chef_history',     label: 'Chef History',       icon: <Clock size={14} />,         desc: 'Your cooking log and leftover remixes' },
@@ -35,6 +36,7 @@ export default function UserProfilePage() {
   });
   const [saved, setSaved] = useState(false);
   const [showRecipes, setShowRecipes] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const displayName = userName || user?.email?.split('@')[0] || 'Chef';
   const cookCount = parseInt(localStorage.getItem('hungry_cook_count') || '0', 10);
@@ -154,12 +156,23 @@ export default function UserProfilePage() {
       </div>
 
       <button
+        onClick={() => setShowPreview(true)}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#6BAEE0] text-[#6BAEE0] hover:bg-sky-50 transition-all"
+      >
+        <Eye size={13} /> Preview My Profile
+      </button>
+
+      <button
         onClick={savePrivacy}
         className={`w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg transition-all ${saved ? 'bg-emerald-500 text-white' : 'bg-[#6BAEE0] text-white shadow-blue-100'}`}
       >
         <Save size={13} className="inline mr-1.5" />
         {saved ? 'Saved!' : 'Save Privacy Settings'}
       </button>
+
+      {showPreview && user && (
+        <UserProfileModal user={{ id: user.id, display_name: displayName }} onClose={() => setShowPreview(false)} />
+      )}
     </div>
   );
 }

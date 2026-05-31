@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Filter, Star, Users } from 'lucide-react';
+import { Filter, Star, Users, Wand2, Loader2, X } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
 import SearchWithHistory from './SearchWithHistory';
@@ -15,13 +15,15 @@ const MOODS = [
 export default function RecipeExplorer({ initialMood = null }) {
   const [shareMenuId, setShareMenuId] = useState(null);
   const [selectedMood, setSelectedMood] = useState(initialMood);
+  const [customIngredients, setCustomIngredients] = useState('');
+  const [customGenerating, setCustomGenerating] = useState(false);
 
   // Sync if Jukebox mood signal arrives after initial render
   useEffect(() => {
     if (initialMood && !selectedMood) setSelectedMood(initialMood);
   }, [initialMood]);
   const shareMenuRef = useRef(null);
-  const { households } = useUser();
+  const { households, userSettings } = useUser();
 
   // Close share menu when clicking outside of it
   useEffect(() => {
@@ -53,6 +55,42 @@ export default function RecipeExplorer({ initialMood = null }) {
     onRemoveSavedRecipe,
     savedRecipes
   } = useRecipes();
+
+  const generateCustomRecipe = async () => {
+    if (!customIngredients.trim() || customGenerating) return;
+    setCustomGenerating(true);
+    try {
+      const restrictions = (userSettings?.dietary_restrictions || []).join(', ');
+      const goal = userSettings?.nutrition_goal || '';
+      const dietContext = [restrictions, goal].filter(Boolean).join('; ');
+      const prompt = `Create a creative recipe using these ingredients: ${customIngredients}.${dietContext ? ` Dietary context: ${dietContext}.` : ''} Return ONLY valid JSON with keys: recipeName, ingredients (array of strings), steps (array of strings).`;
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt, directMode: true }),
+      });
+      const text = await res.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let parsed = {};
+      try { parsed = JSON.parse(cleaned); } catch {}
+      if (!parsed.recipeName && !parsed.name) throw new Error('No recipe name returned');
+      const ingredients = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
+      const steps = Array.isArray(parsed.steps) ? parsed.steps : [cleaned];
+      onOpenRecipe({
+        id: `custom-${Date.now()}`,
+        name: parsed.recipeName || parsed.name || 'Custom Recipe',
+        meal_type: 'Creative',
+        cuisine: '',
+        ingredients,
+        cleanedIngredients: ingredients,
+        steps: steps.length > 0 ? steps : ['Combine and cook the ingredients until ready.'],
+      });
+      setCustomIngredients('');
+    } catch {
+      alert('Could not generate recipe. Please try again.');
+    }
+    setCustomGenerating(false);
+  };
   const mealTypeOptions = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
   const dietOptions = ['vegetarian', 'vegan', 'meat', 'fish'];
   const cuisineOptions = ['indian', 'chinese', 'mexican', 'japanese', 'korean', 'jamaican', 'latin', 'african', 'mediterranean'];
@@ -148,6 +186,39 @@ export default function RecipeExplorer({ initialMood = null }) {
         </div>
       </div>
 
+      {/* Custom Recipe Generator */}
+      <div className="bg-white/80 backdrop-blur-lg p-5 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+        <div className="flex items-center gap-2 mb-3">
+          <Wand2 size={16} className="text-violet-500" />
+          <h3 className="text-[13px] font-bold text-slate-400">Generate from Any Ingredients</h3>
+        </div>
+        <p className="text-[10px] text-slate-400 mb-3">Type any ingredients you have (not just from your pantry) to get a custom AI recipe.</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customIngredients}
+            onChange={e => setCustomIngredients(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && generateCustomRecipe()}
+            placeholder="e.g. chicken, lemon, garlic, pasta…"
+            style={{ fontSize: '16px' }}
+            className="flex-1 bg-violet-50/50 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
+          />
+          {customIngredients && (
+            <button onClick={() => setCustomIngredients('')} className="p-3 text-slate-300 hover:text-slate-500 transition-colors">
+              <X size={16} />
+            </button>
+          )}
+          <button
+            onClick={generateCustomRecipe}
+            disabled={customGenerating || !customIngredients.trim()}
+            className="flex items-center gap-1.5 bg-violet-500 text-white px-4 py-3 rounded-2xl text-xs font-black shadow-md shadow-violet-100 disabled:opacity-50 transition-all active:scale-95"
+          >
+            {customGenerating ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+            {customGenerating ? 'Creating…' : 'Create'}
+          </button>
+        </div>
+      </div>
+
       {/* Recipe Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {moodFilteredRecipes.length === 0 ? (
@@ -216,13 +287,14 @@ export default function RecipeExplorer({ initialMood = null }) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const pkId = savedRecipesMap.get(String(recipe.id));
+                      const stableId = String(recipe.id).replace(/^adapted-local-/, '');
+                      const pkId = savedRecipesMap.get(String(recipe.id)) || savedRecipesMap.get(stableId);
                       if (pkId) onRemoveSavedRecipe(pkId);
-                      else onSaveRecipe(recipe);
+                      else onSaveRecipe({ ...recipe, id: stableId });
                     }}
-                    className={`transition-colors ${savedRecipesMap.has(String(recipe.id)) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}
+                    className={`transition-colors ${(savedRecipesMap.has(String(recipe.id)) || savedRecipesMap.has(String(recipe.id).replace(/^adapted-local-/, ''))) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}
                   >
-                    <Star size={18} fill={savedRecipesMap.has(String(recipe.id)) ? "currentColor" : "none"} />
+                    <Star size={18} fill={(savedRecipesMap.has(String(recipe.id)) || savedRecipesMap.has(String(recipe.id).replace(/^adapted-local-/, ''))) ? "currentColor" : "none"} />
                   </button>
                 </div>
               </div>

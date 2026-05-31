@@ -147,7 +147,7 @@ const loadChecked = () => { try { return new Set(JSON.parse(localStorage.getItem
 const saveChecked = (set) => { try { localStorage.setItem(CHECKED_KEY, JSON.stringify([...set])); } catch {} };
 
 export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
-  const { user } = useUser();
+  const { user, userSettings } = useUser();
   const [selectedStore, setSelectedStore] = useState(null);
   const [listSource, setListSource] = useState('all');
   const [checked, setChecked] = useState(loadChecked);
@@ -159,7 +159,13 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
     if (subLoadingId || subResults[item.id]) return;
     setSubLoadingId(item.id);
     try {
-      const prompt = `The user is shopping at ${selectedStore} and cannot find "${item.item_name}". In one sentence, suggest: 1) another store where they can definitely find it, and 2) the best available substitution at ${selectedStore}. Be specific and concise. Format: "Try [store] for [item]. At ${selectedStore}, [substitution] works well instead."`;
+      const dietaryRestrictions = userSettings?.dietary_restrictions || [];
+      const storeName = selectedStore || 'your store';
+      const dietContext = dietaryRestrictions.length > 0
+        ? ` User dietary restrictions: ${dietaryRestrictions.join(', ')}. Ensure the substitution respects these.`
+        : '';
+      const storeContext = selectedStore ? `The user is shopping at ${selectedStore} and ` : 'The user ';
+      const prompt = `${storeContext}cannot find "${item.item_name}".${dietContext} In one sentence, suggest the best available substitution at ${storeName}. Format exactly: "If they don't have ${item.item_name}, [substitution] works really well instead."`;
       const res = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,7 +177,7 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
       setSubResults(prev => ({ ...prev, [item.id]: 'Could not fetch suggestion right now.' }));
     }
     setSubLoadingId(null);
-  }, [subLoadingId, subResults, selectedStore]);
+  }, [subLoadingId, subResults, selectedStore, userSettings]);
 
   // Feature #11 + #7: Grocery Gig Status + Who's Home? Alerts
   // Sets Roomies presence to "At the Store" immediately, then refines with the
@@ -498,10 +504,10 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
                       )}
                     </div>
                     {subResults[item.id] && !isChecked && (
-                      <div className="px-5 pb-3 bg-violet-50 flex items-start gap-2">
-                        <Sparkles size={11} className="text-violet-400 mt-0.5 shrink-0" />
-                        <p className="text-[10px] text-violet-700 font-bold leading-relaxed flex-1">{subResults[item.id]}</p>
-                        <button onClick={() => setSubResults(p => { const n={...p}; delete n[item.id]; return n; })} className="text-violet-300 hover:text-violet-500 text-xs shrink-0">×</button>
+                      <div className="mx-5 mb-3 bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3 flex items-center gap-2">
+                        <Sparkles size={13} className="text-violet-400 shrink-0" />
+                        <p className="text-[11px] text-violet-700 font-bold leading-relaxed flex-1 text-center">{subResults[item.id]}</p>
+                        <button onClick={() => setSubResults(p => { const n={...p}; delete n[item.id]; return n; })} className="text-violet-300 hover:text-violet-500 shrink-0 text-sm leading-none">×</button>
                       </div>
                     )}
                   </div>

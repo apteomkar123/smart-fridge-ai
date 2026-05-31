@@ -339,6 +339,22 @@ export const useInventory = (user, household) => {
     await performMutation('shopping_list', 'UPDATE', { item_name: newName.trim() }, id);
   }, [performMutation]);
 
+  const handleClearAllShoppingItems = useCallback(async () => {
+    const ids = shoppingListRef.current.map(i => i.id);
+    setShoppingList([]);
+    for (const id of ids) {
+      await performMutation('shopping_list', 'DELETE', null, id);
+    }
+  }, [performMutation]);
+
+  const handleMarkAllShoppingCompleted = useCallback(async () => {
+    const pending = shoppingListRef.current.filter(i => !i.is_completed);
+    setShoppingList(prev => prev.map(i => ({ ...i, is_completed: true })));
+    for (const item of pending) {
+      await performMutation('shopping_list', 'UPDATE', { is_completed: true }, item.id);
+    }
+  }, [performMutation]);
+
   const handleBarcodeLookup = useCallback(async (barcode) => {
     if (!barcode) return;
     setBarcodeLoading(true);
@@ -635,6 +651,8 @@ export const useInventory = (user, household) => {
     handleClearShoppingItem,
     handleRenameShoppingItem,
     handleMoveShoppingItem,
+    handleClearAllShoppingItems,
+    handleMarkAllShoppingCompleted,
     handleBarcodeLookup,
     handleFileUpload,
     handleUpdateInlineItem,

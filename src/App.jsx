@@ -52,6 +52,8 @@ function AppContent({ inventory }) {
     handleClearShoppingItem,
     handleRenameShoppingItem,
     handleMoveShoppingItem,
+    handleClearAllShoppingItems,
+    handleMarkAllShoppingCompleted,
     handleBarcodeLookup,
     handleFileUpload,
     handleUpdateItem,
@@ -267,6 +269,9 @@ function AppContent({ inventory }) {
                   onToggle={handleToggleShoppingCompleted}
                   onClear={handleClearShoppingItem}
                   onRename={handleRenameShoppingItem}
+                  onClearAll={handleClearAllShoppingItems}
+                  onMarkAllDone={handleMarkAllShoppingCompleted}
+                  onAddToPantry={handleAddManualItem}
                   households={households}
                   onMoveToHousehold={(itemId, hhId) => handleMoveShoppingItem(itemId, hhId)}
                 />

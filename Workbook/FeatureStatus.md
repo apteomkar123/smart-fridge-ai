@@ -35,6 +35,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Search by name, ingredient, or filter keyword
 - Filter by meal type, diet, and cuisine
 - AI recipe generator — pick pantry items, generates a custom recipe
+- **Custom Recipe Generator** — "Generate from Any Ingredients" card in the Recipes tab; type any ingredients (not just pantry) to get an AI-generated recipe respecting dietary restrictions
 - Recipe detail modal with full ingredient list and steps
 - Pantry match indicator per ingredient (green/amber dot)
 - Add individual missing ingredients to shopping list
@@ -52,16 +53,21 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Personal Shopper
 - Store-specific aisle locations for 13+ stores (Trader Joe's, Whole Foods, Walmart, Target, Kroger, Wegmans, Publix, Sprouts, HEB, Costco, Aldi, Harris Teeter, Food Lion, Sam's Club)
+- AI substitution suggestion now uses correct format ("If they don't have X, Y works really well instead") and respects dietary restrictions
+- Substitution suggestion box styled as a centered pill with sparkle icon
 - Full Kroger/Target grocery store API integration requires API keys (planned)
 
 ### Shopping List
 - Add items manually — items are now stored with their original casing (Title Case), not lowercased
 - Items auto-grouped by aisle (Produce, Dairy, Meat, Bakery, etc.)
-- Check off items
+- Check off items — **checked-off items are automatically added to pantry**
 - Delete items
+- **Mark All Done** — bulk-complete all pending shopping list items
+- **Delete All** — clear the entire shopping list (with confirmation)
 - Rename items inline (double-tap or pencil icon)
 - Move items between personal list and household lists
 - Personal Shopper mode — distraction-free shopping view
+- AI swap suggestion in shopping list now respects user dietary restrictions in its prompt
 
 ### Chef History
 - **Leftover Remix Engine** — "Remix Leftovers" button on each expanded history card; AI generates a new recipe repurposing the leftover ingredients from that cook
@@ -103,7 +109,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Event / Potluck section removed from Household — use the dedicated Events tab instead
 
 ### Friends
-- Friend codes (8-character code based on user ID)
+- Friend codes — auto-generated 6-character alphanumeric code; created on first profile load if missing
 - Add friends by code (input inside card, Send button stays inside on all screen sizes)
 - Search for friends by display name
 - Send friend requests
@@ -115,9 +121,12 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Public profile card: display name, email, cook count, dietary restrictions badges
 - Per-feature public/private visibility toggles: Chef History, Saved Recipes, Taste Analytics, Food Photos, Comments & Notes, Created Recipes
 - Privacy settings persisted to localStorage and synced to Supabase `profiles.hungry_settings.profile_privacy`
+- **Preview Profile** — "Preview My Profile" button shows how other users see your public profile via UserProfileModal
 
 ### Settings
 - Update display name
+- Bio — saved to and loaded from Supabase auth metadata (bio now persists across sessions)
+- Profile photo — upload now uses upsert to ensure row exists before writing avatar URL
 - Set dietary restrictions
 - Set nutrition goal
 - Set age, weight, height

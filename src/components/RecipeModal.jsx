@@ -146,10 +146,17 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
     setPantryAdded(prev => { const s = new Set(prev); s.add(ing); return s; });
   };
 
-  const savedEntry = useMemo(
-    () => (savedRecipes || []).find(sr => sr.recipe_id === String(recipe?.id)),
-    [savedRecipes, recipe?.id]
-  );
+  const savedEntry = useMemo(() => {
+    const id = String(recipe?.id || '');
+    const stableId = id.replace(/^adapted-local-/, '');
+    return (savedRecipes || []).find(sr => sr.recipe_id === id || sr.recipe_id === stableId);
+  }, [savedRecipes, recipe?.id]);
+
+  const stableRecipe = useMemo(() => {
+    if (!recipe) return null;
+    const stableId = String(recipe.id).replace(/^adapted-local-/, '');
+    return { ...recipe, id: stableId };
+  }, [recipe]);
 
   const handleToggleStar = (e) => {
     e.stopPropagation();
@@ -158,19 +165,21 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
     } else if (households?.length > 0) {
       setShowHouseholdMenu(prev => !prev);
     } else {
-      onSaveRecipe(recipe);
+      onSaveRecipe(stableRecipe);
     }
   };
 
   const handleAddAllMissing = () => {
+    const recipeName = cleanIngredientLocally(displayRecipe.name || '');
     const missing = (displayRecipe.ingredients || []).filter((ing, idx) => {
       const overrideKey = `${idx}:${ing}`;
       const cleaned = cleanIngredientLocally(stripIngredientNotes(ing));
-      return !isInPantry(cleaned, overrideKey);
+      return cleaned && cleaned !== recipeName && !isInPantry(cleaned, overrideKey);
     });
     missing.forEach(ing => {
-      const cleaned = cleanIngredientLocally(stripIngredientNotes(ing));
-      if (cleaned && !addedItems?.has(cleaned)) onAddIngredient(cleaned);
+      const stripped = stripIngredientNotes(ing);
+      const cleaned = cleanIngredientLocally(stripped);
+      if (cleaned && !addedItems?.has(cleaned)) onAddIngredient(stripped || cleaned);
     });
   };
 
@@ -352,7 +361,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
               {showHouseholdMenu && !savedEntry && (
                 <div className="absolute right-0 top-14 bg-white border border-blue-100 rounded-2xl shadow-xl z-20 min-w-[180px] p-2 space-y-1">
                   <button
-                    onClick={() => { onSaveRecipe(recipe); setShowHouseholdMenu(false); }}
+                    onClick={() => { onSaveRecipe(stableRecipe); setShowHouseholdMenu(false); }}
                     className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-sky-50 hover:text-[#6BAEE0] transition-all flex items-center gap-2"
                   >
                     <Star size={12} /> My Saved Recipes
@@ -360,7 +369,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
                   {households.map(h => (
                     <button
                       key={h.id}
-                      onClick={() => { onSaveRecipe(recipe, h.id); setShowHouseholdMenu(false); }}
+                      onClick={() => { onSaveRecipe(stableRecipe, h.id); setShowHouseholdMenu(false); }}
                       className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-sky-50 hover:text-[#6BAEE0] transition-all flex items-center gap-2"
                     >
                       <Users size={12} /> {h.name}

@@ -21,7 +21,7 @@ const getAisle = (itemName) => {
   return 'Pantry';
 };
 
-export default function ShoppingListManager({ list = [], onAdd, onToggle, onClear, onRename, households = [], onMoveToHousehold }) {
+export default function ShoppingListManager({ list = [], onAdd, onToggle, onClear, onRename, onClearAll, onMarkAllDone, onAddToPantry, households = [], onMoveToHousehold }) {
   const { userSettings } = useUser();
   const [shoppingInput, setShoppingInput] = useState('');
   const [movingId, setMovingId] = useState(null);
@@ -36,7 +36,9 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
     if (swapLoadingId || swapResults[item.id]) return;
     setSwapLoadingId(item.id);
     try {
-      const prompt = `You are a nutrition coach. The user's goal is: "${nutritionGoal || 'Balanced diet'}". They have "${item.item_name}" on their shopping list. Suggest ONE better alternative ingredient that helps reach their goal. Reply in exactly this format (no extra text): "Instead of [item], try [alternative] — [one short reason]."`;
+      const dietaryRestrictions = userSettings?.dietary_restrictions || [];
+      const dietContext = dietaryRestrictions.length > 0 ? ` Dietary restrictions: ${dietaryRestrictions.join(', ')}.` : '';
+      const prompt = `You are a nutrition coach. The user's goal is: "${nutritionGoal || 'Balanced diet'}".${dietContext} They have "${item.item_name}" on their shopping list. Suggest ONE better alternative ingredient that helps reach their goal and respects their dietary restrictions. Make sure the substitute is a food item, not a cooking method or recipe name. Reply in exactly this format (no extra text): "Instead of [item], try [alternative] — [one short reason]."`;
       const res = await fetch('/.netlify/functions/scan-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +50,7 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
       setSwapResults(prev => ({ ...prev, [item.id]: 'Could not fetch suggestion right now.' }));
     }
     setSwapLoadingId(null);
-  }, [swapLoadingId, swapResults, nutritionGoal]);
+  }, [swapLoadingId, swapResults, nutritionGoal, userSettings]);
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
@@ -77,10 +79,14 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
   };
 
   const renderItem = (item) => (
-    <div key={item.id} className={`bg-white border rounded-2xl transition-all ${item.is_completed ? 'border-transparent opacity-50' : 'border-blue-50 shadow-sm'}`}>
-      <div className="flex items-center justify-between gap-3 p-4">
+    <div key={item.id} className={`bg-white border rounded-2xl transition-all overflow-hidden ${item.is_completed ? 'border-transparent opacity-50' : 'border-blue-50 shadow-sm'}`}>
+      <div className="flex items-center justify-between gap-3 p-4 min-w-0 overflow-hidden">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <button onClick={() => onToggle(item.id, item.is_completed)} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${item.is_completed ? 'bg-sky-500 text-white' : 'bg-blue-50 text-transparent border border-blue-100'}`}>
+          <button onClick={() => {
+            onToggle(item.id, item.is_completed);
+            // Auto-add to pantry when checking off an item
+            if (!item.is_completed && onAddToPantry) onAddToPantry(item.item_name);
+          }} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${item.is_completed ? 'bg-sky-500 text-white' : 'bg-blue-50 text-transparent border border-blue-100'}`}>
             <Check size={14} strokeWidth={4} />
           </button>
           {editingId === item.id ? (
@@ -174,6 +180,20 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
           <h2 className="text-[14px] font-bold text-slate-400">Shopping List</h2>
           <span className="ml-auto bg-blue-50 text-[#6BAEE0] text-[10px] font-black px-3 py-1 rounded-full border border-blue-100">{pending.length} items</span>
         </div>
+        {list.length > 0 && (
+          <div className="flex gap-2 mb-4">
+            {onMarkAllDone && pending.length > 0 && (
+              <button onClick={onMarkAllDone} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-black border border-emerald-100 hover:bg-emerald-100 transition-all">
+                <Check size={12} /> Mark All Done
+              </button>
+            )}
+            {onClearAll && (
+              <button onClick={() => { if (window.confirm('Clear the entire shopping list?')) onClearAll(); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-400 text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all">
+                <Trash2 size={12} /> Delete All
+              </button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleAddSubmit} className="flex gap-2 mb-6">
           <input

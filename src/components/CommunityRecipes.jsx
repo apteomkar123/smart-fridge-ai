@@ -150,7 +150,13 @@ export default function CommunityRecipes() {
         const meas = m[`strMeasure${i}`];
         if (ing && ing.trim()) ings.push(`${meas?.trim() || ''} ${ing.trim()}`.trim());
       }
-      const steps = (m.strInstructions || '').split(/\r?\n+/).map(s => s.trim()).filter(s => s.length > 8);
+      const rawInstr = (m.strInstructions || '').replace(/\r\n?/g, '\n');
+      let steps = rawInstr.split(/\n+/).map(s => s.trim().replace(/^(?:step\s*)?\d+[\.\:\)]\s*/i, '').trim()).filter(s => s.length > 8);
+      // If only one long block, split by sentence boundaries
+      if (steps.length <= 1 && rawInstr.length > 200) {
+        const sentences = rawInstr.replace(/([.!?])\s+(?=[A-Z])/g, '$1\n').split(/\n+/).map(s => s.trim()).filter(s => s.length > 8);
+        if (sentences.length > 1) steps = sentences;
+      }
       let recipe = {
         id: `mealdb-${m.idMeal}`,
         name: toTitleCase(m.strMeal),

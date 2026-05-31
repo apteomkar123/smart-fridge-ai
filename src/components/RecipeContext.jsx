@@ -131,11 +131,20 @@ export const RecipeProvider = ({ children, fridge }) => {
         cuisine: m.strArea || '',
         ingredients: _normalizeIngredients(ings).map(i => toTitleCase(i)),
         image: m.strMealThumb || '',
-        steps: String(m.strInstructions || '')
-          .replace(/\r\n?/g, '\n')
-          .split(/\n+/)
-          .map(s => s.trim().replace(/^(?:step\s*)?\d+[\.\:\)]\s*/i, '').trim())
-          .filter(s => s.length >= 8 && !/^step\s*\d+[\.\:]?\s*$/i.test(s) && !/^[\d\s\.\:\-\(\)■•·]+$/.test(s))
+        steps: (() => {
+          const raw = String(m.strInstructions || '').replace(/\r\n?/g, '\n');
+          let parts = raw.split(/\n+/)
+            .map(s => s.trim().replace(/^(?:step\s*)?\d+[\.\:\)]\s*/i, '').trim())
+            .filter(s => s.length >= 8 && !/^step\s*\d+[\.\:]?\s*$/i.test(s) && !/^[\d\s\.\:\-\(\)■•·]+$/.test(s));
+          // If only one long step, split by sentence boundaries
+          if (parts.length <= 1 && raw.length > 200) {
+            const sentences = raw.replace(/([.!?])\s+(?=[A-Z])/g, '$1\n').split(/\n+/)
+              .map(s => s.trim().replace(/^(?:step\s*)?\d+[\.\:\)]\s*/i, '').trim())
+              .filter(s => s.length >= 8);
+            if (sentences.length > 1) parts = sentences;
+          }
+          return parts;
+        })()
       };
     });
     try { localStorage.setItem(MEALDB_CACHE_KEY, JSON.stringify({ data: processed, ts: Date.now() })); } catch {}

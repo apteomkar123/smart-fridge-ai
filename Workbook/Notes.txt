@@ -459,3 +459,23 @@ Household still isn't showing all the members. Tell me how to fix this if I need
 
 FEATURES TO ADD: (session 12 / 2026-05-31)
 (none listed)
+
+
+DONE (Session 12)
+-----------------
+Some recipe steps not showing correctly for some recipes on explore page (single block or "make and enjoy")
+Better categorization of explore recipes by dietary type (vegetarian, vegan, meat, dairy free) + smarter substitution conversion
+Substitutions throughout app now respect dietary restrictions; smarter AI substitution prompts
+PersonalShopper AI suggestion "at null" bug fixed; suggestion box centered; format corrected to "If they don't have X, Y works really well"
+Checked-off shopping list items now auto-added to pantry
+Added Mark All Done and Delete All buttons to shopping list
+Fixed add-all-missing-ingredients adding recipe title sometimes; fixed item card overflow
+Fixed explore/community star button not saving recipes (adapted recipe ID normalization)
+Profile photo not saving - fixed by using upsert instead of update in handleUpdateAvatar
+Bio disappearing after save - fixed by including bio in setUserSettings in UserContext
+Friend code area blank - now auto-generated on first profile load if missing
+
+FEATURES ADDED (Session 12)
+----------------------------
+Preview Profile button in Profile section - shows how other users see your profile
+Custom recipe generator in Recipes tab - type any ingredients to get an AI-generated recipe

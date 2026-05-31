@@ -32,8 +32,10 @@ export const UserProvider = ({ children }) => {
   };
 
   const [userSettings, setUserSettings] = useState({
+    bio: '',
     dietary_restrictions: [],
     nutrition_goal: 'Balanced',
+    nutrition_goals: ['Balanced'],
     age: '',
     weight_lbs: '',
     height_ft: '',
@@ -54,8 +56,10 @@ export const UserProvider = ({ children }) => {
     const meta = authUser.user_metadata || {};
     setUserName(meta.name || '');
     setUserSettings({
+      bio: meta.bio || '',
       dietary_restrictions: meta.dietary_restrictions || [],
       nutrition_goal: meta.nutrition_goal || 'Balanced',
+      nutrition_goals: meta.nutrition_goals || (meta.nutrition_goal ? [meta.nutrition_goal] : ['Balanced']),
       age: meta.age || '',
       weight_lbs: meta.weight_lbs || '',
       height_ft: meta.height_ft || '',
@@ -76,13 +80,18 @@ export const UserProvider = ({ children }) => {
       supabase.from('profiles').upsert([upsertData]).then(() => {});
     }
 
-    // Load profile data (tutorial state + avatars)
-    supabase.from('profiles').select('hungry_tutorial_done, avatar_url, hungry_avatar_url').eq('id', authUser.id).single()
-      .then(({ data }) => {
+    // Load profile data (tutorial state + avatars + friend code)
+    supabase.from('profiles').select('hungry_tutorial_done, avatar_url, hungry_avatar_url, friend_code').eq('id', authUser.id).single()
+      .then(async ({ data }) => {
         if (data) {
           if (data.hungry_tutorial_done === false || data.hungry_tutorial_done == null) setShowTutorial(true);
           setAvatarUrl(data.avatar_url || null);
           setHungryAvatarUrl(data.hungry_avatar_url || null);
+          // Generate friend code if the profile doesn't have one yet
+          if (!data.friend_code) {
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            await supabase.from('profiles').update({ friend_code: code }).eq('id', authUser.id);
+          }
         }
       }).catch(() => {});
   };
@@ -204,8 +213,10 @@ export const UserProvider = ({ children }) => {
     if (!error && data.user) {
       const meta = data.user.user_metadata || {};
       setUserSettings({
+        bio: meta.bio || '',
         dietary_restrictions: meta.dietary_restrictions || [],
         nutrition_goal: meta.nutrition_goal || 'Balanced',
+        nutrition_goals: meta.nutrition_goals || (meta.nutrition_goal ? [meta.nutrition_goal] : ['Balanced']),
         age: meta.age || '',
         weight_lbs: meta.weight_lbs || '',
         height_ft: meta.height_ft || '',
@@ -243,7 +254,7 @@ export const UserProvider = ({ children }) => {
     if (error) return;
     const { data: { publicUrl } } = supabase.storage.from('user-avatars').getPublicUrl(path);
     const col = type === 'hungry' ? 'hungry_avatar_url' : 'avatar_url';
-    await supabase.from('profiles').update({ [col]: publicUrl }).eq('id', user.id);
+    await supabase.from('profiles').upsert({ id: user.id, [col]: publicUrl });
     if (type === 'hungry') setHungryAvatarUrl(publicUrl);
     else setAvatarUrl(publicUrl);
   };
