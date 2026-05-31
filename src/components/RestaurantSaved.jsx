@@ -73,36 +73,59 @@ export default function RestaurantSaved({ onOpenRecipe }) {
     vibes: prev.vibes.includes(v) ? prev.vibes.filter(x => x !== v) : [...prev.vibes, v],
   }));
 
-  const addDish = () => {
+  const fetchRecipeForDish = async (dishName, restaurantName) => {
+    try {
+      const prompt = `I had "${dishName}" at ${restaurantName}. Give me a home recipe to recreate it. Return ONLY valid JSON: {"ingredients":["string"],"steps":["string"]}`;
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt, directMode: true }),
+      });
+      if (!res.ok) return null;
+      const text = await res.text();
+      const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+      return {
+        ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
+        steps: Array.isArray(parsed.steps) ? parsed.steps : [],
+      };
+    } catch { return null; }
+  };
+
+  const addDish = async () => {
     if (!form.dishName.trim() || !form.restaurantName.trim()) return;
+    const manualIngredients = form.ingredients.split(',').map(s => s.trim()).filter(Boolean);
     const newDish = {
       id: Date.now().toString(),
       dishName: form.dishName.trim(),
       restaurantName: form.restaurantName.trim(),
       location: form.location.trim(),
-      ingredients: form.ingredients.split(',').map(s => s.trim()).filter(Boolean),
+      ingredients: manualIngredients,
+      steps: [],
       cuisine: form.cuisine,
       vibes: form.vibes,
       notes: form.notes.trim(),
       savedAt: Date.now(),
+      fetchingRecipe: true,
     };
     const updated = [newDish, ...dishes];
     setDishes(updated);
     save(updated);
     setForm({ dishName: '', restaurantName: '', location: '', ingredients: '', cuisine: 'american', vibes: [], notes: '' });
     setAdding(false);
-
-    // Persist to Supabase if logged in
-    if (user) {
-      supabase.from('saved_recipes').insert([{
-        user_id: user.id,
-        recipe_id: `restaurant-${newDish.id}`,
-        recipe_name: `${newDish.dishName} (${newDish.restaurantName})`,
-        meal_type: 'Restaurant',
-        cuisine: newDish.cuisine,
-        ingredients: newDish.ingredients,
-        steps: [`Order at ${newDish.restaurantName}${newDish.location ? `, ${newDish.location}` : ''}.`, ...(newDish.notes ? [newDish.notes] : [])],
-      }]).then(() => {});
+    // Search for recipe online and enrich the dish
+    const recipe = await fetchRecipeForDish(newDish.dishName, newDish.restaurantName);
+    if (recipe) {
+      const enriched = updated.map(d => d.id === newDish.id ? {
+        ...d,
+        ingredients: recipe.ingredients.length ? recipe.ingredients : d.ingredients,
+        steps: recipe.steps,
+        fetchingRecipe: false,
+      } : d);
+      setDishes(enriched);
+      save(enriched);
+    } else {
+      const done = updated.map(d => d.id === newDish.id ? { ...d, fetchingRecipe: false } : d);
+      setDishes(done);
+      save(done);
     }
   };
 
@@ -239,6 +262,11 @@ export default function RestaurantSaved({ onOpenRecipe }) {
             return (
               <div key={dish.id}
                 className="bg-white/80 px-4 py-4 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-all">
+                {dish.fetchingRecipe && (
+                  <div className="flex items-center gap-2 mb-2 text-[10px] text-violet-500 font-bold">
+                    <Loader2 size={11} className="animate-spin" /> Looking up recipe online…
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-2">
                   <button className="flex-1 text-left" onClick={() => openAsRecipe(dish)}>
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">

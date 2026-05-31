@@ -81,8 +81,14 @@ export default function SettingsPage({ onNavigateFriends }) {
   }
 
   const [displayName, setDisplayName] = useState(profileName || '');
+  const [bio, setBio] = useState(userSettings?.bio || '');
   const [dietary, setDietary] = useState(userSettings?.dietary_restrictions || []);
-  const [goal, setGoal] = useState(userSettings?.nutrition_goal || 'Balanced');
+  const [goals, setGoals] = useState(() => {
+    const saved = userSettings?.nutrition_goals || userSettings?.nutrition_goal;
+    if (Array.isArray(saved)) return saved;
+    if (saved) return [saved];
+    return ['Balanced'];
+  });
   const [age, setAge] = useState(String(userSettings?.age || ''));
   const [weightLbs, setWeightLbs] = useState(String(userSettings?.weight_lbs || ''));
   const [heightFt, setHeightFt] = useState(String(userSettings?.height_ft || ''));
@@ -106,8 +112,12 @@ export default function SettingsPage({ onNavigateFriends }) {
 
   useEffect(() => {
     if (userSettings) {
+      setBio(userSettings.bio || '');
       setDietary(userSettings.dietary_restrictions || []);
-      setGoal(userSettings.nutrition_goal || 'Balanced');
+      const saved = userSettings.nutrition_goals || userSettings.nutrition_goal;
+      if (Array.isArray(saved)) setGoals(saved);
+      else if (saved) setGoals([saved]);
+      else setGoals(['Balanced']);
       setAge(String(userSettings.age || ''));
       setWeightLbs(String(userSettings.weight_lbs || ''));
       setHeightFt(String(userSettings.height_ft || ''));
@@ -119,11 +129,15 @@ export default function SettingsPage({ onNavigateFriends }) {
     setDietary(prev => prev.includes(opt) ? prev.filter(d => d !== opt) : [...prev, opt]);
   };
 
+  const toggleGoal = (g) => setGoals(prev => prev.includes(g) ? (prev.length > 1 ? prev.filter(x => x !== g) : prev) : [...prev, g]);
+
   const saveSettings = async () => {
     await handleUpdateSettings({
       name: displayName,
+      bio,
       dietary_restrictions: dietary,
-      nutrition_goal: goal,
+      nutrition_goals: goals,
+      nutrition_goal: goals[0] || 'Balanced',
       age: age ? Number(age) : '',
       weight_lbs: weightLbs ? Number(weightLbs) : '',
       height_ft: heightFt ? Number(heightFt) : '',
@@ -208,6 +222,18 @@ export default function SettingsPage({ onNavigateFriends }) {
           />
         </div>
 
+        {/* Bio */}
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bio</label>
+          <textarea
+            placeholder="A little about yourself…"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            rows={2}
+            className="w-full mt-1 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-2xl text-sm text-slate-800 focus:border-sky-400 focus:outline-none resize-none"
+          />
+        </div>
+
         {/* Body Stats — American units */}
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Body Stats</label>
@@ -273,16 +299,16 @@ export default function SettingsPage({ onNavigateFriends }) {
           </div>
         </div>
 
-        {/* Nutrition Goal */}
+        {/* Nutrition Goals — multi-select */}
         <div>
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nutrition Goal</label>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nutrition Goals <span className="normal-case font-semibold">(select multiple)</span></label>
           <div className="flex flex-wrap gap-2 mt-2">
             {NUTRITION_GOALS.map(g => (
               <button
                 key={g}
                 type="button"
-                onClick={() => setGoal(g)}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border ${goal === g ? 'bg-slate-700 text-white border-slate-700 shadow-md' : 'bg-white text-slate-400 border-blue-100 hover:border-slate-300'}`}
+                onClick={() => toggleGoal(g)}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border ${goals.includes(g) ? 'bg-slate-700 text-white border-slate-700 shadow-md' : 'bg-white text-slate-400 border-blue-100 hover:border-slate-300'}`}
               >
                 {g}
               </button>

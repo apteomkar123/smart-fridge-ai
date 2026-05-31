@@ -149,7 +149,12 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
           setExpandedId(d2.id);
           setNewEventName('');
         } else {
-          setCreateError(e2?.message || error?.message || 'Could not create event. Check your connection and try again.');
+          const msg = e2?.message || error?.message || '';
+          if (msg.includes('potluck_events') || msg.includes('schema cache')) {
+            setCreateError('Events table not set up yet. Run the SQL migration in your Supabase dashboard to create the potluck_events and potluck_items tables.');
+          } else {
+            setCreateError(msg || 'Could not create event. Check your connection and try again.');
+          }
         }
       }
     } catch (err) {
@@ -384,9 +389,26 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
                         </span>
                       )}
                       {ev.venue && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const q = encodeURIComponent(ev.venue);
+                            const ua = navigator.userAgent;
+                            if (/iPhone|iPad/i.test(ua)) {
+                              // Show Apple Maps vs Google Maps choice
+                              if (window.confirm(`Open "${ev.venue}" in Google Maps?\n\nCancel to use Apple Maps instead.`)) {
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+                              } else {
+                                window.open(`maps://maps.apple.com/?q=${q}`, '_blank');
+                              }
+                            } else {
+                              window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+                            }
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-bold text-[#6BAEE0] hover:underline"
+                        >
                           <MapPin size={10} /> {ev.venue}
-                        </span>
+                        </button>
                       )}
                     </div>
                   </div>

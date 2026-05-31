@@ -139,7 +139,7 @@ export const locallyAdaptRecipe = (recipe, targetDiet) => {
   const adapted = {
     ...recipe,
     id: `adapted-local-${recipe.id}`,
-    name: `${recipe.name} (${targetDiet})`,
+    name: `${toTitleCase(diet)} ${recipe.name}`,
     ingredients: updatedIngredients,
     cleanedIngredients: updatedIngredients.map(cleanIngredientLocally).filter(Boolean),
     steps: updatedSteps,

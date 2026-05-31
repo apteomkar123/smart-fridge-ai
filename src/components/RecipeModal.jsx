@@ -482,7 +482,7 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
         )}
 
         {/* Convert + Proteinize buttons */}
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-6 flex flex-wrap gap-2 justify-center">
           {(hasMeat || hasFish) && (
             <button onClick={() => handleAdapt('vegetarian')} disabled={adapting !== null}
               className="flex items-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50">
@@ -514,17 +514,17 @@ export default function RecipeModal({ onStartCooking, addedItems, onAddIngredien
         </div>
 
         <div className="mt-6 pt-6 border-t border-blue-50 space-y-3">
-          <div className="flex justify-between items-center">
-            <div className="flex gap-1 bg-blue-50/50 p-1 rounded-2xl border border-blue-100">
-              {[1, 2, 4].map(n => (
-                <button key={n} onClick={() => setMultiplier(n)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${multiplier === n ? 'bg-white text-[#6BAEE0] shadow-sm' : 'text-slate-400'}`}>{n}x</button>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1 bg-blue-50/50 p-1 rounded-2xl border border-blue-100 shrink-0">
+              {[1, 2, 3, 4].map(n => (
+                <button key={n} onClick={() => setMultiplier(n)} className={`px-3 py-2 rounded-xl text-[10px] font-black transition-all ${multiplier === n ? 'bg-white text-[#6BAEE0] shadow-sm' : 'text-slate-400'}`}>{n}x</button>
               ))}
             </div>
             <button
               onClick={onStartCooking}
-              className="bg-[#6BAEE0] text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-all"
+              className="flex-1 bg-[#6BAEE0] text-white px-4 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-all text-sm"
             >
-              <Play size={18} fill="currentColor" /> Start Cooking
+              <Play size={16} fill="currentColor" /> Start Cooking
             </button>
           </div>
           {onMarkCooked && (

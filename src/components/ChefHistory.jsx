@@ -74,7 +74,10 @@ function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePh
   const gridCols = photoCount === 1 ? '1fr' : photoCount === 2 ? '1fr 1fr' : 'repeat(3, 1fr)';
 
   return (
-    <div className="bg-white/92 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-2xl overflow-hidden">
+    <div
+      className="bg-white/92 backdrop-blur-xl rounded-[2.5rem] border border-white/30 shadow-2xl overflow-hidden"
+      onClick={e => { if (e.target === e.currentTarget) setExpanded(false); }}
+    >
       {/* Header */}
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -114,12 +117,18 @@ function HistoryCard({ entry, displayName, onUpdateNotes, onAddPhoto, onDeletePh
           <p className="text-sm text-slate-500 leading-relaxed">{entry.description}</p>
         ) : entry.ingredients?.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {entry.ingredients.slice(0, 5).map((ing, i) => {
+            {entry.ingredients.slice(0, 6).map((ing, i) => {
               const label = typeof ing === 'string'
-                ? ing.replace(/^\d[\d./]*\s*(tbsp|tsp|cup|cups|g|kg|oz|lb|ml|l)?\s*/i, '').split(',')[0].trim()
-                : ing;
+                ? ing
+                    .replace(/^[\d½⅓¼¾⅛\s\/\-.]+/, '')           // strip leading numbers/fractions
+                    .replace(/^\s*(tbsps?|tsps?|tablespoons?|teaspoons?|cups?|oz|ounces?|g|grams?|kg|lb|lbs|ml|liters?|litres?|pieces?|slices?|cloves?|bunch|cans?|jars?)\s+/i, '') // strip units
+                    .replace(/\s*\([^)]*\)/g, '')                  // strip parenthetical notes
+                    .replace(/,.*$/, '')                           // strip comma-separated qualifiers
+                    .trim()
+                : String(ing);
+              if (!label || label.length < 2) return null;
               return (
-                <span key={i} className="text-[10px] font-bold bg-slate-50 border border-slate-100 text-slate-500 px-2.5 py-1 rounded-full">
+                <span key={i} className="text-[10px] font-bold bg-slate-50 border border-slate-100 text-slate-500 px-2.5 py-1 rounded-full capitalize">
                   {label}
                 </span>
               );

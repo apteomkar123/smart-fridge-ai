@@ -157,7 +157,7 @@ export default function RecipeExplorer({ initialMood = null }) {
               : 'Loading recipes…'}
           </div>
         ) : moodFilteredRecipes.slice(0, 100).map((recipe) => {
-          const adaptedLabel = recipe._adapted ? `✅ ${recipe._adaptedFor} adaptation applied` : null;
+          const adaptedLabel = recipe._adapted ? `✅ ${recipe._adaptedFor ? (recipe._adaptedFor.charAt(0).toUpperCase() + recipe._adaptedFor.slice(1)) : ''} Adaptation Applied` : null;
           const showImage2 = recipe.image && !adaptedLabel;
           return (
           <div key={recipe.id} className="bg-white/80 backdrop-blur-md border border-white/40 rounded-4xl shadow-lg shadow-blue-900/5 group hover:scale-[1.02] transition-all cursor-pointer overflow-hidden" onClick={() => onOpenRecipe(recipe)}>

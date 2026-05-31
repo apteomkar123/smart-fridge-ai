@@ -70,8 +70,11 @@ export default function UserProfilePage() {
             <p className="text-[10px] font-black text-[#6BAEE0] mt-1">{cookCount} dishes cooked</p>
           </div>
         </div>
+        {userSettings?.bio && (
+          <p className="text-xs text-slate-500 leading-relaxed mt-1">{userSettings.bio}</p>
+        )}
         {userSettings?.dietary_restrictions?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 mt-2">
             {userSettings.dietary_restrictions.map(r => (
               <span key={r} className="text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">{r}</span>
             ))}

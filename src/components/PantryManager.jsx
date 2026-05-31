@@ -302,7 +302,7 @@ function CategorySheet({ category, items, onClose, onItemTap, onRemove, househol
                       {item.household_id && <span className="max-w-10 truncate">{getHouseholdLabel(item.household_id)}</span>}
                     </button>
                     {hhPickerItemId === item.id && (
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[140px] p-2 space-y-1">
+                      <div className="absolute right-0 bottom-full mb-1 bg-white border border-blue-100 rounded-2xl shadow-xl z-30 min-w-[140px] p-2 space-y-1">
                         <button
                           onClick={() => pickItemHousehold(item, null)}
                           className="w-full text-left text-xs font-bold text-slate-600 px-3 py-2 rounded-xl hover:bg-slate-50 flex items-center gap-2"

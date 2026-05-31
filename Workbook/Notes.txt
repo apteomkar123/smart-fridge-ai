@@ -404,3 +404,44 @@ FEATURES ADDED:
 NOT DONE / DEFERRED:
 - Nutrition information for pantry items: the estimateNutrition() function already covers most common items; the user's request to look up all items on the internet is not feasible without a paid nutrition API; current behavior shows estimated nutrition for recognized items in the ingredient card modal
 - Restaurants section does not show nearby restaurants using external data: would require Google Places API integration; only user-added restaurant dishes are shown
+
+IMPLEMENTED (session 2026-05-31 session 11):
+BUGS FIXED:
+- Tutorial broken: z-200 is invalid Tailwind (should be z-[200]) — fixed; removed confusing "👆 HERE" pill label that looked like a tappable button; replaced 14 step-dot indicators with a simple "N / 14" counter; removed backdrop blur so background isn't blurry
+- Header "Hungry" bleeding into greeting: added flex-col + leading-none + mt-0.5 on greeting line to properly separate
+- Header logo taps open nav: Header now accepts onOpenNav prop; App.jsx passes setNavOpen(true)
+- RecipeModal Start Cooking button too large: changed to flex-1 with text-sm, side by side with serving size selector
+- RecipeModal serving size: added 3x option (now 1x 2x 3x 4x)
+- RecipeModal Add Meat / Proteinize not centered: added justify-center to the flex container
+- Proteinize ignores dietary restrictions: now passes user restrictions to AI prompt (e.g. vegetarian → uses paneer/tofu/lentils)
+- Recipe naming: "(vegetarian)" suffix replaced with "Vegetarian " prefix in both locallyAdaptRecipe and AI adaptRecipe
+- Explore: adaptation label updated to "✅ Vegetarian Adaptation Applied" (properly capitalized)
+- ChefHistory expanded card: wrapped in onClick handler — tapping outside buttons/text closes the card
+- ChefHistory ingredient pills: improved stripping regex removes fractions, measure units, and parentheticals; null labels filtered out; capitalize CSS applied
+- Analytics "Wrap" tab crowded: removed from Analytics; created standalone AppWareTab.jsx; added "AppWare" nav item (Layers icon) that auto-loads data on mount
+- Settings nutrition goal: changed from single-select to multi-select (any combination allowed; at least one must stay selected)
+- Settings bio: added bio text field; synced to handleUpdateSettings and displayed on Profile page
+- Potluck venue: made clickable — opens Google Maps search URL; on iPhone shows native confirm dialog letting user choose Google Maps or Apple Maps
+- Potluck table error: improved error message when potluck_events table is missing — explains SQL migration needed
+- CommunityRecipes View More: removed inline expand; replaced with full-screen overlay (CategoryFullPage) that slides in; removed duplicate "View All" header button — only one View More button at end of horizontal scroll
+- Saved recipes Add Recipe: changed from right-aligned small button to full-width large button centered
+- Restaurant dish: saving now triggers async AI recipe lookup (fetchRecipeForDish); enriches ingredients/steps; shows "Looking up recipe online…" spinner on card while fetching
+- Household share button saved recipes: changed overflow-hidden to overflow-visible on card so dropdown doesn't clip
+- Pantry share dropdown: changed from top-full (opens below) to bottom-full (opens above) so it stays on screen when item is near bottom
+- AddRecipeModal URL save: handleSaveManual now async and awaits onSaveRecipe so recipe is actually persisted before modal closes
+- Household Settle Up: added consolidated single Venmo request button "Request $X from each member" above per-member rows
+
+FEATURES ADDED:
+- 3x serving size in RecipeModal
+- Bio field in Settings (displayed on Profile page)
+- Multiple nutrition goals selection
+- AppWare nav section (standalone Wrap stats page)
+- Potluck venue → Google Maps / Apple Maps deep link
+- CommunityRecipes full-page category view on View More
+- Restaurant dish auto-recipe fetch on save
+- Consolidated Venmo transaction button in Settle Up
+
+NOT DONE / DEFERRED:
+- World cuisine map as actual world map: requires a mapping library (Mapbox, Leaflet) — deferred
+- Connect to Flo for period cycle recipe suggestions: requires Flo SDK / API — not publicly available
+- Household member list sync issue: existing query logic covers both schema versions; if members are missing it may be a Supabase RLS/data issue rather than a code bug

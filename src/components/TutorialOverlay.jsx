@@ -223,26 +223,20 @@ export default function TutorialOverlay({ onComplete, onSkip, onSwitchTab }) {
   const goBack = () => setStep(s => Math.max(s - 1, 0));
 
   return (
-    <div className="fixed inset-0 z-200 flex flex-col" style={{ background: 'rgba(10,20,50,0.65)', backdropFilter: 'blur(4px)' }}>
+    <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: 'rgba(10,20,50,0.70)' }}>
 
-      {/* ── Spotlight pulsing indicator ─────────────────────────────────── */}
+      {/* ── Spotlight pulsing indicator — pointer-events-none so nothing is tappable ── */}
       <div
         className="absolute pointer-events-none"
         style={{ left: current.spotlight.x, top: current.spotlight.y, transform: 'translate(-50%, -50%)' }}
       >
-        {/* Outer ripple rings */}
-        <div className={`absolute inset-0 rounded-full transition-opacity duration-300 ${spotVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="w-20 h-20 -ml-10 -mt-10 rounded-full border-2 border-[#6BAEE0]/40 animate-ping" />
+        <div className={`absolute transition-opacity duration-300 ${spotVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="w-24 h-24 -ml-12 -mt-12 rounded-full border-2 border-[#6BAEE0]/30 animate-ping" />
         </div>
-        <div className={`absolute inset-0 rounded-full transition-opacity duration-500 delay-75 ${spotVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="w-12 h-12 -ml-6 -mt-6 rounded-full border-2 border-[#6BAEE0]/60 animate-ping" style={{ animationDelay: '0.2s' }} />
+        <div className={`absolute transition-opacity duration-500 ${spotVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="w-14 h-14 -ml-7 -mt-7 rounded-full border-2 border-[#6BAEE0]/60 animate-ping" style={{ animationDelay: '0.25s' }} />
         </div>
-        {/* Center dot */}
-        <div className={`w-4 h-4 -ml-2 -mt-2 rounded-full bg-[#6BAEE0] shadow-lg shadow-sky-400/60 transition-all duration-300 ${spotVisible ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} />
-        {/* "Look here" label */}
-        <div className={`absolute top-5 left-1/2 -translate-x-1/2 whitespace-nowrap transition-all duration-300 ${spotVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
-          <span className="text-[10px] font-black text-white/80 bg-[#6BAEE0]/80 px-2 py-0.5 rounded-full tracking-widest">👆 HERE</span>
-        </div>
+        <div className={`w-5 h-5 -ml-2.5 -mt-2.5 rounded-full bg-[#6BAEE0] shadow-lg shadow-sky-400/60 transition-all duration-300 ${spotVisible ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} />
       </div>
 
       {/* ── Tutorial card anchored at bottom ───────────────────────────── */}
@@ -303,16 +297,8 @@ export default function TutorialOverlay({ onComplete, onSkip, onSwitchTab }) {
                 <ChevronLeft size={14} /> Back
               </button>
 
-              {/* Step dots */}
-              <div className="flex items-center gap-1">
-                {STEPS.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setStep(i)}
-                    className={`rounded-full transition-all ${i === step ? 'w-4 h-2 bg-[#6BAEE0]' : 'w-2 h-2 bg-slate-200 hover:bg-slate-300'}`}
-                  />
-                ))}
-              </div>
+              {/* Step counter */}
+              <p className="text-[11px] font-black text-slate-400">{step + 1} / {STEPS.length}</p>
 
               {isLast ? (
                 <button

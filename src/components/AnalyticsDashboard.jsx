@@ -257,12 +257,6 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         >
           🌍 Taste
         </button>
-        <button
-          onClick={() => { setDashTab('appware'); if (!appWrapData) loadAppWrap(); }}
-          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${dashTab === 'appware' ? 'bg-violet-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <Globe size={13} /> Wrap
-        </button>
       </div>
 
       {dashTab === 'nutrition' && <>
@@ -814,7 +808,7 @@ export default function AnalyticsDashboard({ metrics, fridge, shoppingList, onAd
         );
       })()}
 
-      {/* Feature #5: AppWare Wrap ──────────────────────────────────────── */}
+      {/* AppWare Wrap moved to its own nav section — see AppWareTab.jsx */}
       {dashTab === 'appware' && (
         <div className="space-y-5">
           <section className="bg-linear-to-br from-violet-50 to-sky-50 border border-violet-100 p-6 rounded-[2.5rem] shadow-xl">

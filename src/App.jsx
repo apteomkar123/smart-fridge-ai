@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper, Globe, User } from 'lucide-react';
+import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper, Globe, User, Layers } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
@@ -28,6 +28,7 @@ import ChefHistory from './components/ChefHistory';
 import AddRecipeModal from './components/AddRecipeModal';
 import UserProfilePage from './components/UserProfilePage';
 import RestaurantSaved from './components/RestaurantSaved';
+import AppWareTab from './components/AppWareTab';
 
 function AppContent({ inventory }) {
   const { user, household: activeHousehold, households, showTutorial, dismissTutorial } = useUser();
@@ -164,6 +165,7 @@ function AppContent({ inventory }) {
     { tab: 'household',   icon: <Users size={22} />,          label: 'Household' },
     { tab: 'potluck',     icon: <PartyPopper size={22} />,    label: 'Events' },
     { tab: 'community',   icon: <Globe size={22} />,          label: 'Explore' },
+    { tab: 'appware',     icon: <Layers size={22} />,         label: 'AppWare' },
     { tab: 'friends',     icon: <UserRound size={22} />,     label: 'Friends' },
     { tab: 'profile',     icon: <User size={22} />,          label: 'Profile' },
     { tab: 'settings',    icon: <Settings size={22} />,      label: 'Settings' },
@@ -220,7 +222,7 @@ function AppContent({ inventory }) {
       {/* Scrollable area — Header sticky inside here */}
       <main ref={mainRef} className="flex-1 overflow-y-auto w-full">
         <div className="w-full flex justify-center">
-          <Header scrollToTop={scrollToTop} />
+          <Header scrollToTop={scrollToTop} onOpenNav={() => setNavOpen(true)} />
         </div>
         <div className="w-full flex justify-center px-4 sm:px-6 py-8">
           <div className="w-full max-w-5xl pb-4">
@@ -290,6 +292,7 @@ function AppContent({ inventory }) {
             {activeTab === 'profile' && <UserProfilePage />}
             {activeTab === 'potluck' && <PotluckPage />}
             {activeTab === 'community' && <CommunityRecipes />}
+            {activeTab === 'appware' && <AppWareTab fridge={fridge} />}
             {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}
             {activeTab === 'saved' && (
               <div className="space-y-6">
@@ -305,14 +308,12 @@ function AppContent({ inventory }) {
                   </button>
                 </div>
                 {savedTab === 'restaurants' && <RestaurantSaved onOpenRecipe={setActiveModalRecipe} />}
-                {savedTab === 'saved' && <div className="flex justify-end">
-                  <button
+                {savedTab === 'saved' && <button
                     onClick={() => setIsAddRecipeOpen(true)}
-                    className="flex items-center gap-2 bg-[#6BAEE0] text-white px-5 py-2.5 rounded-2xl text-xs font-black shadow-lg shadow-blue-100 active:scale-95 transition-all"
+                    className="w-full flex items-center justify-center gap-2 bg-[#6BAEE0] text-white px-5 py-4 rounded-2xl text-sm font-black shadow-lg shadow-blue-100 active:scale-95 transition-all"
                   >
-                    <PlusCircle size={15} /> Add Recipe
-                  </button>
-                </div>}
+                    <PlusCircle size={18} /> Add Recipe
+                  </button>}
                 {savedTab === 'saved' && <>
                 {/* ── Meal Plans ── */}
                 {savedMealPlans.length > 0 && (
@@ -390,7 +391,7 @@ function AppContent({ inventory }) {
                     <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
                   ) : (
                     filteredSavedRecipes.map(recipe => (
-                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative overflow-visible">
                         <div
                           className="flex-1 cursor-pointer min-w-0 overflow-hidden"
                           onClick={() => setActiveModalRecipe({

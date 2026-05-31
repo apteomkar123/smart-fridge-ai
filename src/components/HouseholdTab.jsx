@@ -399,6 +399,16 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
                     <span className="text-sm font-black text-[#6BAEE0]">${perPerson.toFixed(2)}</span>
                   </div>
                 </div>
+                {/* One consolidated Venmo request for all members */}
+                {members.filter(m => m.id !== user?.id).length > 0 && (
+                  <a
+                    href={venmoUrl}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full text-[11px] font-black text-white bg-[#3D95CE] py-3 rounded-2xl hover:opacity-90 transition-all shadow-md"
+                  >
+                    <ExternalLink size={13} /> Request ${amount} from each member via Venmo
+                  </a>
+                )}
                 {members.filter(m => m.id !== user?.id).map(m => (
                   <div key={m.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6BAEE0] to-[#4d96d1] flex items-center justify-center text-white font-black text-sm shrink-0">

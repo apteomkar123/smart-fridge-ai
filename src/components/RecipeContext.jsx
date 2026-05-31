@@ -423,7 +423,7 @@ export const RecipeProvider = ({ children, fridge }) => {
     return {
       ...recipe,
       id: `adapted-${Date.now()}`,
-      name: parsed.recipeName || `${recipe.name} (${targetDiet})`,
+      name: parsed.recipeName || `${toTitleCase(targetDiet)} ${recipe.name}`,
       ingredients: newIngredients,
       cleanedIngredients: newIngredients.map(cleanIngredientLocally).filter(Boolean),
       steps: Array.isArray(parsed.steps) ? parsed.steps : recipe.steps,
@@ -548,9 +548,11 @@ export const RecipeProvider = ({ children, fridge }) => {
   }, []);
 
   const proteinizeRecipe = useCallback(async (recipe) => {
-    const prompt = `This recipe is "${recipe.name}" with ingredients: ${(recipe.ingredients || []).join(', ')}.
+    const restrictions = (userSettings?.dietary_restrictions || []).join(', ');
+    const dietNote = restrictions ? ` The user's dietary restrictions are: ${restrictions}. The protein source MUST comply with these restrictions (e.g. no meat if vegetarian — use paneer, tofu, lentils, chickpeas, Greek yogurt, or eggs instead).` : '';
+    const prompt = `This recipe is "${recipe.name}" with ingredients: ${(recipe.ingredients || []).join(', ')}.${dietNote}
 
-Suggest ONE high-protein ingredient addition that complements this dish naturally (e.g. grilled chicken for pasta, paneer for curry, Greek yogurt for soup, lentils for stew). Choose something fitting the cuisine and flavour profile.
+Suggest ONE high-protein ingredient addition that complements this dish naturally. Choose something fitting the cuisine and flavour profile.
 
 Return ONLY valid JSON: {"proteinIngredient": "name and quantity", "proteinAdded": number (total grams added to the whole dish), "ingredients": [full updated ingredient list], "steps": [full updated cooking steps incorporating the protein]}`;
     const res = await fetch('/.netlify/functions/scan-receipt', {

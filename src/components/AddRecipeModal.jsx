@@ -32,7 +32,7 @@ export default function AddRecipeModal({ onClose }) {
   const removeStepRow = (i) => setSteps(p => p.filter((_, idx) => idx !== i));
   const setStepAt = (i, v) => setSteps(p => p.map((x, idx) => idx === i ? v : x));
 
-  const handleSaveManual = () => {
+  const handleSaveManual = async () => {
     if (!name.trim()) return;
     const filteredIngs = ingredients.filter(i => i.trim());
     const filteredSteps = steps.filter(s => s.trim());
@@ -49,7 +49,7 @@ export default function AddRecipeModal({ onClose }) {
       _isPublic: isPublic,
       _householdId: householdId,
     };
-    onSaveRecipe(recipe, householdId);
+    await onSaveRecipe(recipe, householdId);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 1200);
   };
