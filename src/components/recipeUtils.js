@@ -451,7 +451,33 @@ const _estimateNutritionImpl = (n) => {
   if (/\b(soy sauce|tamari)\b/.test(n)) return { kcal: 53, protein: 8, carbs: 5, fat: 0.1 };
   if (/\b(tomato sauce|tomato paste|ketchup)\b/.test(n)) return { kcal: 82, protein: 3, carbs: 18, fat: 0.5 };
   if (/\b(broth|stock|bouillon)\b/.test(n)) return { kcal: 15, protein: 1, carbs: 1, fat: 0.5 };
-  return null;
+  // Additional common items
+  if (/\b(vinegar|balsamic)\b/.test(n)) return { kcal: 18, protein: 0, carbs: 3, fat: 0 };
+  if (/\b(mustard)\b/.test(n)) return { kcal: 66, protein: 4, carbs: 6, fat: 4 };
+  if (/\b(mayo|mayonnaise)\b/.test(n)) return { kcal: 680, protein: 1, carbs: 1, fat: 75 };
+  if (/\b(hot sauce|sriracha|tabasco)\b/.test(n)) return { kcal: 35, protein: 1, carbs: 7, fat: 0.5 };
+  if (/\b(jam|jelly|marmalade|preserves)\b/.test(n)) return { kcal: 250, protein: 0.5, carbs: 65, fat: 0 };
+  if (/\b(pickle|pickled)\b/.test(n)) return { kcal: 12, protein: 0.6, carbs: 2.6, fat: 0.2 };
+  if (/\b(cereal|granola|muesli)\b/.test(n)) return { kcal: 370, protein: 8, carbs: 72, fat: 5 };
+  if (/\b(tortilla|wrap|pita|naan)\b/.test(n)) return { kcal: 300, protein: 8, carbs: 55, fat: 5 };
+  if (/\b(cracker|crisp|chip|popcorn)\b/.test(n)) return { kcal: 450, protein: 7, carbs: 68, fat: 18 };
+  if (/\b(waffle|pancake|crepe)\b/.test(n)) return { kcal: 227, protein: 6, carbs: 30, fat: 10 };
+  if (/\b(ice cream|gelato|sorbet)\b/.test(n)) return { kcal: 207, protein: 3.5, carbs: 24, fat: 11 };
+  if (/\b(cake|pie|tart|brownie|cookie|muffin)\b/.test(n)) return { kcal: 380, protein: 5, carbs: 55, fat: 16 };
+  if (/\b(soup)\b/.test(n)) return { kcal: 50, protein: 3, carbs: 8, fat: 1 };
+  if (/\b(salad dressing|ranch|caesar|vinaigrette)\b/.test(n)) return { kcal: 300, protein: 1, carbs: 8, fat: 30 };
+  if (/\b(tahini|hummus)\b/.test(n)) return { kcal: 595, protein: 17, carbs: 21, fat: 53 };
+  if (/\b(miso)\b/.test(n)) return { kcal: 200, protein: 12, carbs: 27, fat: 6 };
+  if (/\b(curry paste|curry powder|turmeric|cumin|coriander|paprika|cinnamon|cardamom|clove|nutmeg|oregano|thyme|rosemary|basil|bay)\b/.test(n)) return { kcal: 325, protein: 13, carbs: 55, fat: 10 };
+  if (/\b(baking powder|baking soda|yeast)\b/.test(n)) return { kcal: 53, protein: 0, carbs: 28, fat: 0 };
+  if (/\b(cornstarch|cornflour|arrowroot)\b/.test(n)) return { kcal: 381, protein: 0.3, carbs: 91, fat: 0.1 };
+  if (/\b(gelatin|agar)\b/.test(n)) return { kcal: 335, protein: 85, carbs: 0, fat: 0 };
+  if (/\b(protein powder|whey protein|casein)\b/.test(n)) return { kcal: 380, protein: 80, carbs: 5, fat: 5 };
+  if (/\b(energy drink|sports drink|gatorade)\b/.test(n)) return { kcal: 45, protein: 0, carbs: 11, fat: 0 };
+  if (/\b(frozen)\b/.test(n)) return { kcal: 120, protein: 5, carbs: 18, fat: 3 };
+  if (/\b(canned|tinned)\b/.test(n)) return { kcal: 100, protein: 5, carbs: 15, fat: 2 };
+  // Universal fallback: generic food estimate
+  return { kcal: 150, protein: 4, carbs: 20, fat: 5 };
 };
 
 /**

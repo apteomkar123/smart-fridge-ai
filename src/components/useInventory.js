@@ -225,7 +225,8 @@ export const useInventory = (user, household) => {
       household_id: targetHouseholdId,
       nutrition: extraData.nutrition || null,
       price: extraData.price || 0,
-      expiry_date: estimatedExpiry
+      expiry_date: estimatedExpiry,
+      store_name: extraData.store_name || null,
     }]);
     triggerHaptic(50);
 
@@ -370,7 +371,7 @@ export const useInventory = (user, household) => {
         } catch (_) {}
 
         if (name) {
-          await handleAddManualItem(name, null, { nutrition, price });
+          await handleAddManualItem(name, null, { nutrition, price, store_name: storeName !== 'General Grocery' ? storeName : null });
           const nutritionText = nutrition ? ` · ${nutrition.kcal} kcal/100g` : '';
           const priceText = price > 0 ? ` · $${Number(price).toFixed(2)}` : '';
           setBarcodeResult(`Added: ${name}${nutritionText}${priceText}`);
@@ -420,12 +421,13 @@ export const useInventory = (user, household) => {
           throw new Error(errData.error || `Server error ${response.status}`);
         }
         const data = await response.json();
-        if (data.storeName) setStoreName(data.storeName);
+        const receiptStore = data.storeName || null;
+        if (receiptStore) setStoreName(receiptStore);
         if (Array.isArray(data.added) && data.added.length > 0) {
           for (const item of data.added) {
-            await handleAddManualItem(item);
+            await handleAddManualItem(item, null, { store_name: receiptStore });
           }
-          setReceiptMessage(`Added ${data.added.length} item${data.added.length !== 1 ? 's' : ''} from receipt`);
+          setReceiptMessage(`Added ${data.added.length} item${data.added.length !== 1 ? 's' : ''} from receipt${receiptStore ? ` (${receiptStore})` : ''}`);
         } else {
           setReceiptMessage('Receipt scanned — no food items found. Try a clearer photo.');
         }

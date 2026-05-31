@@ -114,6 +114,13 @@ function IngredientCardModal({ item, onClose, onSave, onDelete, households }) {
             </select>
           </div>
 
+          {item.store_name && (
+            <div className="bg-slate-50 rounded-2xl px-4 py-2.5 flex items-center gap-2 border border-slate-100">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bought at</span>
+              <span className="text-xs font-bold text-slate-600">{item.store_name}</span>
+            </div>
+          )}
+
           {displayNutrition && (
             <div className="bg-sky-50 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">

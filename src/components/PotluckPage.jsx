@@ -177,15 +177,22 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
     setJoining(false);
   };
 
+  const [assignTo, setAssignTo] = useState({}); // eventId → { name, id } | null
+
   const addItem = async (eventId) => {
     const name = newItem.trim();
     if (!name || !user) return;
+    const assignee = assignTo[eventId];
+    const insertPayload = assignee
+      ? { event_id: eventId, name, claimed_by_id: assignee.id, claimed_by_name: assignee.name }
+      : { event_id: eventId, name };
     try {
       const { data, error } = await supabase.from('potluck_items')
-        .insert([{ event_id: eventId, name }])
+        .insert([insertPayload])
         .select()
         .single();
       if (!error && data) {
+        setAssignTo(prev => ({ ...prev, [eventId]: null }));
         setEvents(prev => prev.map(ev =>
           ev.id === eventId ? { ...ev, potluck_items: [...(ev.potluck_items || []), data] } : ev
         ));
@@ -511,6 +518,33 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
                           </div>
                         )}
                       </>
+                    );
+                  })()}
+
+                  {/* Assign to someone */}
+                  {(() => {
+                    const attendees = [...new Set((ev.potluck_items || [])
+                      .filter(i => i.claimed_by_id && i.claimed_by_name)
+                      .map(i => JSON.stringify({ id: i.claimed_by_id, name: i.claimed_by_name })))
+                    ].map(s => JSON.parse(s));
+                    const meEntry = { id: user.id, name: displayName };
+                    const allPeople = [meEntry, ...attendees.filter(a => a.id !== user.id)];
+                    const currentAssignee = assignTo[ev.id];
+                    if (allPeople.length === 0) return null;
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign to:</span>
+                        <button
+                          onClick={() => setAssignTo(prev => ({ ...prev, [ev.id]: null }))}
+                          className={`text-[10px] font-black px-3 py-1.5 rounded-full border transition-all ${!currentAssignee ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-400 border-slate-200'}`}
+                        >Anyone (self-claim)</button>
+                        {allPeople.map(p => (
+                          <button key={p.id}
+                            onClick={() => setAssignTo(prev => ({ ...prev, [ev.id]: currentAssignee?.id === p.id ? null : p }))}
+                            className={`text-[10px] font-black px-3 py-1.5 rounded-full border transition-all ${currentAssignee?.id === p.id ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-slate-400 border-slate-200 hover:border-violet-300'}`}
+                          >{p.id === user.id ? 'Me' : p.name}</button>
+                        ))}
+                      </div>
                     );
                   })()}
 

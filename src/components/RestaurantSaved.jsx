@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, MapPin, UtensilsCrossed, ChevronDown, Star, Search, Clock, DollarSign, Users, Coffee } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Plus, Trash2, MapPin, UtensilsCrossed, Star, Search, Loader2, Navigation } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 
@@ -37,6 +37,36 @@ export default function RestaurantSaved({ onOpenRecipe }) {
   const [search, setSearch] = useState('');
   const [filterCuisine, setFilterCuisine] = useState('');
   const [filterVibe, setFilterVibe] = useState('');
+  const [nearby, setNearby] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState('');
+  const [nearbyFilter, setNearbyFilter] = useState('all'); // 'all' | 'quick' | 'cheap' | 'date_night' | 'open'
+
+  const fetchNearby = useCallback(() => {
+    if (!navigator.geolocation) { setNearbyError('Geolocation not supported by your browser.'); return; }
+    setNearbyLoading(true);
+    setNearbyError('');
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude: lat, longitude: lng } }) => {
+        try {
+          const res = await fetch('/.netlify/functions/nearby-restaurants', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng }),
+          });
+          const data = await res.json();
+          if (!data.configured) {
+            setNearbyError('Nearby restaurants require a Google Places API key. Set GOOGLE_PLACES_KEY in Netlify environment variables.');
+          } else {
+            setNearby(data.restaurants || []);
+          }
+        } catch { setNearbyError('Could not fetch nearby restaurants.'); }
+        setNearbyLoading(false);
+      },
+      () => { setNearbyError('Location access denied. Enable location to see nearby restaurants.'); setNearbyLoading(false); },
+      { timeout: 8000 }
+    );
+  }, []);
 
   const toggleVibe = (v) => setForm(prev => ({
     ...prev,
@@ -236,6 +266,82 @@ export default function RestaurantSaved({ onOpenRecipe }) {
           })}
         </div>
       )}
+
+      {/* Nearby Restaurants */}
+      <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[13px] font-bold text-slate-400 flex items-center gap-2">
+            <Navigation size={14} className="text-[#6BAEE0]" /> Restaurants Near You
+          </h3>
+          <button
+            onClick={fetchNearby}
+            disabled={nearbyLoading}
+            className="flex items-center gap-1.5 bg-[#6BAEE0] text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-md active:scale-95 transition-all disabled:opacity-60"
+          >
+            {nearbyLoading ? <Loader2 size={12} className="animate-spin" /> : <MapPin size={12} />}
+            {nearbyLoading ? 'Finding…' : nearby.length ? 'Refresh' : 'Find Nearby'}
+          </button>
+        </div>
+
+        {nearbyError && <p className="text-[11px] text-red-500 font-bold">{nearbyError}</p>}
+
+        {nearby.length > 0 && (
+          <>
+            {/* Vibe filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {[
+                { key: 'all', label: 'All', emoji: '🍽️' },
+                { key: 'open', label: 'Open Now', emoji: '🟢' },
+                { key: 'cheap', label: 'Cheap Eats', emoji: '💸' },
+                { key: 'quick', label: 'Quick Eats', emoji: '⚡' },
+                { key: 'date_night', label: 'Date Night', emoji: '🕯️' },
+              ].map(f => (
+                <button key={f.key} onClick={() => setNearbyFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black whitespace-nowrap border transition-all ${nearbyFilter === f.key ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-400 border-slate-200'}`}>
+                  {f.emoji} {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              {nearby
+                .filter(r => {
+                  if (nearbyFilter === 'open') return r.open_now === true;
+                  if (nearbyFilter === 'cheap') return r.price_level != null && r.price_level <= 1;
+                  if (nearbyFilter === 'quick') return r.types?.some(t => ['fast_food', 'meal_takeaway', 'meal_delivery'].includes(t));
+                  if (nearbyFilter === 'date_night') return r.price_level != null && r.price_level >= 3;
+                  return true;
+                })
+                .map(r => (
+                  <div key={r.place_id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-700 truncate">{r.name}</p>
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <MapPin size={9} /> {r.vicinity}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.rating && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-500">
+                          <Star size={10} fill="currentColor" /> {r.rating}
+                        </span>
+                      )}
+                      {r.price_level != null && (
+                        <span className="text-[10px] font-black text-slate-400">{'$'.repeat(Math.max(1, r.price_level))}</span>
+                      )}
+                      {r.open_now === true && <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">Open</span>}
+                      {r.open_now === false && <span className="text-[9px] font-black text-red-400 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">Closed</span>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </>
+        )}
+
+        {!nearbyLoading && nearby.length === 0 && !nearbyError && (
+          <p className="text-[11px] text-slate-400 text-center">Tap "Find Nearby" to discover restaurants around you.</p>
+        )}
+      </div>
     </div>
   );
 }
