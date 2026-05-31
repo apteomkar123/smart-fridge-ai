@@ -74,13 +74,38 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
 
   useEffect(() => {
     if (!selectedHHId || !user) return;
-    // Load members from the household_members junction table
+    // Load members from household_members junction table.
+    // Use !profile_id hint for Supabase FK disambiguation, then fall back
+    // to querying profiles directly using active_household_id (old schema).
     supabase
       .from('household_members')
-      .select('profile_id, profiles:profile_id(id, display_name, hungry_settings, friend_code)')
+      .select('profile_id, profiles!profile_id(id, display_name, hungry_settings, friend_code)')
       .eq('household_id', selectedHHId)
-      .then(({ data }) => {
-        const loaded = (data || []).map(m => m.profiles).filter(Boolean);
+      .then(async ({ data, error }) => {
+        let loaded = (data || []).map(m => m.profiles).filter(Boolean);
+
+        // Fallback: if join returned no profiles (RLS or schema issue),
+        // fetch profile IDs first then fetch profiles separately.
+        if ((!loaded.length || error) && (data || []).length > 0) {
+          const ids = (data || []).map(m => m.profile_id).filter(Boolean);
+          if (ids.length) {
+            const { data: profs } = await supabase
+              .from('profiles')
+              .select('id, display_name, hungry_settings, friend_code')
+              .in('id', ids);
+            loaded = profs || [];
+          }
+        }
+
+        // Second fallback: old schema — profiles with active_household_id or household_id
+        if (!loaded.length) {
+          const { data: oldProfs } = await supabase
+            .from('profiles')
+            .select('id, display_name, hungry_settings, friend_code')
+            .or(`active_household_id.eq.${selectedHHId},household_id.eq.${selectedHHId}`);
+          loaded = oldProfs || [];
+        }
+
         setMembers(loaded);
         // Feature #7: load presence now that we have the member IDs
         if (loaded.length) {

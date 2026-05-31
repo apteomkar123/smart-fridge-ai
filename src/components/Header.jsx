@@ -24,8 +24,8 @@ export default function Header({ scrollToTop, onOpenNav }) {
           : <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-sm font-black text-[#6BAEE0]">{displayName.slice(0,1).toUpperCase()}</div>
         }
         <div className="flex flex-col">
-          <h1 className="logo-text leading-none">Hungry</h1>
-          <p className="text-slate-500 text-[11px] font-bold mt-0.5 leading-none">{greeting}, <span className="text-[#1F6FB8]">{displayName}</span>!</p>
+          <h1 className="logo-text leading-none" style={{ fontSize: '1.4rem' }}>Hungry</h1>
+          <p className="text-slate-500 text-[11px] font-bold mt-1 leading-none">{greeting}, <span className="text-[#1F6FB8]">{displayName}</span>!</p>
         </div>
       </button>
       <div className="flex items-center gap-3">

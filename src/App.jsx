@@ -386,12 +386,12 @@ function AppContent({ inventory }) {
                   </div>
                 </div>
 
-                <div className="grid gap-4 overflow-x-hidden">
+                <div className="grid gap-4 w-full">
                   {filteredSavedRecipes.length === 0 ? (
                     <p className="text-xs text-slate-400 font-medium italic text-center py-10">No saved recipes match your criteria</p>
                   ) : (
                     filteredSavedRecipes.map(recipe => (
-                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative overflow-visible">
+                      <div key={recipe.id} className="bg-white/80 px-4 py-5 rounded-3xl border border-blue-100 flex justify-between items-center gap-2 shadow-sm hover:shadow-md transition-all group relative w-full min-w-0">
                         <div
                           className="flex-1 cursor-pointer min-w-0 overflow-hidden"
                           onClick={() => setActiveModalRecipe({
@@ -402,7 +402,7 @@ function AppContent({ inventory }) {
                           })}
                         >
                           <span className="text-[8px] font-mono font-black text-slate-400 uppercase bg-blue-50/50 px-2 py-1 rounded-md">{recipe.meal_type}</span>
-                          <h3 className="font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors truncate pr-1">{recipe.recipe_name}</h3>
+                          <h3 className="text-sm font-bold text-slate-700 mt-1 group-hover:text-[#6BAEE0] transition-colors truncate pr-1 max-w-full">{recipe.recipe_name}</h3>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 ml-3">
                           {households?.length > 0 && (

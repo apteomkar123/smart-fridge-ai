@@ -12,6 +12,7 @@ export default function AddRecipeModal({ onClose }) {
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Visibility + destination
   const [isPublic, setIsPublic] = useState(true);
@@ -34,6 +35,7 @@ export default function AddRecipeModal({ onClose }) {
 
   const handleSaveManual = async () => {
     if (!name.trim()) return;
+    setSaveError('');
     const filteredIngs = ingredients.filter(i => i.trim());
     const filteredSteps = steps.filter(s => s.trim());
     const householdId = destination !== 'personal' ? destination : null;
@@ -49,9 +51,13 @@ export default function AddRecipeModal({ onClose }) {
       _isPublic: isPublic,
       _householdId: householdId,
     };
-    await onSaveRecipe(recipe, householdId);
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1200);
+    const ok = await onSaveRecipe(recipe, householdId);
+    if (ok) {
+      setSaved(true);
+      setTimeout(() => { setSaved(false); onClose(); }, 1200);
+    } else {
+      setSaveError('Could not save recipe. Please check your connection and try again.');
+    }
   };
 
   const handleParseUrl = async () => {
@@ -227,6 +233,7 @@ export default function AddRecipeModal({ onClose }) {
               </div>
             )}
 
+            {saveError && <p className="text-xs text-red-400 font-semibold px-1">{saveError}</p>}
             <button
               onClick={handleSaveManual}
               disabled={!name.trim() || saved}

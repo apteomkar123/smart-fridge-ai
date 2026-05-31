@@ -445,3 +445,17 @@ NOT DONE / DEFERRED:
 - World cuisine map as actual world map: requires a mapping library (Mapbox, Leaflet) — deferred
 - Connect to Flo for period cycle recipe suggestions: requires Flo SDK / API — not publicly available
 - Household member list sync issue: existing query logic covers both schema versions; if members are missing it may be a Supabase RLS/data issue rather than a code bug
+
+BUGS TO FIX. (session 12 / 2026-05-31)
+Title is still bleeding into the greeting in the header
+All features on the shopping list section are pushed into the top of the screen when first opened, then comes back down after a while
+The cards on saved recipes are bleeding off the screen on the right side. Fix this permanently
+Recipes in community recipes are not being changed according to dietary restrictions
+App Icon is still messed up
+Recipes being parsed from a link are being saved to neither personal saved recipes or household saved recipes when the saved button is hit.
+Still getting this error when I try to add an event: "Create Events table not set up yet. Run the SQL migration in your Supabase dashboard to create the potluck_events and potluck_items tables."
+Some of these issues were given to you in the last version of changes.md. Go through the whole history, and the whole project, and make sure every feature I've told you so far has been implemented, and look for bugs and issues and inconsistencies in the entire project and fix them all. Be detailed.
+Household still isn't showing all the members. Tell me how to fix this if I need to do anything on supabase. Also tell me if there's anyway where I can just have you apply changes to Supabase.
+
+FEATURES TO ADD: (session 12 / 2026-05-31)
+(none listed)

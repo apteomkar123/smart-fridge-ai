@@ -142,6 +142,7 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Each recipe card shows the dish photo and name (title-cased); tap to open full recipe card with ingredients and steps
 - Search bar at top queries TheMealDB by name in real-time; results are title-cased
 - Category data cached per-row for 6 hours in localStorage
+- **Dietary filtering** — meat-heavy rows (Trending, Beef, High Protein) hidden for vegetarian/vegan users; Seafood hidden for vegan/vegetarian; recipes adapted via `locallyAdaptRecipe` when opened
 
 ### Friends
 - Tapping a friend card (or a search result) opens their full profile modal
@@ -206,7 +207,8 @@ Features that were requested but cannot be built without a third-party dependenc
 |---|---|
 | **World Cuisine Map (actual world map)** | The Taste Profile "🌍 Taste" tab currently shows a bar chart of cuisines cooked. The request is for an interactive world map where countries light up based on cuisines explored. This requires a geographic mapping library (Mapbox GL JS, Leaflet + world GeoJSON, or D3 choropleth) with country-to-cuisine mapping. Non-trivial to implement without a dedicated mapping dependency, and adds significant bundle size. |
 | **Period Cycle Recipe Suggestions (Flo integration)** | Requested feature: suggest recipes and ingredients based on a user's menstrual cycle phase (e.g. iron-rich foods during menstruation, anti-inflammatory during PMS). The Flo Health app does not expose a public API or SDK for third-party integrations, so there is no way to read cycle data programmatically. A manual "cycle phase" selector in the app could approximate this without Flo, if desired. |
-| **Household Member List not showing** | If members added to a household are not appearing in the Household tab, this is a Supabase data or RLS (Row Level Security) issue rather than a client code bug. The query already handles both the old and new schema (`active_household_id` and `household_members` junction table). To fix: check in Supabase Dashboard → Authentication → Policies that `household_members` has a SELECT policy allowing authenticated users to read rows where they are a member, and verify that members were actually inserted into `household_members` when they joined. |
+| **Household Member List not showing** | Client now uses three-tier fallback: (1) `household_members` FK join, (2) separate `profiles` fetch by ID, (3) old `active_household_id`/`household_id` column on profiles. If members still don't appear, run migration 005 and ensure the `household_members` RLS policy (`hm: members can view`) is applied in Supabase. |
+| **Events table not set up** | Migration file created at `supabase/migrations/005_potluck_events.sql`. Run it in Supabase Dashboard → SQL Editor to create `potluck_events` and the updated `potluck_items` tables with correct RLS policies. |
 
 ---
 

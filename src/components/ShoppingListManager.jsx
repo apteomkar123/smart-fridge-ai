@@ -165,7 +165,7 @@ export default function ShoppingListManager({ list = [], onAdd, onToggle, onClea
 
   const closeDropdown = () => setMovingId(null);
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700" onClick={closeDropdown} onTouchStart={closeDropdown}>
+    <div className="space-y-6 animate-in fade-in duration-500" onClick={closeDropdown} onTouchStart={closeDropdown}>
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
         <div className="flex items-center gap-3 mb-6 px-2">
           <div className="p-3 bg-sky-50 text-[#6BAEE0] rounded-2xl">

@@ -362,14 +362,14 @@ export const RecipeProvider = ({ children, fridge }) => {
   }, [fridge, processedRecipes]);
 
   const onSaveRecipe = async (recipe, householdId = undefined) => {
-    if (!user) return;
+    if (!user) return false;
     // If no householdId passed, use the user's default recipe destination preference
     if (householdId === undefined) {
       const defaultDest = localStorage.getItem('hungry_default_recipe_dest') || 'personal';
       householdId = defaultDest === 'personal' ? null : defaultDest;
     }
     const recipeIdStr = String(recipe.id);
-    if (!householdId && savedRecipes.some(r => r.recipe_id === recipeIdStr)) return;
+    if (!householdId && savedRecipes.some(r => r.recipe_id === recipeIdStr)) return true; // already saved
     const insertData = {
       user_id: user.id,
       recipe_id: recipeIdStr,
@@ -381,8 +381,9 @@ export const RecipeProvider = ({ children, fridge }) => {
     };
     if (householdId) insertData.household_id = householdId;
     const { data, error: err } = await supabase.from('saved_recipes').insert([insertData]).select();
-    if (err) { console.error('Save recipe error:', err.message); return; }
+    if (err) { console.error('Save recipe error:', err.message); return false; }
     if (data) setSavedRecipes(prev => [...prev, data[0]]);
+    return true;
   };
 
   const onRemoveSavedRecipe = async (pkId) => {

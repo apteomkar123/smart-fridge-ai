@@ -1,25 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Loader2, X, Globe, ChevronLeft, ArrowRight } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
-import { toTitleCase } from './recipeUtils';
+import { useUser } from './UserContext';
+import { toTitleCase, locallyAdaptRecipe, matchesRecipeFilter } from './recipeUtils';
 
 const MEALDB = 'https://www.themealdb.com/api/json/v1/1';
 
 const CATEGORY_ROWS = [
-  { key: 'trending',   label: '🔥 Trending Now',      endpoint: '/filter.php?c=Chicken'      },
-  { key: 'healthy',    label: '🥗 Healthy & Light',    endpoint: '/filter.php?c=Vegetarian'   },
-  { key: 'comfort',    label: '🍲 Comfort Food',       endpoint: '/filter.php?c=Pasta'        },
-  { key: 'breakfast',  label: '☀️ Breakfast',           endpoint: '/filter.php?c=Breakfast'    },
-  { key: 'seafood',    label: '🦞 Seafood',             endpoint: '/filter.php?c=Seafood'      },
-  { key: 'dessert',    label: '🍰 Desserts',            endpoint: '/filter.php?c=Dessert'      },
-  { key: 'beef',       label: '🥩 Beef & Steak',       endpoint: '/filter.php?c=Beef'         },
-  { key: 'asian',      label: '🍜 Asian Flavors',      endpoint: '/filter.php?a=Chinese'      },
-  { key: 'indian',     label: '🇮🇳 Indian Cuisine',    endpoint: '/filter.php?a=Indian'       },
-  { key: 'mexican',    label: '🇲🇽 Mexican',            endpoint: '/filter.php?a=Mexican'      },
-  { key: 'italian',    label: '🇮🇹 Italian',            endpoint: '/filter.php?a=Italian'      },
-  { key: 'american',   label: '🇺🇸 American',           endpoint: '/filter.php?a=American'     },
-  { key: 'highprot',   label: '💪 High Protein',       endpoint: '/filter.php?c=Chicken'      },
-  { key: 'quick',      label: '⚡ Quick & Easy',        endpoint: '/filter.php?c=Miscellaneous'},
+  { key: 'trending',   label: '🔥 Trending Now',      endpoint: '/filter.php?c=Chicken',       dietType: 'meat'    },
+  { key: 'healthy',    label: '🥗 Healthy & Light',    endpoint: '/filter.php?c=Vegetarian',    dietType: 'veg'     },
+  { key: 'comfort',    label: '🍲 Comfort Food',       endpoint: '/filter.php?c=Pasta',         dietType: 'neutral' },
+  { key: 'breakfast',  label: '☀️ Breakfast',           endpoint: '/filter.php?c=Breakfast',     dietType: 'neutral' },
+  { key: 'seafood',    label: '🦞 Seafood',             endpoint: '/filter.php?c=Seafood',       dietType: 'fish'    },
+  { key: 'dessert',    label: '🍰 Desserts',            endpoint: '/filter.php?c=Dessert',       dietType: 'neutral' },
+  { key: 'beef',       label: '🥩 Beef & Steak',       endpoint: '/filter.php?c=Beef',          dietType: 'meat'    },
+  { key: 'asian',      label: '🍜 Asian Flavors',      endpoint: '/filter.php?a=Chinese',       dietType: 'neutral' },
+  { key: 'indian',     label: '🇮🇳 Indian Cuisine',    endpoint: '/filter.php?a=Indian',        dietType: 'neutral' },
+  { key: 'mexican',    label: '🇲🇽 Mexican',            endpoint: '/filter.php?a=Mexican',       dietType: 'neutral' },
+  { key: 'italian',    label: '🇮🇹 Italian',            endpoint: '/filter.php?a=Italian',       dietType: 'neutral' },
+  { key: 'american',   label: '🇺🇸 American',           endpoint: '/filter.php?a=American',      dietType: 'neutral' },
+  { key: 'highprot',   label: '💪 High Protein',       endpoint: '/filter.php?c=Chicken',       dietType: 'meat'    },
+  { key: 'quick',      label: '⚡ Quick & Easy',        endpoint: '/filter.php?c=Miscellaneous', dietType: 'neutral' },
 ];
 
 const CACHE_KEY = 'hungry_community_';
@@ -119,6 +120,18 @@ function CategoryFullPage({ row, meals, onOpen, onClose }) {
 
 export default function CommunityRecipes() {
   const { setActiveModalRecipe } = useRecipes();
+  const { userSettings } = useUser();
+  const dietaryRestrictions = userSettings?.dietary_restrictions || [];
+  const isVegan = dietaryRestrictions.some(r => r.toLowerCase() === 'vegan');
+  const isVegetarian = isVegan || dietaryRestrictions.some(r => r.toLowerCase() === 'vegetarian');
+  const noFish = isVegan || isVegetarian;
+
+  const visibleRows = CATEGORY_ROWS.filter(row => {
+    if (row.dietType === 'meat' && isVegetarian) return false;
+    if (row.dietType === 'fish' && noFish) return false;
+    return true;
+  });
+
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -138,7 +151,7 @@ export default function CommunityRecipes() {
         if (ing && ing.trim()) ings.push(`${meas?.trim() || ''} ${ing.trim()}`.trim());
       }
       const steps = (m.strInstructions || '').split(/\r?\n+/).map(s => s.trim()).filter(s => s.length > 8);
-      setActiveModalRecipe({
+      let recipe = {
         id: `mealdb-${m.idMeal}`,
         name: toTitleCase(m.strMeal),
         meal_type: m.strCategory || 'General',
@@ -147,9 +160,17 @@ export default function CommunityRecipes() {
         ingredients: ings,
         cleanedIngredients: ings,
         steps,
-      });
+      };
+      // Apply dietary adaptations based on the user's restrictions
+      for (const restriction of dietaryRestrictions) {
+        const key = restriction.toLowerCase();
+        if (!matchesRecipeFilter(recipe, key)) {
+          recipe = locallyAdaptRecipe(recipe, key);
+        }
+      }
+      setActiveModalRecipe(recipe);
     } catch {}
-  }, [setActiveModalRecipe]);
+  }, [setActiveModalRecipe, dietaryRestrictions]);
 
   const doSearch = useCallback(async (q) => {
     if (!q.trim()) { setSearchResults(null); return; }
@@ -217,7 +238,7 @@ export default function CommunityRecipes() {
       ) : (
         /* Category rows */
         <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl">
-          {CATEGORY_ROWS.map(row => (
+          {visibleRows.map(row => (
             <CategoryRow key={row.key} row={row} onOpen={openMeal} onViewAll={(r, meals) => setFullPageCategory({ row: r, meals })} />
           ))}
         </div>
