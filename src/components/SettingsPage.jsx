@@ -90,7 +90,6 @@ export default function SettingsPage({ onNavigateFriends }) {
         <h2 className="text-[14px] font-bold text-slate-400">Settings</h2>
       </div>
 
-      {true && <>
       {/* Profile Photos */}
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Profile Photos</label>
@@ -350,7 +349,6 @@ export default function SettingsPage({ onNavigateFriends }) {
       >
         <BookOpen size={18} /> Re-run App Tutorial
       </button>
-      </>}
 
     </div>
   );

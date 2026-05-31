@@ -137,6 +137,42 @@ const STEPS = [
       'Chef History logs every dish you\'ve cooked. Tap Remix Leftovers to invent a new recipe.',
     ],
   },
+  {
+    title: 'Events — Smart Suggestions',
+    tab: 'potluck',
+    emoji: '✨',
+    spotlight: { x: '50%', y: '50%' },
+    arrow: 'down',
+    lines: [
+      'Open any event and tap ✨ Smart Suggestions — AI reads the event name and everyone\'s dietary restrictions.',
+      'Tap a suggestion chip to pre-fill the add field. Use "Assign to:" to assign a dish to a specific person.',
+      'Tap any item name to open its recipe card so every attendee knows how to make their dish.',
+    ],
+  },
+  {
+    title: 'Restaurant Saves',
+    tab: 'saved',
+    emoji: '🍽️',
+    spotlight: { x: '50%', y: '30%' },
+    arrow: 'down',
+    lines: [
+      'In Saved Recipes, switch to the Restaurants tab to save dishes you loved at restaurants.',
+      'Record the dish name, restaurant, location, and ingredients — tap to open it as a recipe card later.',
+      'Tap Find Nearby to discover restaurants around you, filtered by Quick Eats, Cheap Eats, or Date Night.',
+    ],
+  },
+  {
+    title: 'Your Profile',
+    tab: 'profile',
+    emoji: '👤',
+    spotlight: { x: '50%', y: '35%' },
+    arrow: 'down',
+    lines: [
+      'Tap Profile in the menu to set what others can see on your public profile.',
+      'Toggle sections like Chef History, Saved Recipes, and Analytics between Public and Private.',
+      'Expand Individual Recipe Visibility to control public/private per saved recipe.',
+    ],
+  },
 ];
 
 export default function TutorialOverlay({ onComplete, onSkip, onSwitchTab }) {
