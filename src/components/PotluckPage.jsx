@@ -483,6 +483,37 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
               {/* Expanded: item list + add */}
               {isExpanded && (
                 <div className="px-6 pb-6 space-y-3">
+                  {/* Smart Suggestions */}
+                  {(() => {
+                    const ss = smartSuggestionsState[ev.id];
+                    return (
+                      <>
+                        <button
+                          onClick={() => loadSmartSuggestions(ev)}
+                          disabled={ss?.loading}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[11px] font-black text-violet-500 bg-violet-50 border border-violet-100 hover:bg-violet-100 transition-all"
+                        >
+                          {ss?.loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                          {ss?.loading ? 'Generating suggestions…' : '✨ Smart Suggestions'}
+                        </button>
+                        {ss?.suggestions?.length > 0 && (
+                          <div className="bg-violet-50 border border-violet-100 rounded-2xl p-3">
+                            <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-2">Tap to add to event:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ss.suggestions.map(s => (
+                                <button key={s} type="button"
+                                  onClick={() => setNewItem(s)}
+                                  className="text-[10px] font-bold bg-white border border-violet-200 text-violet-600 px-2.5 py-1 rounded-full hover:bg-violet-100 transition-all">
+                                  + {s}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   {/* Add item */}
                   <div className="flex gap-2">
                     <input
@@ -522,9 +553,15 @@ Suggest 10 food and drink items for this event. Be specific and practical. Retur
                               {item.claimed_by_id && <Check size={11} className="text-white" />}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <span className={`text-xs font-bold ${item.claimed_by_id ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                                {item.name}
-                              </span>
+                              <button
+                                onClick={() => openItemRecipe(item.name)}
+                                className="flex items-center gap-1 text-left hover:text-violet-600 transition-colors"
+                              >
+                                <span className={`text-xs font-bold ${item.claimed_by_id ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                                  {item.name}
+                                </span>
+                                <ChefHat size={10} className="text-slate-300 shrink-0" />
+                              </button>
                               {item.claimed_by_name && (
                                 <p className="text-[9px] text-emerald-500 font-black flex items-center gap-1 mt-0.5">
                                   <HandHeart size={9} />

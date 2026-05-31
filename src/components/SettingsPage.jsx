@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, DollarSign, UserPlus, ShoppingCart, Star, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, DollarSign, UserPlus, ShoppingCart, Star, BookOpen, Camera } from 'lucide-react';
 import { useUser } from './UserContext';
 
 const DIETARY_OPTIONS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Kosher', 'Dairy-Free', 'Nut-Free', 'Low-Carb', 'High-Protein'];
@@ -10,11 +10,24 @@ export default function SettingsPage({ onNavigateFriends }) {
     userName: profileName,
     userSettings,
     households,
+    avatarUrl,
+    hungryAvatarUrl,
+    handleUpdateAvatar,
     handleUpdateProfileName: onUpdateName,
     handleUpdateSettings,
     handleUpdatePersonalBudget,
     rerunTutorial,
   } = useUser();
+
+  const [avatarUploading, setAvatarUploading] = useState({ global: false, hungry: false });
+  const globalAvatarRef = useRef(null);
+  const hungryAvatarRef = useRef(null);
+
+  const uploadAvatar = async (file, type) => {
+    setAvatarUploading(prev => ({ ...prev, [type]: true }));
+    await handleUpdateAvatar(file, type);
+    setAvatarUploading(prev => ({ ...prev, [type]: false }));
+  };
 
   const [displayName, setDisplayName] = useState(profileName || '');
   const [dietary, setDietary] = useState(userSettings?.dietary_restrictions || []);
@@ -78,6 +91,63 @@ export default function SettingsPage({ onNavigateFriends }) {
       </div>
 
       {true && <>
+      {/* Profile Photos */}
+      <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Profile Photos</label>
+        <div className="flex gap-4">
+          {/* Global AppWare avatar */}
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <div className="relative">
+              {avatarUrl
+                ? <img src={avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-blue-100" />
+                : <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Camera size={20} className="text-slate-300" /></div>
+              }
+              <button
+                onClick={() => globalAvatarRef.current?.click()}
+                disabled={avatarUploading.global}
+                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#6BAEE0] flex items-center justify-center border border-white"
+              >
+                {avatarUploading.global
+                  ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Camera size={10} className="text-white" />
+                }
+              </button>
+              <input ref={globalAvatarRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0], 'global'); e.target.value = ''; }} />
+            </div>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">AppWare<br/>Global</span>
+          </div>
+
+          {/* Hungry-specific avatar */}
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <div className="relative">
+              {(hungryAvatarUrl || avatarUrl)
+                ? <img src={hungryAvatarUrl || avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-blue-100" />
+                : <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Camera size={20} className="text-slate-300" /></div>
+              }
+              <button
+                onClick={() => hungryAvatarRef.current?.click()}
+                disabled={avatarUploading.hungry}
+                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1F6FB8] flex items-center justify-center border border-white"
+              >
+                {avatarUploading.hungry
+                  ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Camera size={10} className="text-white" />
+                }
+              </button>
+              <input ref={hungryAvatarRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0], 'hungry'); e.target.value = ''; }} />
+            </div>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">Hungry<br/>Photo</span>
+          </div>
+
+          <div className="flex-1 flex items-center">
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              <span className="font-black text-slate-600">AppWare Global</span> syncs across all apps.<br/>
+              <span className="font-black text-slate-600">Hungry Photo</span> overrides it just here.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-6">
         {/* Display Name */}
         <div>

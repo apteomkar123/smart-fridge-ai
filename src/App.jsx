@@ -27,6 +27,7 @@ import { useInventory } from './components/useInventory';
 import ChefHistory from './components/ChefHistory';
 import AddRecipeModal from './components/AddRecipeModal';
 import UserProfilePage from './components/UserProfilePage';
+import RestaurantSaved from './components/RestaurantSaved';
 
 function AppContent({ inventory }) {
   const { user, household: activeHousehold, households, showTutorial, dismissTutorial } = useUser();
@@ -112,6 +113,7 @@ function AppContent({ inventory }) {
   const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
   const [isShopperOpen, setIsShopperOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [savedTab, setSavedTab] = useState('saved'); // 'saved' | 'restaurants'
 
   // Derive household shopping items directly from main state — no async fetch needed
   const hhShoppingItems = shoppingList.filter(i => i.household_id === activeHousehold?.id);
@@ -291,14 +293,27 @@ function AppContent({ inventory }) {
             {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}
             {activeTab === 'saved' && (
               <div className="space-y-6">
-                <div className="flex justify-end">
+                {/* Sub-tab switcher */}
+                <div className="bg-white/80 backdrop-blur-lg rounded-[2rem] border border-white/20 shadow-xl shadow-blue-900/5 p-1.5 flex gap-1">
+                  <button onClick={() => setSavedTab('saved')}
+                    className={`flex-1 py-2.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all ${savedTab === 'saved' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                    Saved
+                  </button>
+                  <button onClick={() => setSavedTab('restaurants')}
+                    className={`flex-1 py-2.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all ${savedTab === 'restaurants' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                    Restaurants
+                  </button>
+                </div>
+                {savedTab === 'restaurants' && <RestaurantSaved onOpenRecipe={setActiveModalRecipe} />}
+                {savedTab === 'saved' && <div className="flex justify-end">
                   <button
                     onClick={() => setIsAddRecipeOpen(true)}
                     className="flex items-center gap-2 bg-[#6BAEE0] text-white px-5 py-2.5 rounded-2xl text-xs font-black shadow-lg shadow-blue-100 active:scale-95 transition-all"
                   >
                     <PlusCircle size={15} /> Add Recipe
                   </button>
-                </div>
+                </div>}
+                {savedTab === 'saved' && <>
                 {/* ── Meal Plans ── */}
                 {savedMealPlans.length > 0 && (
                   <div className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
@@ -427,6 +442,7 @@ function AppContent({ inventory }) {
                     ))
                   )}
                 </div>
+                </>}
               </div>
             )}
           </div>

@@ -16,6 +16,8 @@ export const UserProvider = ({ children }) => {
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [hungryAvatarUrl, setHungryAvatarUrl] = useState(null);
 
   const fetchHouseholds = async (ids, activeId) => {
     if (!ids || ids.length === 0) {
@@ -74,11 +76,14 @@ export const UserProvider = ({ children }) => {
       supabase.from('profiles').upsert([upsertData]).then(() => {});
     }
 
-    // Check if tutorial has been completed
-    supabase.from('profiles').select('hungry_tutorial_done').eq('id', authUser.id).single()
+    // Load profile data (tutorial state + avatars)
+    supabase.from('profiles').select('hungry_tutorial_done, avatar_url, hungry_avatar_url').eq('id', authUser.id).single()
       .then(({ data }) => {
-        if (data && data.hungry_tutorial_done === false) setShowTutorial(true);
-        else if (data && data.hungry_tutorial_done == null) setShowTutorial(true);
+        if (data) {
+          if (data.hungry_tutorial_done === false || data.hungry_tutorial_done == null) setShowTutorial(true);
+          setAvatarUrl(data.avatar_url || null);
+          setHungryAvatarUrl(data.hungry_avatar_url || null);
+        }
       }).catch(() => {});
   };
 
@@ -221,6 +226,21 @@ export const UserProvider = ({ children }) => {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
+  // type: 'global' | 'hungry'
+  const handleUpdateAvatar = async (file, type = 'global') => {
+    if (!file || !user) return;
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = type === 'hungry' ? `hungry.${ext}` : `avatar.${ext}`;
+    const path = `${user.id}/${filename}`;
+    const { error } = await supabase.storage.from('user-avatars').upload(path, file, { upsert: true });
+    if (error) return;
+    const { data: { publicUrl } } = supabase.storage.from('user-avatars').getPublicUrl(path);
+    const col = type === 'hungry' ? 'hungry_avatar_url' : 'avatar_url';
+    await supabase.from('profiles').update({ [col]: publicUrl }).eq('id', user.id);
+    if (type === 'hungry') setHungryAvatarUrl(publicUrl);
+    else setAvatarUrl(publicUrl);
+  };
+
   const dismissTutorial = () => setShowTutorial(false);
   const rerunTutorial = async () => {
     if (user) await supabase.from('profiles').update({ hungry_tutorial_done: false }).eq('id', user.id);
@@ -235,6 +255,9 @@ export const UserProvider = ({ children }) => {
       activeHousehold,
       userName,
       userSettings,
+      avatarUrl,
+      hungryAvatarUrl,
+      handleUpdateAvatar,
       handleUpdateProfileName,
       handleUpdateSettings,
       handleJoinHousehold,

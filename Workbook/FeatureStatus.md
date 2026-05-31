@@ -91,13 +91,15 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Household member list queries both `active_household_id` and `household_id` in parallel (deduped) — covers old and new schema
 - Household shared recipes refresh automatically when a recipe is shared from any screen
 - Shared shopping list fetched directly from Supabase per selected household (not relayed from active-household state)
-- Create a household with a generated invite code
-- Join a household via invite code
+- Create a household with a generated invite code (inline form — no need to go to Settings)
+- Join a household via invite code (inline form)
 - Switch between multiple households
+- Add another household from the household page
 - Set a household budget limit
 - View household members (with Add Friend button for non-friends)
 - Shared shopping list (household-scoped, real-time via Supabase)
 - Shared saved recipes (household-scoped)
+- Event / Potluck section removed from Household — use the dedicated Events tab instead
 
 ### Friends
 - Friend codes (8-character code based on user ID)
@@ -108,16 +110,30 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - View friends' public chef history feed
 - Household members show an Add Friend button if not already connected
 
+### Profile (nav section)
+- Public profile card: display name, email, cook count, dietary restrictions badges
+- Per-feature public/private visibility toggles: Chef History, Saved Recipes, Taste Analytics, Food Photos, Comments & Notes, Created Recipes
+- Privacy settings persisted to localStorage and synced to Supabase `profiles.hungry_settings.profile_privacy`
+
 ### Settings
 - Update display name
 - Set dietary restrictions
 - Set nutrition goal
 - Set age, weight, height
 - Set personal budget limit
-- Create / join / manage households
 - Default shopping list destination (personal or a specific household)
 - Default saved recipes destination (personal or a specific household)
+- Re-run App Tutorial
+- Invite Friends
 - Sign out
+- Household settings moved to the Household section
+
+### Saved Recipes — Restaurants Tab
+- **Restaurants sub-tab** in the Saved Recipes section — separate from personal saved recipes
+- Save any restaurant dish you loved: dish name, restaurant name, location (optional), key ingredients (comma-separated), cuisine type, and vibe tags (Quick Eats, Cheap Eats, Date Night, Family, Healthy)
+- Saved dishes persist to localStorage and sync to Supabase as `meal_type = 'Restaurant'` saved_recipe rows
+- Filter by cuisine (10 categories) and vibe; search by dish or restaurant name
+- Tap a saved dish to open it as a recipe card (shows how to recreate it at home with the listed ingredients)
 
 ### Community Recipes / Explore (top-level nav section)
 - Category rows with horizontal scroll (limited to 8 cards): Trending, Healthy, Comfort Food, Breakfast, Seafood, Dessert, Beef, Asian, Indian, Mexican, Italian, American, High Protein, Quick & Easy
@@ -133,13 +149,15 @@ A living document tracking what's shipped, what works, and what's blocked until 
 
 ### Events (formerly Potluck — renamed in nav)
 - Create named events with auto-generated 8-character invite codes (generated client-side as fallback)
-- Event creation includes optional date, time, and venue fields
+- Event creation includes optional date, time, and venue fields — date/time inputs show "Choose date" / "Choose time" placeholder text when empty
 - Share event via URL (`?potluck=CODE`) — anyone with the link joins and can claim items
 - Claim/unclaim items per event; host can delete items and the whole event
 - Readiness progress bar; backed by `potluck_events` + `potluck_items` Supabase tables
 - View Full Details card shows each attendee's dietary restrictions (pulled from their profile settings)
 - RSVP view shows who's bringing what, unclaimed items, and the user's own dietary restrictions
 - **Tappable claimer profiles**: claimed_by names in both the item list and the detail card open the claimer's full Hungry profile (UserProfileModal) when tapped; profile is fetched from Supabase and cached
+- **Smart Suggestions**: per-event "✨ Smart Suggestions" button calls AI with event name + attendee dietary restrictions to generate 10 food/drink suggestions; tapping a suggestion pre-fills the add-item input; dietary restrictions respected but not overridden for minority-only restrictions
+- **Recipe cards on item tap**: tapping an event item name opens its recipe card (matched from master recipe list) so all attendees know how to make it; ChefHat icon next to each item name indicates recipe availability
 
 ### Household Members
 - Member cards now tappable (non-self) — opens UserProfileModal showing their saved recipes and chef history

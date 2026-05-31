@@ -380,3 +380,27 @@ FEATURES:
 - TutorialOverlay: 8-step interactive tutorial auto-shown on first login; skip/complete writes has_completed_tutorial to profiles table; Re-run Tutorial button in Settings; confetti on final step; appware-schema.sql patched to add has_completed_tutorial column
 - CommunityRecipes: new "Explore" nav section with 14 category rows (Trending, Healthy, Comfort Food…), horizontal scroll, recipe photos, search; all backed by TheMealDB with 6h localStorage cache
 - UserProfileModal: tapping any friend or search result opens a full profile modal showing their avatar, cuisine mastery, public chef history feed, and saved favorites tab
+
+IMPLEMENTED (session 2026-05-30 session 10):
+BUGS FIXED:
+- Netlify build error (vite permission denied): moved vite, @vitejs/plugin-react, @tailwindcss/vite, postcss, autoprefixer from devDependencies to dependencies so Netlify builds work even when NPM_FLAGS omits dev deps
+- Recipes section completely blank: fixed empty state condition in RecipeExplorer — now shows "Loading recipes…" when no filters are active and recipes array is empty, and "No recipes found" only when filters are active
+- Dietary restrictions in Explore not converting recipes: processedRecipes now applies locallyAdaptRecipe() to each recipe that doesn't pass the user's dietary restriction filter, instead of filtering them out entirely; adapted recipes show "✅ [diet] adaptation applied" tag instead of image
+- Event creation nothing happens: added visible error state (createError) and user-facing error message below the Create button so Supabase insert failures are surfaced instead of silently caught
+- Date/time inputs in party section showing no placeholder: added CSS overlay span showing "Choose date" / "Choose time" when the value is empty (HTML date/time inputs don't support placeholder attribute)
+- Personal shopper store blank on open: changed initial state from STORES[0] ("Trader Joe's") to null; added blank "Select a store…" option at top of dropdown
+- Shopping list household dropdown not closing on outside tap: added onTouchStart={closeDropdown} alongside existing onClick on the outer container
+- App logo black background: index.html was referencing /apple-touch-logo.png which didn't exist; updated to reference existing /icon-192.png (apple-touch-icon) and /icon.svg (favicon)
+
+FEATURES ADDED:
+- Profile page in nav: new UserProfilePage component with profile card (display name, email, cook count, dietary badges) and per-feature public/private visibility toggles (Chef History, Saved Recipes, Taste Analytics, Photos, Comments, Created Recipes); privacy settings persisted to localStorage and Supabase profiles.hungry_settings.profile_privacy
+- Settings page cleaned up: removed "Household" tab and "profile" header label; settings page now only shows profile/body stats/dietary preferences/budget/defaults/tutorial/invite
+- Household create/join moved to Household page: inline create and join forms in HouseholdTab for empty state and for adding additional households; no longer requires Settings page
+- Event section removed from Household tab: events now handled exclusively in the dedicated Events nav section
+- Smart Suggestions in Events (party section): per-event "✨ Smart Suggestions" button calls AI with event name + attendee dietary restrictions (fetched from Supabase profiles); respects majority-rule dietary restrictions; suggestions shown as tappable chips that pre-fill the add-item input
+- Recipe card tap on event items: tapping an event item name searches master recipes for a match and opens the recipe card; ChefHat icon indicates recipe availability
+- Restaurant Saves: new RestaurantSaved component with "Restaurants" sub-tab in the Saved Recipes section; add restaurant dishes with name, restaurant, location, key ingredients, cuisine type, and vibe tags (Quick Eats, Cheap Eats, Date Night, Family, Healthy); persisted to localStorage + Supabase saved_recipes table as meal_type='Restaurant'; filter by cuisine (10 types) and vibe; tap to open as recipe card
+
+NOT DONE / DEFERRED:
+- Nutrition information for pantry items: the estimateNutrition() function already covers most common items; the user's request to look up all items on the internet is not feasible without a paid nutrition API; current behavior shows estimated nutrition for recognized items in the ingredient card modal
+- Restaurants section does not show nearby restaurants using external data: would require Google Places API integration; only user-added restaurant dishes are shown
