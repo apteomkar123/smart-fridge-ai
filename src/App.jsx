@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper, Globe } from 'lucide-react';
+import { ChefHat, Refrigerator, ShoppingCart, BarChart3, Users, Star, Search, Trash2, Settings, Clock, PlusCircle, X, UserRound, Share2, PartyPopper, Globe, User } from 'lucide-react';
 import { cleanIngredientLocally, getStaticRecipeSteps, triggerHaptic, matchesRecipeFilter } from './components/recipeUtils';
 import Header from './components/Header';
 import PantryManager from './components/PantryManager';
@@ -26,6 +26,7 @@ import { RecipeProvider, useRecipes } from './components/RecipeContext';
 import { useInventory } from './components/useInventory';
 import ChefHistory from './components/ChefHistory';
 import AddRecipeModal from './components/AddRecipeModal';
+import UserProfilePage from './components/UserProfilePage';
 
 function AppContent({ inventory }) {
   const { user, household: activeHousehold, households, showTutorial, dismissTutorial } = useUser();
@@ -162,6 +163,7 @@ function AppContent({ inventory }) {
     { tab: 'potluck',     icon: <PartyPopper size={22} />,    label: 'Events' },
     { tab: 'community',   icon: <Globe size={22} />,          label: 'Explore' },
     { tab: 'friends',     icon: <UserRound size={22} />,     label: 'Friends' },
+    { tab: 'profile',     icon: <User size={22} />,          label: 'Profile' },
     { tab: 'settings',    icon: <Settings size={22} />,      label: 'Settings' },
   ];
 
@@ -283,6 +285,7 @@ function AppContent({ inventory }) {
               />
             )}
             {activeTab === 'friends' && <FriendsPage />}
+            {activeTab === 'profile' && <UserProfilePage />}
             {activeTab === 'potluck' && <PotluckPage />}
             {activeTab === 'community' && <CommunityRecipes />}
             {activeTab === 'settings' && <SettingsPage onNavigateFriends={() => switchTab('friends')} />}

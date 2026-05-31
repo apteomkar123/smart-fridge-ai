@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PartyPopper, Plus, Trash2, Check, Share2, HandHeart, X, Loader2, Link, ChevronDown, ChevronUp, Calendar, Clock, MapPin, Users, UserCheck, ChevronRight } from 'lucide-react';
+import { PartyPopper, Plus, Trash2, Check, Share2, HandHeart, X, Loader2, Link, ChevronDown, ChevronUp, Calendar, Clock, MapPin, Users, UserCheck, ChevronRight, Sparkles, ChefHat } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
+import { useRecipes } from './RecipeContext';
 import UserProfileModal from './UserProfileModal';
 
 function genCode() {
@@ -10,11 +11,15 @@ function genCode() {
 
 export default function PotluckPage() {
   const { user, userSettings } = useUser();
+  const { masterRecipes, setActiveModalRecipe } = useRecipes();
   const [events, setEvents] = useState([]);
   const [profileCache, setProfileCache] = useState({}); // id → {id, display_name, hungry_settings}
   const [activeProfile, setActiveProfile] = useState(null);
+  const [smartSuggestionsState, setSmartSuggestionsState] = useState({}); // eventId → { loading, suggestions }
+  const [itemRecipeMap, setItemRecipeMap] = useState({}); // itemName → recipe
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventTime, setNewEventTime] = useState('');
@@ -67,10 +72,51 @@ export default function PotluckPage() {
     if (joinCode && user) handleJoin(joinCode);
   }, [joinCode, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const loadSmartSuggestions = useCallback(async (ev) => {
+    const evId = ev.id;
+    setSmartSuggestionsState(prev => ({ ...prev, [evId]: { loading: true, suggestions: [] } }));
+    try {
+      // Gather dietary restrictions from all claimed participants
+      const claimerIds = [...new Set((ev.potluck_items || []).filter(i => i.claimed_by_id).map(i => i.claimed_by_id))];
+      let allRestrictions = [...(userSettings?.dietary_restrictions || [])];
+      if (claimerIds.length) {
+        const { data: profiles } = await supabase.from('profiles').select('hungry_settings').in('id', claimerIds);
+        (profiles || []).forEach(p => {
+          allRestrictions = allRestrictions.concat(p.hungry_settings?.dietary_restrictions || []);
+        });
+      }
+      const uniqueRestrictions = [...new Set(allRestrictions.map(r => r.toLowerCase()))];
+      const restrictionNote = uniqueRestrictions.length
+        ? `Dietary restrictions among attendees: ${uniqueRestrictions.join(', ')}. There can still be meat dishes if only one person is vegetarian — cater to the majority and include alternatives for restrictions.`
+        : 'No specific dietary restrictions.';
+
+      const prompt = `You are a party food planner. The event is called "${ev.name}". ${restrictionNote}
+Suggest 10 food and drink items for this event. Be specific and practical. Return ONLY a JSON array of strings, e.g. ["Grilled Burgers", "Veggie Skewers", ...]. No extra text.`;
+      const res = await fetch('/.netlify/functions/scan-receipt', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customPrompt: prompt, directMode: true }),
+      });
+      const text = await res.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const suggestions = JSON.parse(cleaned);
+      setSmartSuggestionsState(prev => ({ ...prev, [evId]: { loading: false, suggestions: Array.isArray(suggestions) ? suggestions : [] } }));
+    } catch {
+      setSmartSuggestionsState(prev => ({ ...prev, [evId]: { loading: false, suggestions: ['Burgers', 'Hot Dogs', 'Salad', 'Chips & Dip', 'Lemonade', 'Veggie Platter', 'Watermelon', 'Cookies', 'Corn on the Cob', 'Ice Cream'] } }));
+    }
+  }, [userSettings, masterRecipes]);
+
+  const openItemRecipe = useCallback((itemName) => {
+    if (!masterRecipes?.length) return;
+    const lower = itemName.toLowerCase();
+    const match = masterRecipes.find(r => r.name.toLowerCase().includes(lower) || lower.includes(r.name.toLowerCase().split(' ')[0]));
+    if (match) setActiveModalRecipe(match);
+  }, [masterRecipes, setActiveModalRecipe]);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newEventName.trim() || !user) return;
     setCreating(true);
+    setCreateError('');
     try {
       const eventCode = genCode();
       const payload = {
@@ -93,7 +139,7 @@ export default function PotluckPage() {
         setNewEventTime('');
         setNewEventVenue('');
       } else if (error) {
-        // Fallback: some columns may not exist yet — retry without optional fields
+        // Fallback: retry without optional columns in case they don't exist yet
         const { data: d2, error: e2 } = await supabase.from('potluck_events')
           .insert([{ name: newEventName.trim(), host_id: user.id, event_code: eventCode }])
           .select('*, potluck_items(*)')
@@ -102,9 +148,13 @@ export default function PotluckPage() {
           setEvents(prev => [d2, ...prev]);
           setExpandedId(d2.id);
           setNewEventName('');
+        } else {
+          setCreateError(e2?.message || error?.message || 'Could not create event. Check your connection and try again.');
         }
       }
-    } catch {}
+    } catch (err) {
+      setCreateError(err?.message || 'Unexpected error creating event.');
+    }
     setCreating(false);
   };
 
@@ -214,18 +264,28 @@ export default function PotluckPage() {
             className="w-full bg-violet-50/60 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
           />
           <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={newEventDate}
-              onChange={e => setNewEventDate(e.target.value)}
-              className="bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
-            />
-            <input
-              type="time"
-              value={newEventTime}
-              onChange={e => setNewEventTime(e.target.value)}
-              className="bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                value={newEventDate}
+                onChange={e => setNewEventDate(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
+              />
+              {!newEventDate && (
+                <span className="absolute inset-0 flex items-center px-3 text-xs font-semibold text-slate-400 pointer-events-none">Choose date</span>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="time"
+                value={newEventTime}
+                onChange={e => setNewEventTime(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-2xl text-xs font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
+              />
+              {!newEventTime && (
+                <span className="absolute inset-0 flex items-center px-3 text-xs font-semibold text-slate-400 pointer-events-none">Choose time</span>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <input
@@ -244,6 +304,7 @@ export default function PotluckPage() {
               Create
             </button>
           </div>
+          {createError && <p className="text-[11px] text-red-500 font-bold mt-1">{createError}</p>}
         </form>
 
         {/* Join via code */}

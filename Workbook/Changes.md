@@ -2,6 +2,12 @@ DON'T FORGET ABOUT CLAUDE.MD
 
 BUGS TO FIX. 
 -------------
+
+I emptied .gitignore, I wanted all files and dependencies to follow me from machine to machine.
+
+Netlify build error: The build stops at sh: 1: vite: Permission denied while running npm run build, which means the Vite CLI was not present/executable in the Netlify build environment.
+Your Netlify configuration includes the environment variable NPM_FLAGS (lines #L69-L74). If NPM_FLAGS is set to omit dev dependencies (e.g. --omit=dev or --production), the Vite CLI—listed only under devDependencies—won’t be installed. When the build script later tries to run vite build, the binary is missing, yielding the permission-denied error from the shell.
+
 Nutrition information for all pantry items isn’t showing up. Run an Internet search for the items you can’t find nutritional info from. If scanned by barcode or receipt, also store what store the item was bought from.
 
 The date and time blocks in the party section should say “choose date” and “choose time” if the user hasn’t made a selection yet.
@@ -28,3 +34,6 @@ FEATURES TO ADD:
 -------------------
 
 Take out the event feature from the household section, the event section takes care of that. Add the smart suggestions button to the party section. The smart suggestions should read what kind of event it is, and provide food suggestions based on the event as well as the invitees and hosts dietary restrictions. There can still be meat dishes if only one person is vegetarian, and that applies to all dietary restrictions. User will have the option to add the suggestion to the event item list and assign it someone. Upon tapping on an item from the event, it should pull up a recipe card for that item so all users know how to make their dishes.
+
+
+Make a section where the user can add restaurant food if they really liked something. Ask them where they got it, location, and the name of the dish, and ingredients it’s something generic  like Chipotle. Then add that recipe under a separate tab in the saved recipes called “Restaurants”. The original section where the user has the option to add a restaurant dish should also have the restaurants around, categorized by cuisine, and different categories like quick eats, cheap eats, date night, etc.

@@ -1,20 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink, PartyPopper, HandHeart, Sparkles, MapPin, ChevronRight } from 'lucide-react';
+import { Users, Star, ShoppingCart, Plus, Trash2, Check, X, ChevronDown, DollarSign, Edit2, UserPlus, UserCheck, CreditCard, ExternalLink, MapPin, ChevronRight, Home, Copy } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUser } from './UserContext';
 import { useRecipes } from './RecipeContext';
 import { cleanIngredientLocally } from './recipeUtils';
 import UserProfileModal from './UserProfileModal';
 
-// Common potluck item suggestions by dietary category
-const POTLUCK_SUGGESTIONS = {
-  base: ['Paper Plates', 'Napkins', 'Cups', 'Ice', 'Charcoal', 'Lighter Fluid'],
-  meat: ['Burgers', 'Hot Dogs', 'Chicken Wings', 'Ribs', 'Steak'],
-  vegetarian: ['Veggie Burgers', 'Grilled Corn', 'Caprese Salad', 'Hummus & Pita', 'Potato Salad'],
-  vegan: ['Black Bean Burgers', 'Guacamole', 'Fruit Salad', 'Roasted Veggies', 'Vegan Pasta Salad'],
-  dessert: ['Brownies', 'Cookies', 'Watermelon', 'Ice Cream', 'S\'mores Kit'],
-  drinks: ['Lemonade', 'Iced Tea', 'Sparkling Water', 'Beer/Wine', 'Juice Boxes'],
-};
 
 export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDeleteHhItem }) {
   const { households, household: activeHousehold, handleUpdateBudgetLimit, user } = useUser();
@@ -31,38 +22,6 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
       .then(({ data }) => setLocalShopItems(data || []));
   }, [selectedHHId]);
 
-  // ── Potluck / Event ─────────────────────────────────────────
-  const EVENT_KEY = `hungry_event_${selectedHHId}`;
-  const [eventName, setEventName] = useState('');
-  const [eventItems, setEventItems] = useState([]);
-  const [newEventItem, setNewEventItem] = useState('');
-  const [showEventPanel, setShowEventPanel] = useState(false);
-
-  useEffect(() => {
-    try { setEventItems(JSON.parse(localStorage.getItem(EVENT_KEY) || '[]')); } catch { setEventItems([]); }
-  }, [EVENT_KEY]);
-
-  const persistEvent = (items) => {
-    setEventItems(items);
-    try { localStorage.setItem(EVENT_KEY, JSON.stringify(items)); } catch {}
-  };
-
-  const addEventItem = () => {
-    const name = newEventItem.trim();
-    if (!name) return;
-    persistEvent([...eventItems, { id: Date.now(), name, claimedBy: null }]);
-    setNewEventItem('');
-  };
-
-  const claimEventItem = (id) => {
-    const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You';
-    persistEvent(eventItems.map(i => i.id === id ? { ...i, claimedBy: i.claimedBy ? null : displayName } : i));
-  };
-
-  const deleteEventItem = (id) => persistEvent(eventItems.filter(i => i.id !== id));
-
-  const readyCount = eventItems.filter(i => i.claimedBy).length;
-  const readyPct = eventItems.length > 0 ? Math.round((readyCount / eventItems.length) * 100) : 0;
   const [hhRecipes, setHhRecipes] = useState([]);
   const [newShopItem, setNewShopItem] = useState('');
   const [loadingRecipes, setLoadingRecipes] = useState(false);
@@ -73,8 +32,9 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
   const [friends, setFriends] = useState([]);
   const [sentRequests, setSentRequests] = useState(new Set());
   const [memberPresence, setMemberPresence] = useState({}); // profileId → {status, custom_text}
-  const [eventSuggestions, setEventSuggestions] = useState([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showAddHH, setShowAddHH] = useState(false);
+  const [newHHName, setNewHHName] = useState('');
+  const [joinHHCode, setJoinHHCode] = useState('');
 
   const selectedHH = households.find(h => h.id === selectedHHId) || activeHousehold;
 
@@ -198,53 +158,48 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
     setEditingBudget(false);
   };
 
-  // Feature #4: Potluck Planner — fetch member dietary restrictions and generate smart item list
-  const loadSmartSuggestions = useCallback(async () => {
-    if (!selectedHHId || !members.length) return;
-    setLoadingSuggestions(true);
-    try {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, hungry_settings')
-        .in('id', members.map(m => m.id));
+  const { handleCreateHousehold, handleJoinHousehold } = useUser();
 
-      const allRestrictions = new Set();
-      (profiles || []).forEach(p => {
-        const r = p.hungry_settings?.dietary_restrictions || [];
-        r.forEach(d => allRestrictions.add(d.toLowerCase()));
-      });
+  const handleCreateHH = () => {
+    if (!newHHName.trim()) return;
+    handleCreateHousehold(newHHName.trim());
+    setNewHHName('');
+    setShowAddHH(false);
+  };
 
-      const isVegan = allRestrictions.has('vegan');
-      const isVegetarian = isVegan || allRestrictions.has('vegetarian');
-
-      const suggestions = [
-        ...POTLUCK_SUGGESTIONS.base,
-        ...(isVegan ? POTLUCK_SUGGESTIONS.vegan : isVegetarian ? POTLUCK_SUGGESTIONS.vegetarian : POTLUCK_SUGGESTIONS.meat),
-        ...POTLUCK_SUGGESTIONS.dessert,
-        ...POTLUCK_SUGGESTIONS.drinks,
-      ];
-      setEventSuggestions(suggestions);
-
-      // Write to cross_app_activity so Jukebox can queue a party playlist
-      if (user?.id) {
-        supabase.from('cross_app_activity').insert({
-          user_id: user.id,
-          app: 'hungry',
-          activity_type: 'potluck_created',
-          is_public: false,
-          payload: { household_id: selectedHHId, event_name: eventName, genre_seed: 'party' },
-        }).then(() => {});
-      }
-    } catch {}
-    setLoadingSuggestions(false);
-  }, [selectedHHId, members, user, eventName]);
+  const handleJoinHH = () => {
+    if (!joinHHCode.trim()) return;
+    handleJoinHousehold(joinHHCode.trim());
+    setJoinHHCode('');
+    setShowAddHH(false);
+  };
 
   if (!households.length) {
     return (
-      <div className="bg-white/80 backdrop-blur-lg p-8 rounded-[2.5rem] border border-white/20 shadow-xl text-center space-y-3">
-        <Users size={32} className="text-slate-200 mx-auto" />
-        <p className="text-sm font-black text-slate-400">No household yet</p>
-        <p className="text-xs text-slate-300">Create or join one in Settings → Household Settings</p>
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-white/80 backdrop-blur-lg p-8 rounded-[2.5rem] border border-white/20 shadow-xl text-center space-y-3">
+          <Users size={32} className="text-slate-200 mx-auto" />
+          <p className="text-sm font-black text-slate-400">No household yet</p>
+          <p className="text-xs text-slate-300">Create one below to share lists and recipes with roommates</p>
+        </div>
+        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-5">
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Plus size={11} /> Create New Household</p>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Household name (e.g. My Flat)" value={newHHName} onChange={e => setNewHHName(e.target.value)}
+                className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold focus:border-sky-400 focus:outline-none" />
+              <button onClick={handleCreateHH} className="bg-[#6BAEE0] text-white p-4 rounded-2xl"><Plus size={20} /></button>
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Users size={11} /> Join Existing</p>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Enter invite code" value={joinHHCode} onChange={e => setJoinHHCode(e.target.value)}
+                className="flex-1 bg-white border border-blue-100 px-5 py-4 rounded-2xl text-xs font-semibold uppercase focus:border-sky-400 focus:outline-none" />
+              <button onClick={handleJoinHH} className="bg-[#6BAEE0] text-white p-4 rounded-2xl font-bold text-sm">Join</button>
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -469,125 +424,36 @@ export default function HouseholdTab({ onAddShoppingItem, onToggleHhItem, onDele
         </section>
       )}
 
-      {/* ── Potluck / Event Panel ──────────────────────────────── */}
-      {selectedHH && (
-        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-          <button
-            onClick={() => setShowEventPanel(v => !v)}
-            className="w-full flex items-center justify-between gap-2"
-          >
-            <h2 className="text-[14px] font-bold text-slate-400 flex items-center gap-2">
-              <PartyPopper size={15} className="text-violet-400" /> Potluck / Event
-            </h2>
-            <ChevronDown size={14} className={`text-slate-300 transition-transform ${showEventPanel ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showEventPanel && (
-            <div className="mt-4 space-y-4">
-              {/* Event name */}
-              <input
-                type="text"
-                value={eventName}
-                onChange={e => setEventName(e.target.value)}
-                placeholder="Event name (e.g. Friday BBQ)"
-                className="w-full bg-violet-50/50 border border-violet-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
-              />
-
-              {/* Progress bar */}
-              {eventItems.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      {eventName || 'Event'} Readiness
-                    </span>
-                    <span className="text-[10px] font-black text-violet-500">{readyPct}% Ready</span>
-                  </div>
-                  <div className="h-2 bg-violet-50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-violet-400 rounded-full transition-all duration-500"
-                      style={{ width: `${readyPct}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Feature #4: Smart Suggestions */}
-              <button
-                type="button"
-                onClick={loadSmartSuggestions}
-                disabled={loadingSuggestions}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[11px] font-black text-violet-500 bg-violet-50 border border-violet-100 hover:bg-violet-100 transition-all"
-              >
-                <Sparkles size={13} />
-                {loadingSuggestions ? 'Generating…' : '✨ Smart Suggestions (filters by dietary needs)'}
-              </button>
-              {eventSuggestions.length > 0 && (
-                <div className="bg-violet-50 border border-violet-100 rounded-2xl p-3">
-                  <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-2">Tap to add:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {eventSuggestions.map(s => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => { setNewEventItem(s); }}
-                        className="text-[10px] font-bold bg-white border border-violet-200 text-violet-600 px-2.5 py-1 rounded-full hover:bg-violet-100 transition-all"
-                      >
-                        + {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Add item */}
-              <form onSubmit={e => { e.preventDefault(); addEventItem(); }} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newEventItem}
-                  onChange={e => setNewEventItem(e.target.value)}
-                  placeholder="Add item needed (e.g. Buns, Charcoal)…"
-                  className="flex-1 bg-slate-50 border border-slate-100 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-800 focus:border-violet-300 focus:outline-none"
-                />
-                <button type="submit" className="bg-violet-400 text-white p-3 rounded-2xl shadow-md">
-                  <Plus size={18} />
-                </button>
-              </form>
-
-              {/* Item list */}
-              {eventItems.length === 0 ? (
-                <p className="text-xs text-slate-300 italic text-center py-2">No items yet — add what you need for the event</p>
-              ) : (
-                <div className="space-y-2">
-                  {eventItems.map(item => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${item.claimedBy ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}
-                    >
-                      <button
-                        onClick={() => claimEventItem(item.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${item.claimedBy ? 'bg-emerald-400 border-emerald-400' : 'border-slate-300 hover:border-violet-400'}`}
-                      >
-                        {item.claimedBy && <Check size={10} className="text-white" />}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-xs font-bold ${item.claimedBy ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                          {item.name}
-                        </span>
-                        {item.claimedBy && (
-                          <p className="text-[9px] text-emerald-500 font-black flex items-center gap-1 mt-0.5">
-                            <HandHeart size={9} /> Claimed by {item.claimedBy}
-                          </p>
-                        )}
-                      </div>
-                      <button onClick={() => deleteEventItem(item.id)} className="text-slate-200 hover:text-red-400 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {/* Add another household */}
+      {!showAddHH ? (
+        <button
+          onClick={() => setShowAddHH(true)}
+          className="w-full bg-white/80 backdrop-blur-lg p-4 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 text-[13px] font-bold text-[#6BAEE0] flex items-center justify-center gap-2 hover:bg-sky-50 transition-all"
+        >
+          <Plus size={16} /> Add Another Household
+        </button>
+      ) : (
+        <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[14px] font-bold text-slate-400 flex items-center gap-2"><Home size={14} /> Add Household</h3>
+            <button onClick={() => setShowAddHH(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Cancel</button>
+          </div>
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Plus size={11} /> Create New</p>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Household name" value={newHHName} onChange={e => setNewHHName(e.target.value)}
+                className="flex-1 bg-white border border-blue-100 px-4 py-3 rounded-2xl text-xs font-semibold focus:border-sky-400 focus:outline-none" />
+              <button onClick={handleCreateHH} className="bg-[#6BAEE0] text-white p-3 rounded-2xl"><Plus size={18} /></button>
             </div>
-          )}
+          </div>
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Users size={11} /> Join Existing</p>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Enter invite code" value={joinHHCode} onChange={e => setJoinHHCode(e.target.value)}
+                className="flex-1 bg-white border border-blue-100 px-4 py-3 rounded-2xl text-xs font-semibold uppercase focus:border-sky-400 focus:outline-none" />
+              <button onClick={handleJoinHH} className="bg-[#6BAEE0] text-white p-3 rounded-2xl font-bold text-sm">Join</button>
+            </div>
+          </div>
         </section>
       )}
 

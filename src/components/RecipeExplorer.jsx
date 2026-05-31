@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Filter, Star, Users } from 'lucide-react';
 import { useRecipes } from './RecipeContext';
 import { useUser } from './UserContext';
-import { matchesRecipeFilter } from './recipeUtils';
 import SearchWithHistory from './SearchWithHistory';
 
 const MOODS = [
@@ -151,27 +150,25 @@ export default function RecipeExplorer({ initialMood = null }) {
 
       {/* Recipe Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {moodFilteredRecipes.length === 0 && (categoryFilters.length > 0 || activeDietFilters.length > 0 || activeCuisineFilters.length > 0) ? (
+        {moodFilteredRecipes.length === 0 ? (
           <div className="col-span-full bg-white/80 border border-blue-100 p-8 rounded-[2rem] text-center text-slate-500">
-            No recipes found for this filter.
+            {categoryFilters.length > 0 || activeDietFilters.length > 0 || activeCuisineFilters.length > 0 || recipeSearch
+              ? 'No recipes found for this filter.'
+              : 'Loading recipes…'}
           </div>
         ) : moodFilteredRecipes.slice(0, 100).map((recipe) => {
-          // Determine if user's dietary restrictions would require substitutions on this recipe
-          const userRestrictions = userSettings?.dietary_restrictions || [];
-          const violatedRestriction = userRestrictions.find(r => !matchesRecipeFilter(recipe, r.toLowerCase()));
-          const substitutionLabel = violatedRestriction ? `${violatedRestriction} substitution made` : null;
-          const showImage = recipe.image && !substitutionLabel;
-
+          const adaptedLabel = recipe._adapted ? `✅ ${recipe._adaptedFor} adaptation applied` : null;
+          const showImage2 = recipe.image && !adaptedLabel;
           return (
           <div key={recipe.id} className="bg-white/80 backdrop-blur-md border border-white/40 rounded-4xl shadow-lg shadow-blue-900/5 group hover:scale-[1.02] transition-all cursor-pointer overflow-hidden" onClick={() => onOpenRecipe(recipe)}>
             {/* Recipe image or substitution tag */}
-            {showImage ? (
+            {showImage2 ? (
               <div className="w-full h-36 overflow-hidden">
                 <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
               </div>
-            ) : substitutionLabel ? (
+            ) : adaptedLabel ? (
               <div className="w-full h-16 bg-emerald-50 border-b border-emerald-100 flex items-center justify-center px-4">
-                <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 px-3 py-1.5 rounded-full">✅ {substitutionLabel}</span>
+                <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 px-3 py-1.5 rounded-full">{adaptedLabel}</span>
               </div>
             ) : null}
 

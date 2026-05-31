@@ -7,6 +7,7 @@ import {
   fuzzyTokenMatch,
   getStaticRecipeSteps,
   matchesRecipeFilter,
+  locallyAdaptRecipe,
   toTitleCase,
   stripIngredientNotes
 } from './recipeUtils';
@@ -329,9 +330,16 @@ export const RecipeProvider = ({ children, fridge }) => {
         .filter(r => categoryFilters.length === 0 || categoryFilters.some(f => matchesRecipeFilter(r, f)))
         .filter(r => dietFilters.length === 0 || dietFilters.some(f => matchesRecipeFilter(r, f)))
         .filter(r => cuisineFilters.length === 0 || cuisineFilters.some(f => matchesRecipeFilter(r, f)))
-        .filter(r => {
+        .map(r => {
           const restrictions = userSettings?.dietary_restrictions || [];
-          return restrictions.every(d => matchesRecipeFilter(r, d.toLowerCase()));
+          let adapted = r;
+          for (const d of restrictions) {
+            const key = d.toLowerCase();
+            if (!matchesRecipeFilter(adapted, key)) {
+              adapted = locallyAdaptRecipe(adapted, key);
+            }
+          }
+          return adapted;
         })
         .sort((a, b) => b.matchPercentage - a.matchPercentage);
     }, [fridge, masterRecipes, debouncedRecipeSearch, categoryFilters, dietFilters, cuisineFilters, userSettings]);

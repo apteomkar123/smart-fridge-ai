@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Users, UserRound, DollarSign, UserPlus, ShoppingCart, Star, BookOpen } from 'lucide-react';
+import { Settings, DollarSign, UserPlus, ShoppingCart, Star, BookOpen } from 'lucide-react';
 import { useUser } from './UserContext';
-import HouseholdSettings from './HouseholdSettings';
 
 const DIETARY_OPTIONS = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Kosher', 'Dairy-Free', 'Nut-Free', 'Low-Carb', 'High-Protein'];
 const NUTRITION_GOALS = ['Balanced', 'High Protein', 'Low Carb', 'Low Fat', 'Build Muscle', 'Lose Weight'];
@@ -17,7 +16,6 @@ export default function SettingsPage({ onNavigateFriends }) {
     rerunTutorial,
   } = useUser();
 
-  const [tab, setTab] = useState('profile');
   const [displayName, setDisplayName] = useState(profileName || '');
   const [dietary, setDietary] = useState(userSettings?.dietary_restrictions || []);
   const [goal, setGoal] = useState(userSettings?.nutrition_goal || 'Balanced');
@@ -79,19 +77,7 @@ export default function SettingsPage({ onNavigateFriends }) {
         <h2 className="text-[14px] font-bold text-slate-400">Settings</h2>
       </div>
 
-      {/* Tab switcher */}
-      <div className="bg-white/80 backdrop-blur-lg rounded-[2rem] border border-white/20 shadow-xl shadow-blue-900/5 p-1.5 flex gap-1">
-        <button onClick={() => setTab('profile')}
-          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${tab === 'profile' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
-          <UserRound size={13} /> Profile
-        </button>
-        <button onClick={() => setTab('household')}
-          className={`flex-1 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${tab === 'household' ? 'bg-[#6BAEE0] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
-          <Users size={13} /> Household
-        </button>
-      </div>
-
-      {tab === 'profile' && <>
+      {true && <>
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5 space-y-6">
         {/* Display Name */}
         <div>
@@ -296,9 +282,6 @@ export default function SettingsPage({ onNavigateFriends }) {
       </button>
       </>}
 
-      {tab === 'household' && (
-        <HouseholdSettings />
-      )}
     </div>
   );
 }

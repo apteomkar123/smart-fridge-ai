@@ -148,7 +148,7 @@ const saveChecked = (set) => { try { localStorage.setItem(CHECKED_KEY, JSON.stri
 
 export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
   const { user } = useUser();
-  const [selectedStore, setSelectedStore] = useState(STORES[0]);
+  const [selectedStore, setSelectedStore] = useState(null);
   const [listSource, setListSource] = useState('all');
   const [checked, setChecked] = useState(loadChecked);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
@@ -303,8 +303,9 @@ export default function PersonalShopper({ shoppingList, onToggle, onClose }) {
         {/* Store selector */}
         <div className="relative mb-3">
           <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" />
-          <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
+          <select value={selectedStore || ''} onChange={e => setSelectedStore(e.target.value || null)}
             className="w-full bg-white/20 border border-white/30 pl-8 pr-8 py-2.5 rounded-xl text-sm font-bold text-white focus:outline-none appearance-none">
+            <option value="" className="text-slate-400 bg-white">Select a store…</option>
             {STORES.map(s => <option key={s} value={s} className="text-slate-800 bg-white">{s}</option>)}
           </select>
           <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none" />
