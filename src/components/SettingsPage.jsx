@@ -13,21 +13,72 @@ export default function SettingsPage({ onNavigateFriends }) {
     avatarUrl,
     hungryAvatarUrl,
     handleUpdateAvatar,
+    clearHungryAvatar,
     handleUpdateProfileName: onUpdateName,
     handleUpdateSettings,
     handleUpdatePersonalBudget,
     rerunTutorial,
   } = useUser();
 
-  const [avatarUploading, setAvatarUploading] = useState({ global: false, hungry: false });
-  const globalAvatarRef = useRef(null);
-  const hungryAvatarRef = useRef(null);
+  // 'import-or-new' = user has global photo, ask if they want it here
+  // 'apply-all' = user picked a new photo, ask if global or app-only
+  const [photoDialog, setPhotoDialog] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
-  const uploadAvatar = async (file, type) => {
-    setAvatarUploading(prev => ({ ...prev, [type]: true }));
-    await handleUpdateAvatar(file, type);
-    setAvatarUploading(prev => ({ ...prev, [type]: false }));
-  };
+  const displayedAvatar = hungryAvatarUrl || avatarUrl;
+
+  function handleAvatarButtonClick() {
+    if (avatarUrl) {
+      setPhotoDialog('import-or-new');
+    } else {
+      fileInputRef.current?.click();
+    }
+  }
+
+  async function handleFileChosen(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    if (!avatarUrl) {
+      // No global photo — ask if they want to apply everywhere
+      setPendingFile(file);
+      setPhotoDialog('apply-all');
+    } else {
+      // Chose a new Hungry-specific photo (said "no" to import)
+      setPhotoUploading(true);
+      await handleUpdateAvatar(file, 'hungry');
+      setPhotoUploading(false);
+      setPhotoDialog(null);
+    }
+  }
+
+  async function handleImportGlobal() {
+    // Use the AppWare global photo here — clear any Hungry-specific override
+    setPhotoUploading(true);
+    await clearHungryAvatar();
+    setPhotoUploading(false);
+    setPhotoDialog(null);
+  }
+
+  async function handleApplyAll() {
+    if (!pendingFile) return;
+    setPhotoUploading(true);
+    await handleUpdateAvatar(pendingFile, 'global'); // saves as global, hungry falls back to it
+    setPendingFile(null);
+    setPhotoUploading(false);
+    setPhotoDialog(null);
+  }
+
+  async function handleApplyHungryOnly() {
+    if (!pendingFile) return;
+    setPhotoUploading(true);
+    await handleUpdateAvatar(pendingFile, 'hungry');
+    setPendingFile(null);
+    setPhotoUploading(false);
+    setPhotoDialog(null);
+  }
 
   const [displayName, setDisplayName] = useState(profileName || '');
   const [dietary, setDietary] = useState(userSettings?.dietary_restrictions || []);
@@ -90,60 +141,57 @@ export default function SettingsPage({ onNavigateFriends }) {
         <h2 className="text-[14px] font-bold text-slate-400">Settings</h2>
       </div>
 
-      {/* Profile Photos */}
+      {/* Profile Photo */}
       <section className="bg-white/80 backdrop-blur-lg p-6 rounded-[2.5rem] border border-white/20 shadow-xl shadow-blue-900/5">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Profile Photos</label>
-        <div className="flex gap-4">
-          {/* Global AppWare avatar */}
-          <div className="flex flex-col items-center gap-2 flex-1">
-            <div className="relative">
-              {avatarUrl
-                ? <img src={avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-blue-100" />
-                : <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Camera size={20} className="text-slate-300" /></div>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Profile Photo</label>
+        <div className="flex items-center gap-5">
+          <div className="relative shrink-0">
+            {displayedAvatar
+              ? <img src={displayedAvatar} alt="" className="w-16 h-16 rounded-2xl object-cover border border-blue-100" />
+              : <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Camera size={20} className="text-slate-300" /></div>
+            }
+            <button
+              onClick={handleAvatarButtonClick}
+              disabled={photoUploading}
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#6BAEE0] flex items-center justify-center border border-white"
+            >
+              {photoUploading
+                ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                : <Camera size={10} className="text-white" />
               }
-              <button
-                onClick={() => globalAvatarRef.current?.click()}
-                disabled={avatarUploading.global}
-                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#6BAEE0] flex items-center justify-center border border-white"
-              >
-                {avatarUploading.global
-                  ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
-                  : <Camera size={10} className="text-white" />
-                }
-              </button>
-              <input ref={globalAvatarRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0], 'global'); e.target.value = ''; }} />
-            </div>
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">AppWare<br/>Global</span>
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChosen} />
           </div>
 
-          {/* Hungry-specific avatar */}
-          <div className="flex flex-col items-center gap-2 flex-1">
-            <div className="relative">
-              {(hungryAvatarUrl || avatarUrl)
-                ? <img src={hungryAvatarUrl || avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover border border-blue-100" />
-                : <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Camera size={20} className="text-slate-300" /></div>
-              }
-              <button
-                onClick={() => hungryAvatarRef.current?.click()}
-                disabled={avatarUploading.hungry}
-                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1F6FB8] flex items-center justify-center border border-white"
-              >
-                {avatarUploading.hungry
-                  ? <div className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
-                  : <Camera size={10} className="text-white" />
-                }
-              </button>
-              <input ref={hungryAvatarRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0], 'hungry'); e.target.value = ''; }} />
+          {/* Smart dialog panel */}
+          {photoDialog === 'import-or-new' && (
+            <div className="flex-1 bg-sky-50 border border-sky-200 rounded-2xl p-3 space-y-2">
+              <p className="text-[11px] font-bold text-slate-700">You already have an AppWare photo. Use it here?</p>
+              <div className="flex gap-2">
+                <button onClick={handleImportGlobal} className="flex-1 bg-[#6BAEE0] text-white text-[10px] font-black py-2 rounded-xl">Yes, Use It</button>
+                <button onClick={() => { setPhotoDialog(null); fileInputRef.current?.click(); }} className="flex-1 bg-white border border-blue-100 text-slate-500 text-[10px] font-black py-2 rounded-xl">Choose Different</button>
+              </div>
+              <button onClick={() => setPhotoDialog(null)} className="w-full text-[10px] text-slate-400 hover:text-slate-600">Cancel</button>
             </div>
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">Hungry<br/>Photo</span>
-          </div>
+          )}
 
-          <div className="flex-1 flex items-center">
-            <p className="text-[10px] text-slate-400 leading-relaxed">
-              <span className="font-black text-slate-600">AppWare Global</span> syncs across all apps.<br/>
-              <span className="font-black text-slate-600">Hungry Photo</span> overrides it just here.
+          {photoDialog === 'apply-all' && (
+            <div className="flex-1 bg-sky-50 border border-sky-200 rounded-2xl p-3 space-y-2">
+              <p className="text-[11px] font-bold text-slate-700">Apply this photo to all your AppWare apps?</p>
+              <div className="flex gap-2">
+                <button onClick={handleApplyAll} className="flex-1 bg-[#6BAEE0] text-white text-[10px] font-black py-2 rounded-xl">Yes, All Apps</button>
+                <button onClick={handleApplyHungryOnly} className="flex-1 bg-white border border-blue-100 text-slate-500 text-[10px] font-black py-2 rounded-xl">Just Hungry</button>
+              </div>
+              <button onClick={() => { setPhotoDialog(null); setPendingFile(null); }} className="w-full text-[10px] text-slate-400 hover:text-slate-600">Cancel</button>
+            </div>
+          )}
+
+          {!photoDialog && (
+            <p className="text-[10px] text-slate-400 leading-relaxed flex-1">
+              Tap your photo to update it.<br/>
+              {avatarUrl ? <span className="text-slate-500">Your AppWare photo is already active here.</span> : <span>You can apply it to all your AppWare apps at once.</span>}
             </p>
-          </div>
+          )}
         </div>
       </section>
 

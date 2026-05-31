@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 const SCREENS = [
@@ -133,11 +133,92 @@ export default function Onboarding({ user, onComplete }) {
   const [goal, setGoal] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Photo onboarding state
+  const [existingGlobalUrl, setExistingGlobalUrl] = useState(null);
+  const [localPhotoUrl, setLocalPhotoUrl] = useState(null); // preview URL
+  const [photoDialog, setPhotoDialog] = useState(null); // 'import-or-new' | 'apply-all'
+  const [pendingFile, setPendingFile] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef(null);
+
+  // Load existing global photo once the prefs screen is reached
+  const loadExistingPhoto = async () => {
+    if (!user?.id || existingGlobalUrl !== null) return;
+    const { data } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single();
+    setExistingGlobalUrl(data?.avatar_url ?? '');
+    if (data?.avatar_url) setLocalPhotoUrl(data.avatar_url);
+  };
+
+  async function uploadOnboardingPhoto(file, type) {
+    if (!user?.id || !file) return null;
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = type === 'global' ? `avatar.${ext}` : `hungry.${ext}`;
+    const path = `${user.id}/${filename}`;
+    const { error } = await supabase.storage.from('user-avatars').upload(path, file, { upsert: true });
+    if (error) return null;
+    const { data: { publicUrl } } = supabase.storage.from('user-avatars').getPublicUrl(path);
+    const col = type === 'global' ? 'avatar_url' : 'hungry_avatar_url';
+    await supabase.from('profiles').update({ [col]: publicUrl }).eq('id', user.id);
+    return publicUrl;
+  }
+
+  function handlePhotoButton() {
+    if (existingGlobalUrl) {
+      setPhotoDialog('import-or-new');
+    } else {
+      photoInputRef.current?.click();
+    }
+  }
+
+  async function handleFileChosen(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setLocalPhotoUrl(URL.createObjectURL(file));
+    if (!existingGlobalUrl) {
+      setPendingFile(file);
+      setPhotoDialog('apply-all');
+    } else {
+      // Chose a new Hungry-specific photo (declined import)
+      setPhotoUploading(true);
+      await uploadOnboardingPhoto(file, 'hungry');
+      setPhotoUploading(false);
+      setPhotoDialog(null);
+    }
+  }
+
+  async function handleImportGlobal() {
+    // Use global AppWare photo — nothing to upload; just show it
+    setLocalPhotoUrl(existingGlobalUrl);
+    setPhotoDialog(null);
+  }
+
+  async function handleApplyAll() {
+    if (!pendingFile) return;
+    setPhotoUploading(true);
+    await uploadOnboardingPhoto(pendingFile, 'global');
+    setPendingFile(null);
+    setPhotoUploading(false);
+    setPhotoDialog(null);
+  }
+
+  async function handleApplyHungryOnly() {
+    if (!pendingFile) return;
+    setPhotoUploading(true);
+    await uploadOnboardingPhoto(pendingFile, 'hungry');
+    setPendingFile(null);
+    setPhotoUploading(false);
+    setPhotoDialog(null);
+  }
+
   const toggleRestriction = (r) =>
     setRestrictions(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
 
   const total = SCREENS.length;
   const isPrefs = screen === total - 1;
+
+  // Load existing photo when reaching the prefs screen
+  if (isPrefs && existingGlobalUrl === null) loadExistingPhoto();
 
   const handleNext = async () => {
     if (isPrefs) {
@@ -187,6 +268,44 @@ export default function Onboarding({ user, onComplete }) {
           <div className="flex flex-col flex-1 px-6 py-8">
             <h2 className="text-2xl font-black text-slate-800 mb-1">Almost There!</h2>
             <p className="text-xs text-slate-400 mb-6">Tell us a bit about yourself so we can personalise your experience.</p>
+
+            {/* Profile Photo */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative shrink-0">
+                {localPhotoUrl
+                  ? <img src={localPhotoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover border border-blue-100" />
+                  : <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-slate-300 text-xl">📷</div>
+                }
+                <button
+                  type="button"
+                  onClick={handlePhotoButton}
+                  disabled={photoUploading}
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#6BAEE0] text-white flex items-center justify-center border border-white text-[10px]"
+                >
+                  {photoUploading ? '…' : '+'}
+                </button>
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChosen} />
+              </div>
+              {photoDialog === 'import-or-new' ? (
+                <div className="flex-1 bg-sky-50 border border-sky-200 rounded-2xl p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-slate-700">Use your AppWare profile photo here?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleImportGlobal} className="flex-1 bg-[#6BAEE0] text-white text-[10px] font-black py-1.5 rounded-xl">Yes, Use It</button>
+                    <button type="button" onClick={() => { setPhotoDialog(null); photoInputRef.current?.click(); }} className="flex-1 bg-white border border-blue-100 text-slate-500 text-[10px] font-black py-1.5 rounded-xl">Choose Different</button>
+                  </div>
+                </div>
+              ) : photoDialog === 'apply-all' ? (
+                <div className="flex-1 bg-sky-50 border border-sky-200 rounded-2xl p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-slate-700">Apply this photo to all AppWare apps?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleApplyAll} className="flex-1 bg-[#6BAEE0] text-white text-[10px] font-black py-1.5 rounded-xl">Yes, All Apps</button>
+                    <button type="button" onClick={handleApplyHungryOnly} className="flex-1 bg-white border border-blue-100 text-slate-500 text-[10px] font-black py-1.5 rounded-xl">Just Hungry</button>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-400">Add a profile photo<br/><span className="font-bold text-slate-500">(optional)</span></span>
+              )}
+            </div>
 
             <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">What should we call you, Chef?</label>
             <input

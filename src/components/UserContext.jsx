@@ -226,6 +226,13 @@ export const UserProvider = ({ children }) => {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
+  // Clear the Hungry-specific photo so the global AppWare photo shows instead
+  const clearHungryAvatar = async () => {
+    if (!user) return;
+    await supabase.from('profiles').update({ hungry_avatar_url: null }).eq('id', user.id);
+    setHungryAvatarUrl(null);
+  };
+
   // type: 'global' | 'hungry'
   const handleUpdateAvatar = async (file, type = 'global') => {
     if (!file || !user) return;
@@ -258,6 +265,7 @@ export const UserProvider = ({ children }) => {
       avatarUrl,
       hungryAvatarUrl,
       handleUpdateAvatar,
+      clearHungryAvatar,
       handleUpdateProfileName,
       handleUpdateSettings,
       handleJoinHousehold,
