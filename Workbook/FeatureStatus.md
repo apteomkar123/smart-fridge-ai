@@ -171,6 +171,11 @@ A living document tracking what's shipped, what works, and what's blocked until 
 - Ingredient panel toggle (tap list icon or say "Ingredients") shows full ingredient list during cooking
 - Mic pulses red when active; screen stay-awake via Wake Lock API
 
+### Profile Photos
+- **AppWare Global Photo** — Upload in Settings → Profile Photos → "AppWare Global" tile; syncs to all apps via `profiles.avatar_url`
+- **Hungry-specific Photo** — Upload in Settings → Profile Photos → "Hungry Photo" tile; shows only in Hungry; falls back to global photo if not set
+- **Avatar in Header** — Header shows the Hungry photo (or global fallback) as a 36px rounded avatar next to the greeting
+
 ### AppWare Ecosystem Features
 - **#1 Kitchen Concert** — when Cooking Mode opens, writes a `cooking_started` event to `cross_app_activity` with a genre seed mapped from recipe cuisine (Italian → classical, Indian → world-music, etc.) so Jukebox can queue a matching playlist
 - **#3 Smart Grocery Split** — when a priced pantry item is moved to a household, automatically creates a `Groceries` transaction in Roomies and splits it among household members
